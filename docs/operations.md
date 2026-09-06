@@ -31,8 +31,9 @@ missing.
 | `HOSTINGAFFE_TRUSTED_PROXY` | unset | an address, a CIDR network, or `all`; unset, every request looks as if it came from the proxy |
 | `HOSTINGAFFE_DELETION_GRACE_DAYS` | `7` | how long a deleted row can be restored before the purge may take it |
 
-A value that is not a positive number stops the start, where the message names
-the variable — rather than being rounded to something nobody asked for.
+A value the instance will not accept stops the start with one line naming the
+variable, rather than being rounded to something nobody asked for or leaving a
+stack trace in a container that restarts every few seconds.
 
 ### Transactional email
 
@@ -42,11 +43,16 @@ those refuse with `smtp-not-configured` and say so.
 
 | | |
 |---|---|
-| `HOSTINGAFFE_PUBLIC_URL` | the address the links in the mails have to lead to |
+| `HOSTINGAFFE_PUBLIC_URL` | the address the links in the mails have to lead to; **https outside Development** |
 | `HOSTINGAFFE_SMTP_HOST`, `_PORT` | the server |
-| `HOSTINGAFFE_SMTP_USERNAME`, `_PASSWORD` | credentials, where it wants them |
-| `HOSTINGAFFE_SMTP_SECURITY` | `none`, `starttls` or `tls` |
+| `HOSTINGAFFE_SMTP_USERNAME`, `_PASSWORD` | credentials, where it wants them; both or neither |
+| `HOSTINGAFFE_SMTP_SECURITY` | `starttls` (default) or `tls`; **`none` only in Development** |
 | `HOSTINGAFFE_SMTP_FROM_ADDRESS`, `_FROM_NAME` | the sender |
+
+An invitation link is a secret in an email, which is why the last two are
+rules and not suggestions: a plaintext hop or an `http` link would hand it to
+whoever is listening. Both stop the start rather than degrading quietly, and
+the line the instance writes names the variable.
 
 `GET /admin/smtp` says whether it is configured, and the administration screen
 sends a test mail to an address you name.

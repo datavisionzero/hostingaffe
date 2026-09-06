@@ -115,6 +115,17 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         var fields = await reader.History.OrderBy(h => h.Id).Select(h => h.Field).ToListAsync(Ct);
         Assert.Equal(["created", "title", "body", "body", "body", "title"], fields);
         Assert.All(await reader.History.Where(h => h.Field == "body").ToListAsync(Ct), entry => Assert.Null(entry.NewValue));
+
+        // The same history, as the API serves it: who, when, from what to what.
+        var served = await admin.GetFromJsonAsync<JsonElement>("/pages/architecture/history", Ct);
+        Assert.Equal(fields, served.EnumerateArray().Select(entry => entry.GetProperty("field").GetString()));
+        var titled = served.EnumerateArray().Last(entry => entry.GetProperty("field").GetString() == "title");
+        Assert.Equal("The four layers", titled.GetProperty("old_value").GetString());
+        Assert.Equal("Architecture", titled.GetProperty("new_value").GetString());
+        Assert.Equal("maintainer", titled.GetProperty("actor").GetProperty("name").GetString());
+        // A text records that it changed, not how.
+        var body = served.EnumerateArray().First(entry => entry.GetProperty("field").GetString() == "body");
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("new_value").ValueKind);
     }
 
     [Fact]

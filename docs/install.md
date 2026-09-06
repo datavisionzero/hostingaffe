@@ -45,6 +45,10 @@ and the message names it.
 
 ## Start it
 
+Before the first release there is no `:latest` to pull. Set
+`HOSTINGAFFE_IMAGE=ghcr.io/datavisionzero/hostingaffe:main` in `deploy/.env`
+until there is one.
+
 ```sh
 docker compose -f deploy/docker-compose.yml up -d
 ```
@@ -58,9 +62,10 @@ curl -s localhost:8080/version
 
 ## Sign in
 
-The web application is on the same port. Open `http://<host>:8080/`, and sign
-in with the administrator's name and the bootstrap token — the first sign-in
-sets a password.
+The web application is on the same port. Open `http://<host>:8080/`. The first
+sign-in is the one that uses the bootstrap token: it exchanges the token for a
+session and sets the administrator's password. Every sign-in after that is the
+**email address** and that password — the name is a handle, not a login.
 
 From the console instead:
 
@@ -96,6 +101,11 @@ password recovery and changing an address all refuse with
 `smtp-not-configured`. To turn it on, set the SMTP block in `deploy/.env` and
 `HOSTINGAFFE_PUBLIC_URL` to the address the links have to lead to, then restart
 and let the instance send itself a test mail from the administration screen.
+
+Two of those values are refused outside a development environment, because an
+invitation link is a secret in an email: `HOSTINGAFFE_PUBLIC_URL` has to be
+`https`, and `HOSTINGAFFE_SMTP_SECURITY` may not be `none`. A wrong one stops
+the start and the log says which.
 
 ## What to do next
 

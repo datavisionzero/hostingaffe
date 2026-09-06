@@ -45,7 +45,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/email-changes/confirm",
                 "/invitations/accept",
                 "/me", "/me/email", "/me/metadata", "/me/password",
-                "/pages", "/pages/{slug}", "/pages/{slug}/restore",
+                "/pages", "/pages/{slug}", "/pages/{slug}/history", "/pages/{slug}/restore",
                 "/password-recovery", "/password-recovery/complete",
                 "/session", "/session/bootstrap", "/sessions", "/sessions/{id}",
                 "/tokens", "/tokens/{id}", "/users", "/users/{id}", "/users/{id}/deactivate",
@@ -60,6 +60,7 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Me", schemas);
         Assert.Contains("Page", schemas);
         Assert.Contains("PageSummary", schemas);
+        Assert.Contains("HistoryEntry", schemas);
         Assert.Contains("SmtpStatus", schemas);
         Assert.Contains("VersionResponse", schemas);
         Assert.Contains("ProblemDetails", schemas);

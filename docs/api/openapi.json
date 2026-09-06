@@ -1481,6 +1481,60 @@
         }
       }
     },
+    "/pages/{slug}/history": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the page, oldest first: who, when, which field, from what to what. A text records that it changed, not how.",
+        "operationId": "ReadPageHistory",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/pages/{slug}/restore": {
       "post": {
         "tags": [
@@ -1973,6 +2027,52 @@
         "type": "object",
         "properties": {
           "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "HistoryEntry": {
+        "required": [
+          "id",
+          "actor",
+          "at",
+          "field",
+          "old_value",
+          "new_value",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "field": {
+            "type": "string"
+          },
+          "old_value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "new_value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
             "type": [
               "null",
               "string"

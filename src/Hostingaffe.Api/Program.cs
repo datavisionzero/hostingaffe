@@ -21,33 +21,47 @@ Serilog.Debugging.SelfLog.Enable(Console.Error);
 
 var builder = WebApplication.CreateBuilder(args);
 
-// The two sinks of ADR 0008, chosen once from three variables (docs/operations.md).
-// `writeToProviders` keeps the providers a host adds beside Serilog — a test
-// host listening for errors — in the loop.
-var logSettings = LogSettings.FromVariables(
-    builder.Configuration[LogSettings.EndpointVariable],
-    builder.Configuration[LogSettings.TokenVariable],
-    builder.Configuration[LogSettings.LevelVariable]);
-builder.Host.UseSerilog((_, configuration) => LogSinks.Configure(configuration, logSettings), writeToProviders: true);
+// Everything read from the environment is read here, in one block, so that a
+// value the instance will not accept stops the start with the one line that
+// names the variable. Without it the exception escapes unhandled, and what the
+// operator finds is a stack trace in a container restarting every few seconds.
+// There is no logger yet — this runs before the host is built, which is why the
+// message goes to stderr by hand.
+TrustedProxies trustedProxies;
+try
+{
+    // The two sinks of ADR 0008, chosen once from three variables
+    // (docs/operations.md). `writeToProviders` keeps the providers a host adds
+    // beside Serilog — a test host listening for errors — in the loop.
+    var logSettings = LogSettings.FromVariables(
+        builder.Configuration[LogSettings.EndpointVariable],
+        builder.Configuration[LogSettings.TokenVariable],
+        builder.Configuration[LogSettings.LevelVariable]);
+    builder.Host.UseSerilog((_, configuration) => LogSinks.Configure(configuration, logSettings), writeToProviders: true);
 
-builder.Services.AddHostingaffeInfrastructure(builder.Configuration);
+    builder.Services.AddHostingaffeInfrastructure(builder.Configuration);
 
-var smtpSettings = SmtpSettings.FromVariables(
-    builder.Configuration[SmtpSettings.HostVariable],
-    builder.Configuration[SmtpSettings.PortVariable],
-    builder.Configuration[SmtpSettings.UsernameVariable],
-    builder.Configuration[SmtpSettings.PasswordVariable],
-    builder.Configuration[SmtpSettings.SecurityVariable],
-    builder.Configuration[SmtpSettings.FromAddressVariable],
-    builder.Configuration[SmtpSettings.FromNameVariable],
-    builder.Configuration[SmtpSettings.PublicUrlVariable],
-    builder.Environment.IsDevelopment());
-builder.Services.AddSingleton(smtpSettings);
+    builder.Services.AddSingleton(SmtpSettings.FromVariables(
+        builder.Configuration[SmtpSettings.HostVariable],
+        builder.Configuration[SmtpSettings.PortVariable],
+        builder.Configuration[SmtpSettings.UsernameVariable],
+        builder.Configuration[SmtpSettings.PasswordVariable],
+        builder.Configuration[SmtpSettings.SecurityVariable],
+        builder.Configuration[SmtpSettings.FromAddressVariable],
+        builder.Configuration[SmtpSettings.FromNameVariable],
+        builder.Configuration[SmtpSettings.PublicUrlVariable],
+        builder.Environment.IsDevelopment()));
 
-// Who may speak for the caller (docs/operations.md). Unset, nothing may, and
-// the instance reads the socket.
-var trustedProxies = TrustedProxies.FromVariable(builder.Configuration[TrustedProxies.Variable]);
-builder.Services.AddSingleton(trustedProxies);
+    // Who may speak for the caller (docs/operations.md). Unset, nothing may, and
+    // the instance reads the socket.
+    trustedProxies = TrustedProxies.FromVariable(builder.Configuration[TrustedProxies.Variable]);
+    builder.Services.AddSingleton(trustedProxies);
+}
+catch (ArgumentException refusal)
+{
+    Console.Error.WriteLine($"{refusal.Message} The instance will not start.");
+    return 1;
+}
 
 // The acts are registered here; the layers below know nothing about the
 // container they are resolved from. The clock is the base class library's.
@@ -94,6 +108,7 @@ builder.Services.AddSingleton(InstanceSettings.FromVariables(
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
 builder.Services.AddScoped<ReadPage>();
+builder.Services.AddScoped<ReadPageHistory>();
 builder.Services.AddScoped<CreatePage>();
 builder.Services.AddScoped<ChangePage>();
 builder.Services.AddScoped<MovePage>();
@@ -172,6 +187,8 @@ app.UseStaticFiles();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+return 0;
 
 /// <summary>
 /// Named so that a test can start this instance in its own process. Top level

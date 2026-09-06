@@ -82,6 +82,21 @@ public sealed class PageAssembler(IIdentities identities)
     }
 }
 
+/// <summary>
+/// One entry of the history: who, when, which field, from what to what
+/// (<c>CONTEXT.md</c>, History). The values are the ones the instance wrote —
+/// a title as it read, a slug as it read, and nothing at all where the field
+/// records that a text changed rather than how.
+/// </summary>
+public sealed record HistoryEntryShape(
+    long Id,
+    IdentityRef Actor,
+    DateTimeOffset At,
+    string Field,
+    string? OldValue,
+    string? NewValue,
+    string? Note);
+
 /// <summary>The lookup every page act starts with: the slug.</summary>
 public static class PageLookup
 {
@@ -125,6 +140,36 @@ public sealed class ReadPage(IPages pages, PageAssembler assembler, InstanceSett
 {
     public async Task<PageShape> ExecuteAsync(string slug, CancellationToken cancellationToken) =>
         await assembler.CompleteAsync(await pages.LiveAsync(slug, settings, cancellationToken), cancellationToken);
+}
+
+/// <summary>
+/// The history of a page: who, when, which field, from what to what, oldest
+/// first. Not paginated — a page's history is as long as its edits, and a wiki
+/// page is edited by hand.
+/// </summary>
+public sealed class ReadPageHistory(
+    IPages pages, IIdentities identities, IHistory history, InstanceSettings settings)
+{
+    public async Task<IReadOnlyList<HistoryEntryShape>> ExecuteAsync(string slug, CancellationToken cancellationToken)
+    {
+        var page = await pages.LiveAsync(slug, settings, cancellationToken);
+        var entries = await history.ListAsync(page.Id, cancellationToken);
+
+        var people = await identities.FindManyAsync(
+            entries.Select(entry => entry.ActorId).Distinct(), cancellationToken);
+
+        return
+        [
+            .. entries.Select(entry => new HistoryEntryShape(
+                entry.Id,
+                IdentityRef.Of(people[entry.ActorId]),
+                entry.At,
+                entry.Field,
+                entry.OldValue,
+                entry.NewValue,
+                entry.Note)),
+        ];
+    }
 }
 
 /// <summary>A page of the wiki, in one transaction.</summary>

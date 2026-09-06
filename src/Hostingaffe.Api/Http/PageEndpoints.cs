@@ -92,6 +92,11 @@ public static class PageEndpoints
             .WithName("ReadPage")
             .WithSummary("The complete page: the Markdown, the author and who touched it last.");
 
+        door.MapGet("/{slug}/history", (string slug, ReadPageHistory read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(slug, cancellationToken))
+            .WithName("ReadPageHistory")
+            .WithSummary("Every change to the page, oldest first: who, when, which field, from what to what. A text records that it changed, not how.");
+
         door.MapPatch("/{slug}", (string slug, ChangePageRequest? request, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
                     slug,
