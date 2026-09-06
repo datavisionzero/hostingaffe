@@ -35,8 +35,14 @@ browser session, one-time secret), `Machines`, `Pages`, `History`, and at the
 root what belongs to more than one of them — `Key`, the handle an operator
 chooses; `Status`, the lifecycle a machine and an installation share;
 `Spelling`, which turns a closed set's value into the word the contract, the
-column and the history all use; and `Refusal` with `RefusalCode`, the one list
-of every way the product says no, which the CLI derives its exit code from.
+column and the history all use; `Fields`, the shapes every editable field
+shares; and `Refusal` with `RefusalCode`, the one list of every way the product
+says no, which the CLI derives its exit code from.
+
+`Software` is at the root too, and for a different reason: the word is
+uncountable, so there is no plural to name a folder with, and a namespace
+`Software` beside a type `Software` is an ambiguity every reference then has to
+spell around.
 
 **Application** is the use cases. `Acts/` holds one class per act, named for
 what it does — `CreatePage`, `CreateUser`, `AuthenticateToken` — plus the

@@ -112,6 +112,14 @@ builder.Services.AddScoped<ReadMachineHistory>();
 builder.Services.AddScoped<CreateMachine>();
 builder.Services.AddScoped<ChangeMachine>();
 
+// What an installation is an installation of (VISION 7).
+builder.Services.AddScoped<SoftwareAssembler>();
+builder.Services.AddScoped<ListSoftware>();
+builder.Services.AddScoped<ReadSoftware>();
+builder.Services.AddScoped<ReadSoftwareHistory>();
+builder.Services.AddScoped<CreateSoftware>();
+builder.Services.AddScoped<ChangeSoftware>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -191,6 +199,7 @@ api.MapInstance();
 api.MapIdentities();
 api.MapBrowserIdentity();
 api.MapMachines();
+api.MapSoftware();
 api.MapPages();
 api.MapSmtp();
 

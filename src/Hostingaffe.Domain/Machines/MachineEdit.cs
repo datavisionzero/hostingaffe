@@ -1,8 +1,5 @@
 namespace Hostingaffe.Domain.Machines;
 
-/// <summary>One field that changed, as the history records it: what, from what, to what.</summary>
-public sealed record FieldChange(string Field, string? OldValue, string? NewValue);
-
 /// <summary>
 /// What a caller wants a machine to say. Every field is optional; <c>null</c>
 /// leaves the field alone, and the empty string clears a text field

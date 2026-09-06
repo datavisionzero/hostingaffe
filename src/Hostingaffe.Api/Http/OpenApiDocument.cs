@@ -64,7 +64,9 @@ public static class OpenApiDocument
                 // generated client will happily send it.
                 if (type == typeof(AgentMetadataRequest)
                     || type == typeof(CreateMachineRequest)
-                    || type == typeof(ChangeMachineRequest))
+                    || type == typeof(ChangeMachineRequest)
+                    || type == typeof(CreateSoftwareRequest)
+                    || type == typeof(ChangeSoftwareRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;
                 }

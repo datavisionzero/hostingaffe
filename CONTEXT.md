@@ -68,6 +68,15 @@ exists once per instance, so that "where is this running, and in which
 versions?" has a screen. It carries no version — versions belong to
 deployments.
 
+`homepage` and `repository` are URLs. `image` is the name of a container image
+**without a tag** — `caddy`, `ghcr.io/datavisionzero/logaffe` — and a `:tag` in
+it is refused, because the tag belongs to the deployment.
+
+**The word is uncountable.** The collection is `/api/software`, never
+`/api/softwares`; the type is `Software`; and the plural is circumscribed
+wherever it is needed — "the software rows", "every software". A `Softwares`
+anywhere is a naming error.
+
 ## Installation
 
 One software installed once on one machine. Two logaffe installations on one

@@ -49,6 +49,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/pages", "/api/pages/{slug}", "/api/pages/{slug}/history", "/api/pages/{slug}/restore",
                 "/api/password-recovery", "/api/password-recovery/complete",
                 "/api/session", "/api/session/bootstrap", "/api/sessions", "/api/sessions/{id}",
+                "/api/software", "/api/software/{key}", "/api/software/{key}/history",
                 "/api/tokens", "/api/tokens/{id}", "/api/users", "/api/users/{id}", "/api/users/{id}/deactivate",
                 "/api/users/{id}/invitation", "/api/users/{id}/reactivate", "/api/version",
             ],
@@ -61,6 +62,8 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Me", schemas);
         Assert.Contains("Machine", schemas);
         Assert.Contains("MachineSummary", schemas);
+        Assert.Contains("Software", schemas);
+        Assert.Contains("SoftwareSummary", schemas);
         Assert.Contains("Page", schemas);
         Assert.Contains("PageSummary", schemas);
         Assert.Contains("HistoryEntry", schemas);

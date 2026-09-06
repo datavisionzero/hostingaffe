@@ -10,4 +10,5 @@ public enum HistorySubject
 {
     Page,
     Machine,
+    Software,
 }

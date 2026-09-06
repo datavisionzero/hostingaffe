@@ -219,6 +219,48 @@ nobody has looked at for a year says so itself.
 `ipv4`, `ipv6` and `private_ip` are stored as the text of a parsed address, so
 that what comes back out is what an address parser accepted going in.
 
+## Software
+
+What an installation is an installation of (`CONTEXT.md`, Software). The word is
+uncountable, so the table is `software` and the adapter over it is
+`SoftwareRows` — there is no plural to name either of them with.
+
+```sql
+create table software (
+    id          uuid          not null primary key,
+    key         varchar(64)   not null,
+    name        varchar(200)  not null,
+    homepage    varchar(500),
+    repository  varchar(500),
+    image       varchar(500),
+    description text          not null default '',
+    created_by  uuid          not null references identity (id),
+    created_at  timestamptz   not null,
+    updated_by  uuid          not null references identity (id),
+    updated_at  timestamptz   not null,
+    deleted_at  timestamptz,
+    deleted_by  uuid          references identity (id)
+);
+
+create unique index software_key on software (key);
+```
+
+**There is no version column, and there will not be one.** A software carries no
+version — versions belong to deployments (VISION 7) — and a column repeating one
+would be the second truth nobody keeps. `version` in a request body is
+`unknown-field`, and the message says why.
+
+**`image` is a container image name without a tag.** `caddy`,
+`ghcr.io/datavisionzero/logaffe`. A `:tag` is refused rather than dropped,
+because a caller who wrote one meant it, and what it meant belongs to a
+deployment. A digest is refused for the same reason. `homepage` and `repository`
+are absolute `http` or `https` addresses, checked where they are typed rather
+than found broken by whoever clicks them.
+
+`software_key` holds the key unique across the instance and is the order the
+list is read in, and it covers deleted rows, so a key stays spent for the grace
+period.
+
 ## Pages
 
 The instance's flat wiki, addressed by a slug rather than a key
@@ -259,7 +301,7 @@ to what (`CONTEXT.md`, History).
 ```sql
 create table history (
     id         bigint      not null primary key generated always as identity,
-    subject    text        not null check (subject in ('page', 'machine')),
+    subject    text        not null check (subject in ('page', 'machine', 'software')),
     subject_id uuid        not null,
     actor_id   uuid        not null references identity (id),
     at         timestamptz not null,
@@ -285,10 +327,10 @@ points at an id nothing answers to.
 order of the ids is the order the rows were written and nothing else. That is
 what makes `order by id` the history's order.
 
-**A text records that it changed, not how.** A page's body and a machine's
-description write a row with both values empty; the text itself is one read
-away, and a history that carried every draft would be a second copy of the
-wiki. Files are the exception the model makes, and they do not exist yet.
+**A text records that it changed, not how.** A page's body and a machine's or a
+software's description write a row with both values empty; the text itself is
+one read away, and a history that carried every draft would be a second copy of
+the wiki. Files are the exception the model makes, and they do not exist yet.
 
 **The field names are the API's.** `status`, `measured_at`, `private_ip` — a
 history row can be read beside the object without a translation table. `created`

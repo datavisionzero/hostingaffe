@@ -20,7 +20,7 @@ public sealed class HistoryEntryConfiguration : IEntityTypeConfiguration<History
     public void Configure(EntityTypeBuilder<HistoryEntry> builder)
     {
         builder.ToTable("history", table =>
-            table.HasCheckConstraint("ck_history_subject", "subject in ('page', 'machine')"));
+            table.HasCheckConstraint("ck_history_subject", "subject in ('page', 'machine', 'software')"));
 
         // Always generated, so that the order of the ids is the order the rows
         // were written and nothing can insert one out of sequence.

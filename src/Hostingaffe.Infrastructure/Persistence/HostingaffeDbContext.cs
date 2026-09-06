@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Machines;
@@ -38,6 +39,13 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
 
     /// <summary>The computers the instance is a record of (VISION 7).</summary>
     public DbSet<Machine> Machines => Set<Machine>();
+
+    /// <summary>
+    /// What an installation is an installation of (VISION 7). Singular, because
+    /// the word is: <c>CONTEXT.md</c> circumscribes the plural rather than
+    /// inventing one.
+    /// </summary>
+    public DbSet<Software> Software => Set<Software>();
 
     /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();

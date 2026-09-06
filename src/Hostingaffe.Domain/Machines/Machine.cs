@@ -1,6 +1,6 @@
-using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using Hostingaffe.Domain.History;
 
 namespace Hostingaffe.Domain.Machines;
 
@@ -128,7 +128,7 @@ public sealed class Machine
             Guid.CreateVersion7(),
             handle,
             string.IsNullOrWhiteSpace(name) ? handle : NormalizeName(name),
-            Named(kind),
+            Enum.IsDefined(kind) ? kind : throw new ArgumentException("Not a kind.", nameof(kind)),
             createdBy,
             createdAt);
     }
@@ -146,42 +146,28 @@ public sealed class Machine
 
         var changes = new List<FieldChange>();
 
-        Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
-        Text("hostname", edit.Hostname, Hostname, value => Hostname = value, Fact, changes);
-        Text("provider", edit.Provider, Provider, value => Provider = value, Fact, changes);
-        Text("plan", edit.Plan, Plan, value => Plan = value, Fact, changes);
-        Text("location", edit.Location, Location, value => Location = value, Fact, changes);
-        Text("os", edit.Os, Os, value => Os = value, Fact, changes);
-        Text("cpu", edit.Cpu, Cpu, value => Cpu = value, Fact, changes);
-        Text("memory", edit.Memory, Memory, value => Memory = value, Fact, changes);
-        Text("disk", edit.Disk, Disk, value => Disk = value, Fact, changes);
-        Text("ssh", edit.Ssh, Ssh, value => Ssh = value, Fact, changes);
+        Fields.Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
+        Fields.Text("hostname", edit.Hostname, Hostname, value => Hostname = value, Fact, changes);
+        Fields.Text("provider", edit.Provider, Provider, value => Provider = value, Fact, changes);
+        Fields.Text("plan", edit.Plan, Plan, value => Plan = value, Fact, changes);
+        Fields.Text("location", edit.Location, Location, value => Location = value, Fact, changes);
+        Fields.Text("os", edit.Os, Os, value => Os = value, Fact, changes);
+        Fields.Text("cpu", edit.Cpu, Cpu, value => Cpu = value, Fact, changes);
+        Fields.Text("memory", edit.Memory, Memory, value => Memory = value, Fact, changes);
+        Fields.Text("disk", edit.Disk, Disk, value => Disk = value, Fact, changes);
+        Fields.Text("ssh", edit.Ssh, Ssh, value => Ssh = value, Fact, changes);
 
-        Text("ipv4", edit.Ipv4, Ipv4, value => Ipv4 = value, value => Address(value, AddressFamily.InterNetwork, "ipv4"), changes);
-        Text("ipv6", edit.Ipv6, Ipv6, value => Ipv6 = value, value => Address(value, AddressFamily.InterNetworkV6, "ipv6"), changes);
-        Text("private_ip", edit.PrivateIp, PrivateIp, value => PrivateIp = value, value => Address(value, null, "private_ip"), changes);
+        Fields.Text("ipv4", edit.Ipv4, Ipv4, value => Ipv4 = value, value => Address(value, AddressFamily.InterNetwork, "ipv4"), changes);
+        Fields.Text("ipv6", edit.Ipv6, Ipv6, value => Ipv6 = value, value => Address(value, AddressFamily.InterNetworkV6, "ipv6"), changes);
+        Fields.Text("private_ip", edit.PrivateIp, PrivateIp, value => PrivateIp = value, value => Address(value, null, "private_ip"), changes);
 
-        if (edit.Kind is { } kind && kind != Kind)
-        {
-            changes.Add(new FieldChange("kind", Spelling.Of(Kind), Spelling.Of(kind)));
-            Kind = Named(kind);
-        }
-
-        if (edit.Arch is { } arch && arch != Arch)
-        {
-            changes.Add(new FieldChange("arch", Arch is null ? null : Spelling.Of(Arch.Value), Spelling.Of(arch)));
-            Arch = arch;
-        }
-
-        if (edit.Status is { } status && status != Status)
-        {
-            changes.Add(new FieldChange("status", Spelling.Of(Status), Spelling.Of(status)));
-            Status = status;
-        }
+        Fields.Closed("kind", edit.Kind, Kind, value => Kind = value, changes);
+        Fields.Closed("arch", edit.Arch, Arch, value => Arch = value, changes);
+        Fields.Closed("status", edit.Status, Status, value => Status = value, changes);
 
         if (edit.MeasuredAt is { } measured && measured != MeasuredAt)
         {
-            changes.Add(new FieldChange("measured_at", Stamp(MeasuredAt), Stamp(measured)));
+            changes.Add(new FieldChange("measured_at", Fields.Stamp(MeasuredAt), Fields.Stamp(measured)));
             MeasuredAt = measured;
         }
 
@@ -246,24 +232,15 @@ public sealed class Machine
             throw new ArgumentException("A machine has a name.", nameof(name));
         }
 
-        return trimmed.Length > NameMaxLength || trimmed.Contains('\n')
-            ? throw new ArgumentException(
-                $"A machine name is one line of at most {NameMaxLength} characters.", nameof(name))
-            : trimmed;
+        return Fields.Line(trimmed, NameMaxLength, "A machine name");
     }
-
-    private static MachineKind Named(MachineKind kind) =>
-        Enum.IsDefined(kind) ? kind : throw new ArgumentException("Not a machine kind.", nameof(kind));
 
     /// <summary>
     /// One free-text fact: a line, trimmed, at most <see cref="FactMaxLength"/>.
     /// Hardware is described here rather than measured, so the cap is what keeps
     /// a paragraph out, not what keeps a number in.
     /// </summary>
-    private static string Fact(string value) =>
-        value.Length > FactMaxLength || value.Contains('\n')
-            ? throw new ArgumentException($"A machine fact is one line of at most {FactMaxLength} characters.")
-            : value;
+    private static string Fact(string value) => Fields.Line(value, FactMaxLength, "A machine fact");
 
     private static string Address(string value, AddressFamily? family, string field) =>
         IPAddress.TryParse(value, out var parsed) && (family is null || parsed.AddressFamily == family)
@@ -275,46 +252,4 @@ public sealed class Machine
                     AddressFamily.InterNetworkV6 => "An ipv6 is an IPv6 address.",
                     _ => $"A {field} is an IP address.",
                 });
-
-    private static string? Stamp(DateTimeOffset? at) =>
-        at?.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
-
-    /// <summary>
-    /// The one shape every text field shares: absent leaves it, the empty
-    /// string clears it, anything else is normalized and set
-    /// (<c>docs/api.md</c>, Machines).
-    /// </summary>
-    private static void Text(
-        string field,
-        string? given,
-        string? current,
-        Action<string?> set,
-        Func<string, string> normalize,
-        List<FieldChange> changes)
-    {
-        if (given is null)
-        {
-            return;
-        }
-
-        var trimmed = given.Trim();
-        string? value;
-
-        try
-        {
-            value = trimmed.Length == 0 ? null : normalize(trimmed);
-        }
-        catch (ArgumentException refusal)
-        {
-            throw new ArgumentException(refusal.Message, field);
-        }
-
-        if (value == current)
-        {
-            return;
-        }
-
-        set(value);
-        changes.Add(new FieldChange(field, current, value));
-    }
 }

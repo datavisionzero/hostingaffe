@@ -7,8 +7,7 @@ captured from a running instance and checked in, and both clients are generated
 from it (planaffe ADRs 0005, 0011).
 
 The endpoint tables below cover what the foundation serves. The objects of
-the product — machine, software, installation, deployment, file — arrive with
-their own sections.
+the product — installation, deployment, file — arrive with their own sections.
 
 ## Where it is
 
@@ -183,6 +182,32 @@ machine leaves and what a deleted one takes with it arrives with deleting.
 
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
+
+### Software
+
+| | |
+|---|---|
+| `GET /api/software` | every software as a slim `SoftwareSummary`, by key |
+| `POST /api/software` | only `key` is required; everything else may arrive later |
+| `GET /api/software/{key}` | the complete software |
+| `PATCH /api/software/{key}` | any field but the key; `If-Match` guards it |
+| `GET /api/software/{key}/history` | who changed what, oldest first |
+
+**The collection is `/api/software`.** The word is uncountable, and there is no
+`/api/softwares` (`CONTEXT.md`, Software).
+
+The key is the address and is **immutable**, and both request objects are closed,
+exactly as for a machine. `version` is a field neither of them has, and the
+refusal says why: a software carries no version, because versions belong to
+deployments.
+
+`image` is a container image name **without a tag** — `caddy`,
+`ghcr.io/datavisionzero/logaffe`. A `:tag` is `validation`, and so is a digest:
+what was deployed belongs to a deployment. `homepage` and `repository` are
+absolute `http` or `https` addresses.
+
+Deleting is not here yet: a software with installations is not deleted at all,
+and that refusal needs the installation.
 
 ### Pages
 

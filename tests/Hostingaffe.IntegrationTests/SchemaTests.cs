@@ -90,7 +90,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
             [
                 "__EFMigrationsHistory",
                 "browser_session", "history", "idempotency", "identity", "identity_metadata",
-                "machine", "one_time_secret", "page", "token",
+                "machine", "one_time_secret", "page", "software", "token",
             ],
             tables);
     }
@@ -119,7 +119,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "one_live_secret_per_purpose", "one_time_secret_hash", "page_search", "page_slug",
                 "pk_browser_session", "pk_history", "pk_idempotency",
                 "pk_identity", "pk_identity_metadata", "pk_machine", "pk_one_time_secret", "pk_page",
-                "pk_token", "token_agent", "token_secret_hash",
+                "pk_software", "pk_token", "software_key", "token_agent", "token_secret_hash",
             ],
             indexes);
 
