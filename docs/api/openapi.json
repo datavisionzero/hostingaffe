@@ -1187,6 +1187,309 @@
         }
       }
     },
+    "/api/machines": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter; not paginated.",
+        "operationId": "ListMachines",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MachineSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Create a machine: the key and the kind are required, everything else may arrive later. `host` is a vm's only.",
+        "operationId": "CreateMachine",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMachineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Machine"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The complete machine: every field, the host it runs on, and who touched it last.",
+        "operationId": "ReadMachine",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Machine"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write.",
+        "operationId": "ChangeMachine",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeMachineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Machine"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/history": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the machine, oldest first: who, when, which field, from what to what. The description records that it changed, not how.",
+        "operationId": "ReadMachineHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pages": {
       "get": {
         "tags": [
@@ -1829,6 +2132,17 @@
           }
         }
       },
+      "Arch": {
+        "enum": [
+          "amd64",
+          "arm64",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
+      },
       "BootstrapExchangeRequest": {
         "required": [
           "token",
@@ -1895,6 +2209,160 @@
           }
         }
       },
+      "ChangeMachineRequest": {
+        "required": [
+          "name",
+          "hostname",
+          "kind",
+          "host",
+          "provider",
+          "plan",
+          "location",
+          "os",
+          "arch",
+          "cpu",
+          "memory",
+          "disk",
+          "ipv4",
+          "ipv6",
+          "private_ip",
+          "ssh",
+          "status",
+          "measured_at",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MachineKind"
+              }
+            ]
+          },
+          "host": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Arch"
+              }
+            ]
+          },
+          "cpu": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "memory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv6": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "private_ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ssh": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Status"
+              }
+            ]
+          },
+          "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "ChangePageRequest": {},
       "ChangePasswordRequest": {
         "required": [
@@ -1930,6 +2398,167 @@
             ]
           }
         }
+      },
+      "CreateMachineRequest": {
+        "required": [
+          "key",
+          "name",
+          "hostname",
+          "kind",
+          "host",
+          "provider",
+          "plan",
+          "location",
+          "os",
+          "arch",
+          "cpu",
+          "memory",
+          "disk",
+          "ipv4",
+          "ipv6",
+          "private_ip",
+          "ssh",
+          "status",
+          "measured_at",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MachineKind"
+              }
+            ]
+          },
+          "host": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Arch"
+              }
+            ]
+          },
+          "cpu": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "memory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv6": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "private_ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ssh": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Status"
+              }
+            ]
+          },
+          "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "CreatePageRequest": {
         "required": [
@@ -2127,6 +2756,231 @@
             "type": "string"
           },
           "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Machine": {
+        "required": [
+          "key",
+          "name",
+          "hostname",
+          "kind",
+          "host",
+          "provider",
+          "plan",
+          "location",
+          "os",
+          "arch",
+          "cpu",
+          "memory",
+          "disk",
+          "ipv4",
+          "ipv6",
+          "private_ip",
+          "ssh",
+          "status",
+          "measured_at",
+          "description",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MachineKind"
+          },
+          "host": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Arch"
+              }
+            ]
+          },
+          "cpu": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "memory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv6": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "private_ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ssh": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MachineKind": {
+        "enum": [
+          "vps",
+          "dedicated",
+          "vm",
+          "local"
+        ],
+        "type": "string"
+      },
+      "MachineSummary": {
+        "required": [
+          "key",
+          "name",
+          "kind",
+          "status",
+          "provider",
+          "location",
+          "arch",
+          "measured_at",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MachineKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Arch"
+              }
+            ]
+          },
+          "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
             "type": "string",
             "format": "date-time"
           }
@@ -2457,6 +3311,14 @@
             ]
           }
         }
+      },
+      "Status": {
+        "enum": [
+          "planned",
+          "active",
+          "retired"
+        ],
+        "type": "string"
       },
       "TokenRef": {
         "required": [

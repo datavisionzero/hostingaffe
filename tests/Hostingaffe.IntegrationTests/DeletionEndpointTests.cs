@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Hostingaffe.Domain.History;
 using Hostingaffe.Infrastructure.Persistence;
 
 namespace Hostingaffe.IntegrationTests;
@@ -69,7 +70,7 @@ public sealed class DeletionEndpointTests(PostgresFixture postgres)
             await context.SaveChangesAsync(Ct);
         }
 
-        // Any write pays for the purge: `old` goes with its history, `recent` stays.
+        // Any write pays for the purge: `old` goes, `recent` stays.
         await Page(admin, "a-write", "A write");
 
         await using (var context = Migrated.ContextFor(instance.ConnectionString))
@@ -78,10 +79,15 @@ public sealed class DeletionEndpointTests(PostgresFixture postgres)
                 ["a-write", "recent"],
                 await context.Pages.Select(p => p.Slug).OrderBy(s => s).ToListAsync(Ct));
             Assert.Equal(0, await context.Idempotency.CountAsync(Ct));
-            // The history died with its subject: one page id in it per surviving page, no orphans.
-            Assert.Equal(
-                await context.Pages.CountAsync(Ct),
-                await context.History.Select(h => h.PageId).Distinct().CountAsync(Ct));
+
+            // The history outlived its subject (VISION 7): the purged page is
+            // gone and its rows still say that it existed and when it went.
+            var subjects = await context.History
+                .Where(h => h.Subject == HistorySubject.Page)
+                .Select(h => h.SubjectId)
+                .Distinct()
+                .CountAsync(Ct);
+            Assert.Equal(await context.Pages.CountAsync(Ct) + 1, subjects);
         }
 
         // The slug is free again.

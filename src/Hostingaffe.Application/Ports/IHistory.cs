@@ -7,6 +7,7 @@ public interface IHistory
 {
     void Add(HistoryEntry entry);
 
-    /// <summary>Every entry of a page, oldest first. Not paginated.</summary>
-    Task<IReadOnlyList<HistoryEntry>> ListAsync(Guid pageId, CancellationToken cancellationToken);
+    /// <summary>Every entry about one subject, oldest first. Not paginated.</summary>
+    Task<IReadOnlyList<HistoryEntry>> ListAsync(
+        HistorySubject subject, Guid subjectId, CancellationToken cancellationToken);
 }

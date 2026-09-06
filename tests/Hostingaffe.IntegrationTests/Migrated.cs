@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
 using Hostingaffe.Infrastructure.Persistence;
 
@@ -25,6 +26,8 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
 
     public Page Page { get; private set; } = null!;
 
+    public Machine Machine { get; private set; } = null!;
+
     public static async Task<Migrated> EmptyAsync(PostgresFixture postgres)
     {
         var migrated = new Migrated(await postgres.CreateDatabaseAsync());
@@ -40,8 +43,9 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
         migrated.User = User.Create("maintainer", administrator: true, Now);
         migrated.Agent = Agent.Create("quiet-otter-42", migrated.User.Id, Now);
         migrated.Page = Page.Create("welcome", "Welcome", "The seeded page.", migrated.User.Id, Now);
+        migrated.Machine = Machine.Create("ex44", null, MachineKind.Dedicated, migrated.User.Id, Now);
 
-        context.AddRange(migrated.User, migrated.Agent, migrated.Page);
+        context.AddRange(migrated.User, migrated.Agent, migrated.Page, migrated.Machine);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         context.ChangeTracker.Clear();
 

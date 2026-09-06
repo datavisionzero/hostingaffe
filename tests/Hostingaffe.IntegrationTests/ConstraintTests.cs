@@ -134,12 +134,55 @@ public sealed class ConstraintTests(PostgresFixture postgres)
         // order of the ids is the order the rows were written and nothing else.
         var refusal = await Assert.ThrowsAsync<PostgresException>(() =>
             db.Context.Database.ExecuteSqlRawAsync(
-                "insert into history (id, page_id, actor_id, at, field) values (7, {0}, {1}, now(), 'created')",
+                "insert into history (id, subject, subject_id, actor_id, at, field) values (7, 'page', {0}, {1}, now(), 'created')",
                 [db.Page.Id, db.User.Id],
                 TestContext.Current.CancellationToken));
 
         // SQLSTATE 428C9, `generated_always`, which Npgsql has no constant for.
         Assert.Equal("428C9", refusal.SqlState);
+    }
+
+    // -- machine ---------------------------------------------------------------
+
+    [Theory]
+    [InlineData("ck_machine_kind", "kind = 'toaster'")]
+    [InlineData("ck_machine_arch", "arch = 'sparc'")]
+    [InlineData("ck_machine_status", "status = 'broken'")]
+    public async Task A_closed_set_is_closed_in_the_column_too(string constraint, string assignment)
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await Refused(constraint, db.Context, $"update machine set {assignment} where id = {{0}}", db.Machine.Id);
+    }
+
+    [Fact]
+    public async Task Only_a_vm_names_a_host()
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        // The seeded machine is dedicated, so a host on it is a state the model
+        // does not have — and the column says so, not only the write path.
+        await Refused("ck_machine_host", db.Context,
+            "update machine set host_id = {0} where id = {0}", db.Machine.Id);
+    }
+
+    [Fact]
+    public async Task No_machine_runs_on_itself()
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await Refused("ck_machine_not_its_own_host", db.Context,
+            "update machine set kind = 'vm', host_id = {0} where id = {0}", db.Machine.Id);
+    }
+
+    [Fact]
+    public async Task A_history_row_names_a_subject_the_code_knows()
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await Refused("ck_history_subject", db.Context,
+            "insert into history (subject, subject_id, actor_id, at, field) values ('installation', {0}, {1}, now(), 'created')",
+            db.Machine.Id, db.User.Id);
     }
 
     private static async Task Refused(

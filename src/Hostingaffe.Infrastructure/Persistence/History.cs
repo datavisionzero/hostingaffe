@@ -9,6 +9,10 @@ public sealed class History(HostingaffeDbContext context) : IHistory
 {
     public void Add(HistoryEntry entry) => context.History.Add(entry);
 
-    public async Task<IReadOnlyList<HistoryEntry>> ListAsync(Guid pageId, CancellationToken cancellationToken) =>
-        await context.History.Where(h => h.PageId == pageId).OrderBy(h => h.Id).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<HistoryEntry>> ListAsync(
+        HistorySubject subject, Guid subjectId, CancellationToken cancellationToken) =>
+        await context.History
+            .Where(h => h.Subject == subject && h.SubjectId == subjectId)
+            .OrderBy(h => h.Id)
+            .ToListAsync(cancellationToken);
 }

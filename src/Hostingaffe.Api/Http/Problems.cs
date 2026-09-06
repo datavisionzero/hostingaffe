@@ -130,6 +130,23 @@ public static class Problems
         Document(refusal.Code, refusal.Detail, instance, refusal.Extensions);
 
     /// <summary>
+    /// A body or a parameter the framework could not read at all — a closed set
+    /// given a word outside it, a number where a string was sent, malformed
+    /// JSON. It is the caller's mistake and answers as <c>validation</c>, named
+    /// after the field where the reader gave up.
+    /// </summary>
+    private static Refusal Unreadable(BadHttpRequestException exception)
+    {
+        var path = (exception.InnerException as JsonException)?.Path;
+
+        return path is null or "$"
+            ? Refusal.Validation("body", "The request body is not the JSON object this endpoint takes.")
+            : Refusal.Validation(
+                path.Split('.', '[')[^1].TrimEnd(']'),
+                "The value is not of the type this field takes; a closed set takes one of its words.");
+    }
+
+    /// <summary>
     /// What turns a <see cref="Refusal"/> thrown by an act into its document,
     /// and anything else into <c>internal</c> with nothing else in it.
     /// </summary>
@@ -141,6 +158,7 @@ public static class Problems
             var document = exception switch
             {
                 Refusal refusal => Document(refusal, context.Request.Path),
+                BadHttpRequestException bad => Document(Unreadable(bad), context.Request.Path),
                 _ => Document(RefusalCode.Internal, detail: null, context.Request.Path),
             };
 

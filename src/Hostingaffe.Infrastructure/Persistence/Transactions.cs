@@ -14,11 +14,11 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <strong>The purge is opportunistic.</strong> Before the commit, up to twenty
-/// deleted pages whose grace period has passed are removed — the cascade taking
-/// their history with them — plus up to twenty idempotency rows older than a
-/// day. The batch is small so that no request pays for a backlog, and the floor
-/// is a floor: an instance nobody writes to keeps its deleted rows longer. No
-/// scheduler; the write that would have paid for one does the work instead.
+/// deleted pages whose grace period has passed are removed, plus up to twenty
+/// idempotency rows older than a day. The batch is small so that no request pays
+/// for a backlog, and the floor is a floor: an instance nobody writes to keeps
+/// its deleted rows longer. No scheduler; the write that would have paid for one
+/// does the work instead.
 /// </para>
 /// </remarks>
 public sealed class Transactions(HostingaffeDbContext context, InstanceSettings settings) : ITransactions
@@ -48,7 +48,9 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
 
     private async Task PurgeAsync(CancellationToken cancellationToken)
     {
-        // A page holds nothing else up: its slug comes free with the row.
+        // A page holds nothing else up: its slug comes free with the row. Its
+        // history stays where it is — VISION 7 wants the history of a thing
+        // that is gone to still say that it existed and when it went.
         await context.Database.ExecuteSqlRawAsync(
             """
             delete from page where id in (

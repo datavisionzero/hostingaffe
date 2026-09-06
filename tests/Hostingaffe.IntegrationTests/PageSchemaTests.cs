@@ -102,8 +102,11 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         var remaining = await reader.Pages.SingleAsync(p => p.Slug == "architecture", TestContext.Current.CancellationToken);
         Assert.Equal("Architecture again", remaining.Title);
 
-        // The history went with the row: it dies with its subject (ADR 0013).
-        Assert.Empty(await reader.History.ToListAsync(TestContext.Current.CancellationToken));
+        // The history outlived the row it described (VISION 7): the purged page
+        // is gone, and its history still says that it existed.
+        var entry = Assert.Single(await reader.History.ToListAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(Domain.History.HistorySubject.Page, entry.Subject);
+        Assert.NotEqual(remaining.Id, entry.SubjectId);
     }
 
     private static bool Unique(DbUpdateException exception) =>

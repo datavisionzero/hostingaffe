@@ -11,9 +11,8 @@ Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
 conventions, [`CONTEXT.md`](CONTEXT.md), [`docs/codebase.md`](docs/codebase.md),
 [`docs/cli.md`](docs/cli.md), [`docs/install.md`](docs/install.md),
 [`docs/operations.md`](docs/operations.md), [`docs/api.md`](docs/api.md),
-[`docs/adr/`](docs/adr/) and [`deploy/`](deploy/) exist; `docs/storage.md` is
-still to be written. Until it exists, this file says what stands in for it.
-Add the link here when you create one.
+[`docs/storage.md`](docs/storage.md), [`docs/adr/`](docs/adr/) and
+[`deploy/`](deploy/) all exist. A new one is linked here when it is created.
 
 ## Language
 

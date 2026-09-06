@@ -150,6 +150,40 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
 | `PATCH /api/agents/{id}`, `DELETE /api/agents/{id}` | rename, and revoke the token |
 | `GET /api/tokens`, `POST /api/tokens`, `DELETE /api/tokens/{id}` | your own user tokens |
 
+### Machines
+
+| | |
+|---|---|
+| `GET /api/machines` | every machine as a slim `MachineSummary`, by key; `status` and `kind` filter |
+| `POST /api/machines` | `key` and `kind` are required, everything else may arrive later |
+| `GET /api/machines/{key}` | the complete machine |
+| `PATCH /api/machines/{key}` | any field but the key; `If-Match` guards it |
+| `GET /api/machines/{key}/history` | who changed what, oldest first |
+
+The key is the address and is **immutable**: `key` in a change body is
+`unknown-field`, not a rename. Both request objects are closed — a field they
+do not define is refused rather than ignored.
+
+**A change says what changes.** A field left out of `PATCH` stays as it is, and
+**the empty string clears a text field**: `{"location": ""}` empties it,
+`{"location": "fsn1-dc14"}` sets it, and a body without `location` leaves it
+alone. `kind`, `arch`, `status` and `measured_at` are set, never cleared — a
+closed set has no empty value to send, and a measurement is corrected by
+measuring again.
+
+`host` is a `vm`'s only, and names the machine it runs on; on any other kind it
+is refused. A machine is not its own host, and a chain of hosts that would close
+on itself is refused. A machine that stops being a `vm` loses its host, and the
+history says so.
+
+`status` is `planned`, `active` or `retired` and defaults to `active`: a record
+is usually made for a machine that already exists, and `planned` is the case a
+caller states. Retiring is a value here and not yet a behaviour — what a retired
+machine leaves and what a deleted one takes with it arrives with deleting.
+
+Hardware facts are text, `arch` excepted, and each is one line of at most 200
+characters. What is longer than that is the `description`, or a page.
+
 ### Pages
 
 | | |

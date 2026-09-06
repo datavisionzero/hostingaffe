@@ -104,6 +104,14 @@ builder.Services.AddScoped<ChangePassword>();
 builder.Services.AddSingleton(InstanceSettings.FromVariables(
     builder.Configuration[InstanceSettings.DeletionGraceVariable]));
 
+// The record itself (VISION 7): the computers the instance knows about.
+builder.Services.AddScoped<MachineAssembler>();
+builder.Services.AddScoped<ListMachines>();
+builder.Services.AddScoped<ReadMachine>();
+builder.Services.AddScoped<ReadMachineHistory>();
+builder.Services.AddScoped<CreateMachine>();
+builder.Services.AddScoped<ChangeMachine>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -182,6 +190,7 @@ app.MapOpenApi($"{Routes.Api}/openapi/{{documentName}}.json");
 api.MapInstance();
 api.MapIdentities();
 api.MapBrowserIdentity();
+api.MapMachines();
 api.MapPages();
 api.MapSmtp();
 

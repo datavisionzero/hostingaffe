@@ -31,15 +31,18 @@ Api ──────► Application ──────► Domain
 ```
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
-browser session, one-time secret), `Pages`, `History`, and `Refusal` with
-`RefusalCode` — the one list of every way the product says no, which the CLI
-derives its exit code from.
+browser session, one-time secret), `Machines`, `Pages`, `History`, and at the
+root what belongs to more than one of them — `Key`, the handle an operator
+chooses; `Status`, the lifecycle a machine and an installation share;
+`Spelling`, which turns a closed set's value into the word the contract, the
+column and the history all use; and `Refusal` with `RefusalCode`, the one list
+of every way the product says no, which the CLI derives its exit code from.
 
 **Application** is the use cases. `Acts/` holds one class per act, named for
 what it does — `CreatePage`, `CreateUser`, `AuthenticateToken` — plus the
 shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
-`IPages`, `IIdentities`, `ITokens`, `IHistory`, `ITransactions`,
+`IMachines`, `IPages`, `IIdentities`, `ITokens`, `IHistory`, `ITransactions`,
 `IIdempotency`, `IEmailSender`, and the settings records read from the
 environment.
 
@@ -103,6 +106,14 @@ navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
 `/pages`, `/settings`, `/admin` — because the API is out of the way under
 `/api`; in development Vite forwards that one prefix to the API and serves
 everything else itself.
+
+## Storage
+
+[`storage.md`](storage.md) is every table, what each column is for, which rules
+the database holds and which the write path holds. EF Core declares them and
+owns the migrations that apply themselves on start; that document is what the
+declarations have to say, and a test compares its list of tables and indexes
+against a migrated database.
 
 ## The contract
 

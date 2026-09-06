@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Infrastructure.Persistence;
@@ -34,6 +35,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     public DbSet<Token> Tokens => Set<Token>();
     public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
     public DbSet<BrowserSession> BrowserSessions => Set<BrowserSession>();
+
+    /// <summary>The computers the instance is a record of (VISION 7).</summary>
+    public DbSet<Machine> Machines => Set<Machine>();
 
     /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();

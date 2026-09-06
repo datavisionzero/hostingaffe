@@ -2,32 +2,37 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
-using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// The history of everything that has one, in a table whose rows name their
-/// subject. A page's is the only kind there is yet, and a row dies with the
-/// page it belongs to (ADR 0013).
+/// subject (<c>docs/storage.md</c>, The history).
 /// </summary>
+/// <remarks>
+/// The subject is a pair — kind and row id — and carries no foreign key,
+/// because it points at more than one table. That is also what lets a row
+/// outlive what it describes, which is what VISION 7 asks of the history of a
+/// deleted machine.
+/// </remarks>
 public sealed class HistoryEntryConfiguration : IEntityTypeConfiguration<HistoryEntry>
 {
     public void Configure(EntityTypeBuilder<HistoryEntry> builder)
     {
-        builder.ToTable("history");
+        builder.ToTable("history", table =>
+            table.HasCheckConstraint("ck_history_subject", "subject in ('page', 'machine')"));
 
         // Always generated, so that the order of the ids is the order the rows
         // were written and nothing can insert one out of sequence.
         builder.HasKey(h => h.Id).HasName("pk_history");
         builder.Property(h => h.Id).HasColumnName("id").UseIdentityAlwaysColumn();
 
-        builder.Property(h => h.PageId).HasColumnName("page_id").IsRequired();
-        builder.HasOne<Page>()
-            .WithMany()
-            .HasForeignKey(h => h.PageId)
-            .HasConstraintName("fk_history_page")
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(h => h.Subject)
+            .HasColumnName("subject")
+            .HasConversion(new SnakeCaseEnumConverter<HistorySubject>())
+            .IsRequired();
+
+        builder.Property(h => h.SubjectId).HasColumnName("subject_id").IsRequired();
 
         builder.Property(h => h.ActorId).HasColumnName("actor_id").IsRequired();
         builder.HasOne<Identity>()
@@ -42,6 +47,8 @@ public sealed class HistoryEntryConfiguration : IEntityTypeConfiguration<History
         builder.Property(h => h.NewValue).HasColumnName("new_value");
         builder.Property(h => h.Note).HasColumnName("note");
 
-        builder.HasIndex(h => new { h.PageId, h.Id }).HasDatabaseName("history_page");
+        // The one way the history is read: everything about one subject, in the
+        // order it was written.
+        builder.HasIndex(h => new { h.Subject, h.SubjectId, h.Id }).HasDatabaseName("history_subject");
     }
 }

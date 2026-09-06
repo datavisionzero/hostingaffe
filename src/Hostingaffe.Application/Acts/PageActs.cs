@@ -153,7 +153,7 @@ public sealed class ReadPageHistory(
     public async Task<IReadOnlyList<HistoryEntryShape>> ExecuteAsync(string slug, CancellationToken cancellationToken)
     {
         var page = await pages.LiveAsync(slug, settings, cancellationToken);
-        var entries = await history.ListAsync(page.Id, cancellationToken);
+        var entries = await history.ListAsync(HistorySubject.Page, page.Id, cancellationToken);
 
         var people = await identities.FindManyAsync(
             entries.Select(entry => entry.ActorId).Distinct(), cancellationToken);

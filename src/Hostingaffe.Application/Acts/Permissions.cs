@@ -39,7 +39,23 @@ public static class Validated
         }
         catch (ArgumentException refusal)
         {
-            throw Refusal.Validation(field, refusal.Message);
+            throw Refusal.Validation(field, Said(refusal));
         }
+    }
+
+    /// <summary>
+    /// What the exception says, without the <c>(Parameter 'x')</c> the runtime
+    /// appends: the document already names the field, and saying it twice reads
+    /// like a stack trace. Public because an act that catches its own
+    /// <see cref="ArgumentException"/> owes the caller the same sentence.
+    /// </summary>
+    public static string Said(ArgumentException refusal)
+    {
+        ArgumentNullException.ThrowIfNull(refusal);
+
+        var message = refusal.Message;
+        var appended = message.IndexOf(" (Parameter '", StringComparison.Ordinal);
+
+        return appended < 0 ? message : message[..appended];
     }
 }

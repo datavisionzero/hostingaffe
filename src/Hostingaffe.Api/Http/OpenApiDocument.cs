@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Hostingaffe.Api.Hosting;
+using Hostingaffe.Application.Acts;
 using Hostingaffe.Domain.Identities;
 
 namespace Hostingaffe.Api.Http;
@@ -58,7 +59,12 @@ public static class OpenApiDocument
                     schema.Format = "date-time";
                 }
 
-                if (type == typeof(AgentMetadataRequest))
+                // The closed request objects of docs/api.md: what they do not
+                // define, they refuse, and the document has to say so or a
+                // generated client will happily send it.
+                if (type == typeof(AgentMetadataRequest)
+                    || type == typeof(CreateMachineRequest)
+                    || type == typeof(ChangeMachineRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;
                 }
