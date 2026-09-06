@@ -455,6 +455,8 @@ other product and not a word of this model.
 
 The instance's flat wiki, addressed by a slug rather than a key
 ([planaffe ADR 0021](https://github.com/datavisionzero/planaffe/blob/main/docs/adr/0021-a-pages-address-is-its-slug-not-a-key.md)).
+A slug is one segment and carries no slash
+([ADR 0003](adr/0003-a-pages-slug-is-one-segment-not-a-path.md)).
 
 ```sql
 create table page (

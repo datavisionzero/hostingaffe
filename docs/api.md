@@ -408,13 +408,16 @@ this model.
 | `GET /api/pages` | every page, by slug, without the bodies; `q`, `kind`, `machine`, `installation` filter |
 | `POST /api/pages` | the slug is given, never derived from the title (planaffe ADR 0021) |
 | `GET /api/pages/{slug}` | the complete page |
-| `PATCH /api/pages/{slug}` | title, body or slug; `If-Match` guards it |
+| `PATCH /api/pages/{slug}` | title, body, slug, `kind` or `attached_to`; `If-Match` guards it |
 | `DELETE /api/pages/{slug}`, `POST /api/pages/{slug}/restore` | soft, with the grace period |
 | `GET /api/pages/{slug}/history` | who changed what, oldest first |
 
 A page's slug is its address and may be renamed; nothing forwards afterwards,
-and the rename stands in the history. A deleted page keeps its slug until the
-purge, so a restore never lands on a name somebody else has taken.
+and the rename stands in the history. It is one segment and carries no slash
+([ADR 0003](adr/0003-a-pages-slug-is-one-segment-not-a-path.md)), so
+`/api/pages/{slug}/history` is never itself a page. A deleted page keeps its
+slug until the purge, so a restore never lands on a name somebody else has
+taken.
 
 **`kind` is `runbook`, `decision` or `note`**, and it says how the page is to be
 read and nothing more: no status, no supersedes, no template enforced beyond it.

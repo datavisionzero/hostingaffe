@@ -148,10 +148,12 @@ instance as a whole. Where everything goes that is longer than a description.
 | `kind` | `runbook` · `decision` · `note` |
 
 Pages are flat and addressed by their slug, which is their address and may be
-renamed; nothing forwards afterwards. `kind` says how a page is to be read and
-nothing more — a `decision` has no status, no supersedes and no enforced
-template. `attached_to` names a machine or an installation, or is empty for a
-page of the instance, and a page does not follow its anchor into deletion.
+renamed; nothing forwards afterwards. A slug is one segment and carries no
+slash ([ADR 0003](docs/adr/0003-a-pages-slug-is-one-segment-not-a-path.md)).
+`kind` says how a page is to be read and nothing more — a `decision` has no
+status, no supersedes and no enforced template. `attached_to` names a machine
+or an installation, or is empty for a page of the instance, and a page does not
+follow its anchor into deletion.
 
 ## History
 

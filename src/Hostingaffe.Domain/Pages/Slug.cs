@@ -17,6 +17,12 @@ namespace Hostingaffe.Domain.Pages;
 /// address is not, and deriving one behind the author's back is what ADR 0021
 /// refuses.
 /// </para>
+/// <para>
+/// One segment, never a path: a slash would make <c>/api/pages/{slug}</c> a
+/// catch-all, and a page slugged <c>caddy/history</c> indistinguishable from
+/// the history of the page <c>caddy</c>. What a page belongs to is said by its
+/// <c>attached_to</c>, not by a prefix in its address (ADR 0003).
+/// </para>
 /// </remarks>
 public static partial class Slug
 {

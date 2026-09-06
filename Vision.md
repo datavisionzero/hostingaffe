@@ -192,7 +192,8 @@ ha files sync logaffe-prod /srv/logaffe # on the machine: write the current file
 ha deploy logaffe-prod --version 1.4.0 --ref ghcr.io/datavisionzero/logaffe@sha256:… \
    --ticket LOG-42 --note-file -
 ha deploy list --inst logaffe-prod     # the history, newest first
-ha page put caddy/backup-restore --kind runbook --title "Backup and restore" --file -
+ha page put backup-restore --kind runbook --machine caddy \
+   --title "Backup and restore" --file -
 ha search "18502"                      # ports, addresses, names, Markdown, files — everything
 ha export --dir ./hosting-export       # the whole record as a Markdown tree, the files, plus JSON
 ```
@@ -511,15 +512,19 @@ management, the notes from an incident.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `slug` | handle | `caddy/backup-restore`, `decisions/tailscale-for-management` |
+| `slug` | handle | `backup-restore`, `tailscale-for-management` |
 | `title` | text | |
 | `kind` | `runbook` · `decision` · `note` | closed set |
 | `attached_to` | machine key, installation key, or nothing | |
 | `body` | Markdown | |
 
-Pages are flat, addressed by slug, and edited like planaffe's pages. A
-`decision` is a page whose kind says it should be read as one; there is no
-status, no supersedes, no template enforcement beyond the kind.
+Pages are flat, addressed by slug, and edited like planaffe's pages. Flat is
+meant literally: a slug is one segment and carries no slash, so
+`/api/pages/{slug}/history` can never be read as a page of its own
+([ADR 0003](docs/adr/0003-a-pages-slug-is-one-segment-not-a-path.md)). A page
+names what it belongs to in `attached_to`, not in its address. A `decision` is
+a page whose kind says it should be read as one; there is no status, no
+supersedes, no template enforcement beyond the kind.
 
 **Deliberately left out:** folders, page hierarchy, attachments, images.
 
