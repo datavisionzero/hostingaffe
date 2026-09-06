@@ -465,6 +465,50 @@ deployment is not necessarily who deployed. `ticket` is a planaffe key like
 `LOG-42` and stays a string: a reference to the other product, not a word of
 this model.
 
+### Importing
+
+| | |
+|---|---|
+| `POST /api/import` | a whole record from one document, in one transaction |
+
+Documenting a host is one act and not thirty calls. The body is the document
+`ha export` writes — machines with their installations, files and deployments,
+the software they are of, and pages — and everything in it is created in **one
+transaction**:
+
+```json
+{"software": [{"key": "caddy", "image": "caddy"}],
+ "machines": [{"key": "ex44", "kind": "dedicated",
+               "files": [{"path": "sites/app.caddy", "content": "…"}],
+               "installations": [{"key": "app-1", "software": "caddy",
+                                  "environment": "production", "role": "application",
+                                  "files": [{"path": "compose.yml", "content": "…"}],
+                                  "deployments": [{"version": "1.4.0", "at": "2026-09-05T12:00:00Z"}]}]}],
+ "pages": [{"slug": "backup-restore", "title": "Restoring a backup", "kind": "runbook"}]}
+```
+
+**All or nothing.** It is the ordinary acts run inside one transaction, so every
+rule they hold still holds — the keys, the closed sets, the refused paths, the
+history each of them writes — and an installation whose software neither exists
+nor arrives with it fails the whole thing, leaving nothing standing and no key
+spent.
+
+**What only the instance writes is read past.** The document is an export, so it
+carries `created_by`, `updated_by`, `created_at`, `updated_at`, the `history`, a
+file's `revision` and `owner`, a deployment's `number`, `previous`, `files` and
+`by`, and a page's `author`. Those are accepted by name and dropped; anything
+else is `unknown-field`, as everywhere. **The closed sets arrive as their
+words**, spelled as the contract spells them.
+
+**A file arrives at the content it is at**, as its first revision: what it said
+before is in the source's history, and a record that invented revisions it never
+had would be a worse copy than one that says where it began. **An installation's
+`version` is not read**, because the deployments are in the document and they
+are what a version is derived from. **A vm finds its host anywhere in the same
+document**: every machine is created first and the hosts are set afterwards.
+
+`note` goes into the history beside every change the import makes.
+
 ### Searching
 
 | | |

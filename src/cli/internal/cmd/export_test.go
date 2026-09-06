@@ -276,3 +276,54 @@ func read(t *testing.T, path string) string {
 	}
 	return string(content)
 }
+
+// `ha machine add --file` hands the document to the instance and prints what it
+// made. ha does not read it: the instance is the one place that knows what a
+// record may hold.
+func TestABulkAddHandsTheDocumentToTheInstance(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
+		return 200, `{"machines":1,"software":1,"installations":2,"deployments":2,"files":3,"pages":1}`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	document := `{"machines":[{"key":"ex44","kind":"dedicated"}]}`
+	path := filepath.Join(t.TempDir(), "batch.json")
+	if err := os.WriteFile(path, []byte(document), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, stderr := run(t, server, "machine", "add", "--file", path, "--note", "migrated")
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	last := f.requests[len(f.requests)-1]
+	if last.Method != http.MethodPost || last.URL.Path != "/api/import" {
+		t.Errorf("%s %s", last.Method, last.URL.Path)
+	}
+	if got := last.URL.Query().Get("note"); got != "migrated" {
+		t.Errorf("note = %q", got)
+	}
+	// Byte for byte: what the file says is what the instance is asked.
+	if f.bodies[len(f.bodies)-1] != document {
+		t.Errorf("body = %q", f.bodies[len(f.bodies)-1])
+	}
+	if !strings.Contains(out, "1 machines, 2 installations, 1 software, 2 deployments, 3 files, 1 pages.") {
+		t.Errorf("it says what was made: %q", out)
+	}
+}
+
+// A file says which machines it holds, so a key beside it says two things.
+func TestABulkAddTakesNoKey(t *testing.T) {
+	f := exported()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	if code, _, stderr := run(t, server, "machine", "add", "ex44", "--file", "-"); code != exit.Usage || stderr == "" {
+		t.Errorf("code %d, stderr %q", code, stderr)
+	}
+	if code, _, stderr := run(t, server, "machine", "add"); code != exit.Usage || stderr == "" {
+		t.Errorf("code %d, stderr %q", code, stderr)
+	}
+}

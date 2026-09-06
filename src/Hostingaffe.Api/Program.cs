@@ -111,6 +111,7 @@ builder.Services.AddScoped<ReadMachine>();
 builder.Services.AddScoped<ReadMachineHistory>();
 builder.Services.AddScoped<ReadMachineContext>();
 builder.Services.AddScoped<Search>();
+builder.Services.AddScoped<ImportRecord>();
 builder.Services.AddScoped<CreateMachine>();
 builder.Services.AddScoped<ChangeMachine>();
 
@@ -247,6 +248,7 @@ api.MapFiles();
 api.MapDeployments();
 api.MapPages();
 api.MapSearch();
+api.MapImport();
 api.MapSmtp();
 
 // The web application: built by its own toolchain into wwwroot at image build

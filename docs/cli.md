@@ -108,6 +108,14 @@ keep the glossary's words and the short forms are only short forms, and
 `--inst` is `--installation` wherever that flag appears. There is no
 `ha softwares`: the word is uncountable (`CONTEXT.md`, Software).
 
+**`ha machine add --file FILE`** is the bulk write: a whole host — its software,
+its installations, their files and their first deployments — in one transaction,
+because documenting a host is one act and not thirty commands. The file is the
+JSON `ha export` writes, so export and import go in a circle, and `-` reads it
+from stdin. All or nothing: a refusal anywhere leaves nothing standing. `ha`
+does not read the document; it hands it to the instance, which is the one place
+that knows what a record may hold.
+
 **`add` and `set` take the same flags**, so that what a record can be created
 with is what it can be corrected with. A flag left off leaves the field alone;
 **a flag given empty clears a text field** — `--location ""` empties it. `set`

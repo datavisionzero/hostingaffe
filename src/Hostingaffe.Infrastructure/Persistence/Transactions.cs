@@ -41,6 +41,19 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
 
     public async Task<T> RunAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(work);
+
+        // An act inside an act joins the transaction it is already in rather
+        // than opening a second one: the bulk write is one act made of the
+        // ordinary ones, and "all or nothing" is what makes it one. The
+        // outermost call commits, purges, and rolls the lot back — an inner
+        // one that cleared the change tracker would throw away what the outer
+        // is still holding.
+        if (context.Database.CurrentTransaction is not null)
+        {
+            return await work();
+        }
+
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
         {

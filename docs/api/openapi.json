@@ -348,6 +348,76 @@
         }
       }
     },
+    "/api/import": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Create a whole record from one document — machines with their installations, files and deployments, the software they are of, and pages — in one transaction. All or nothing: a refusal anywhere leaves nothing standing. The document is what `ha export` writes, so what only the instance writes (`created_by`, `updated_at`, the history, a file's `revision`, a deployment's `number`) is read past by name and anything else is `unknown-field`. A file arrives at the content it is at, as its first revision. `note` goes into the history beside every change it makes (ADR 0004).",
+        "operationId": "Import",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Imported"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users": {
       "post": {
         "tags": [
@@ -6175,6 +6245,555 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "ImportDeployment": {
+        "required": [
+          "version",
+          "ref",
+          "at",
+          "ticket",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ImportFile": {
+        "required": [
+          "path",
+          "content",
+          "executable"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executable": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "ImportInstallation": {
+        "required": [
+          "key",
+          "name",
+          "machine",
+          "software",
+          "environment",
+          "role",
+          "status",
+          "urls",
+          "ports",
+          "path",
+          "secrets",
+          "backup",
+          "monitoring",
+          "logging",
+          "description",
+          "deployments",
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "machine": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "software": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "environment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "urls": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "monitoring": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logging": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deployments": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportDeployment"
+            }
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportFile"
+            }
+          }
+        }
+      },
+      "ImportMachine": {
+        "required": [
+          "key",
+          "name",
+          "hostname",
+          "kind",
+          "host",
+          "provider",
+          "plan",
+          "location",
+          "os",
+          "arch",
+          "cpu",
+          "memory",
+          "disk",
+          "ipv4",
+          "ipv6",
+          "private_ip",
+          "ssh",
+          "status",
+          "measured_at",
+          "description",
+          "installations",
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "host": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cpu": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "memory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv6": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "private_ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ssh": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "installations": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportInstallation"
+            }
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportFile"
+            }
+          }
+        }
+      },
+      "ImportPage": {
+        "required": [
+          "slug",
+          "title",
+          "body",
+          "kind",
+          "attached_to"
+        ],
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attached_to": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
+            ]
+          }
+        }
+      },
+      "ImportRequest": {
+        "required": [
+          "machines",
+          "software",
+          "pages"
+        ],
+        "type": "object",
+        "properties": {
+          "machines": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportMachine"
+            }
+          },
+          "software": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportSoftware"
+            }
+          },
+          "pages": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportPage"
+            }
+          }
+        }
+      },
+      "ImportSoftware": {
+        "required": [
+          "key",
+          "name",
+          "homepage",
+          "repository",
+          "image",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "homepage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "repository": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "Imported": {
+        "required": [
+          "machines",
+          "software",
+          "installations",
+          "deployments",
+          "files",
+          "pages"
+        ],
+        "type": "object",
+        "properties": {
+          "machines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "software": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "installations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deployments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "files": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

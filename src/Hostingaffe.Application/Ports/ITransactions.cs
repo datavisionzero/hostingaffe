@@ -7,5 +7,10 @@ namespace Hostingaffe.Application.Ports;
 /// </summary>
 public interface ITransactions
 {
+    /// <summary>
+    /// Runs <paramref name="work"/> in one transaction. An act inside an act
+    /// joins the one it is already in: the bulk write is one act made of the
+    /// ordinary ones, and the outermost call is what commits or rolls back.
+    /// </summary>
     Task<T> RunAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken);
 }

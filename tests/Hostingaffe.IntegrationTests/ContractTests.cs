@@ -43,6 +43,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/admin/smtp", "/api/admin/smtp/test",
                 "/api/agents", "/api/agents/{id}",
                 "/api/email-changes/confirm",
+                "/api/import",
                 "/api/installations", "/api/installations/{key}",
                 "/api/installations/{key}/deployments", "/api/installations/{key}/deployments/{number}",
                 "/api/installations/{key}/deployments/{number}/history",

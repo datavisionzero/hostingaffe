@@ -184,10 +184,24 @@ func (m *machineFields) body(cmd *cobra.Command) (*fields, error) {
 
 func newMachineAdd(g *globals) *cobra.Command {
 	var write machineFields
-	var note string
+	var note, file string
 	cmd := &cobra.Command{
-		Use: "add KEY --kind KIND", Short: "Record a machine. The key is the address you give it, and it is immutable.", Args: cobra.ExactArgs(1),
+		Use:   "add KEY --kind KIND | --file FILE",
+		Short: "Record a machine, or a whole host from a file: machine, software, installations, files and first deployments in one transaction.",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if file != "" {
+				if len(args) > 0 {
+					return &config.UsageError{
+						Message: "a file says which machines it holds; --file takes no key.",
+					}
+				}
+				return importRecord(g, cmd, file, note)
+			}
+			if len(args) == 0 {
+				return &config.UsageError{Message: "a machine has a key: `ha machine add KEY --kind KIND`, or --file for a whole host."}
+			}
+
 			body, err := write.body(cmd)
 			if err != nil {
 				return err
@@ -211,6 +225,8 @@ func newMachineAdd(g *globals) *cobra.Command {
 		},
 	}
 	write.flags(cmd)
+	cmd.Flags().StringVar(&file, "file", "",
+		"a whole host from a file, in the shape `ha export` writes, or `-` for stdin")
 	noteFlag(cmd, &note)
 	return cmd
 }
