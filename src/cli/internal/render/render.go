@@ -25,17 +25,31 @@ func JSON(w io.Writer, v any) error {
 // piped straight back into `--body-file -`.
 func Page(w io.Writer, p api.Page) {
 	fmt.Fprintf(w, "%s  %s\n", p.Slug, p.Title)
+	fmt.Fprintf(w, "kind: %s  hangs on: %s\n", p.Kind, Anchor(p.AttachedTo))
 	fmt.Fprintf(w, "updated: %s by %s  author: %s\n", p.UpdatedAt.Format(time.RFC3339), p.UpdatedBy.Name, p.Author.Name)
 	if p.Body != "" {
 		fmt.Fprintf(w, "\n%s\n", p.Body)
 	}
 }
 
-// PageSummaries prints the flat wiki: the address, when it last moved, the title.
+// PageSummaries prints the flat wiki: the address, its kind, what it hangs on,
+// when it last moved, the title.
 func PageSummaries(w io.Writer, items []api.PageSummary) {
 	for _, p := range items {
-		fmt.Fprintf(w, "%-24s %-10s %s\n", p.Slug, p.UpdatedAt.Format("2006-01-02"), p.Title)
+		fmt.Fprintf(w, "%-24s %-9s %-26s %-10s %s\n",
+			p.Slug, p.Kind, Anchor(p.AttachedTo), p.UpdatedAt.Format("2006-01-02"), p.Title)
 	}
+}
+
+// Anchor names what a record hangs on as the kind and the key together, because
+// the machine `caddy` and the software `caddy` are different things and a key
+// alone would not say which. Nothing to hang on prints as a dash: a page of the
+// instance as a whole is not a page with a field missing.
+func Anchor(a *api.Anchor) string {
+	if a == nil {
+		return "-"
+	}
+	return string(a.Kind) + " " + a.Key
 }
 
 // Me prints the caller as GET /me answers.

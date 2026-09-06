@@ -31,15 +31,23 @@ func printPage(g *globals, cmd *cobra.Command, page api.Page) error {
 }
 
 func newPageList(g *globals) *cobra.Command {
-	var query string
+	var query, kind, machine, installation string
 	cmd := &cobra.Command{
 		Use: "list", Short: "Every page, by slug, without the bodies.", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if machine != "" && installation != "" {
+				return &config.UsageError{Message: "a page hangs on one thing: --machine or --installation, not both."}
+			}
 			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			resp, err := c.ListPagesWithResponse(cmd.Context(), &api.ListPagesParams{Q: optional(query)})
+			resp, err := c.ListPagesWithResponse(cmd.Context(), &api.ListPagesParams{
+				Q:            optional(query),
+				Kind:         optional(kind),
+				Machine:      optional(machine),
+				Installation: optional(installation),
+			})
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -54,6 +62,9 @@ func newPageList(g *globals) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&query, "query", "q", "", "full text in the title and the body")
+	cmd.Flags().StringVar(&kind, "kind", "", "only pages of this kind: runbook, decision or note")
+	cmd.Flags().StringVar(&machine, "machine", "", "only pages hanging on this machine, by `key`")
+	cmd.Flags().StringVar(&installation, "installation", "", "only pages hanging on this installation, by `key`")
 	return cmd
 }
 
@@ -80,22 +91,30 @@ func newPageView(g *globals) *cobra.Command {
 }
 
 func newPageCreate(g *globals) *cobra.Command {
-	var title, bodyFile string
+	var title, bodyFile, kind, machine, installation string
 	cmd := &cobra.Command{
 		Use: "create SLUG --title TITLE", Short: "Create a page; the slug is the address you give it, never derived from the title.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, c, err := g.load()
+			if title == "" {
+				return &config.UsageError{Message: "a page has a title: --title."}
+			}
+			anchor, err := anchorOf(machine, installation)
 			if err != nil {
 				return err
 			}
-			if title == "" {
-				return &config.UsageError{Message: "a page has a title: --title."}
+			_, c, err := g.load()
+			if err != nil {
+				return err
 			}
 			body, err := readText(cmd.InOrStdin(), bodyFile)
 			if err != nil {
 				return err
 			}
-			request := api.CreatePageRequest{Slug: &args[0], Title: &title, Body: body}
+			request := api.CreatePageRequest{Slug: &args[0], Title: &title, Body: body, AttachedTo: anchor}
+			if kind != "" {
+				of := api.PageKind(kind)
+				request.Kind = &of
+			}
 			resp, err := c.CreatePageWithResponse(cmd.Context(), request)
 			if err != nil {
 				return client.Transport(err)
@@ -108,14 +127,42 @@ func newPageCreate(g *globals) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "the one line that says what the page is")
 	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
+	cmd.Flags().StringVar(&kind, "kind", "", "how the page is to be read: runbook, decision or note (default note)")
+	cmd.Flags().StringVar(&machine, "machine", "", "hang the page on this machine, by `key`")
+	cmd.Flags().StringVar(&installation, "installation", "", "hang the page on this installation, by `key`")
 	return cmd
 }
 
+// anchorOf turns the two flags into the one anchor the contract carries. It is
+// a usage error rather than a refusal from the instance, because `attached_to`
+// holds one anchor and there is no request that says two: the mistake is in the
+// arguments and never reaches the wire.
+func anchorOf(machine, installation string) (*api.Anchor, error) {
+	switch {
+	case machine != "" && installation != "":
+		return nil, &config.UsageError{Message: "a page hangs on one thing: --machine or --installation, not both."}
+	case machine != "":
+		return &api.Anchor{Kind: api.AnchorKindMachine, Key: machine}, nil
+	case installation != "":
+		return &api.Anchor{Kind: api.AnchorKindInstallation, Key: installation}, nil
+	default:
+		return nil, nil
+	}
+}
+
 func newPageEdit(g *globals) *cobra.Command {
-	var title, bodyFile, ifMatch string
+	var title, bodyFile, ifMatch, kind, machine, installation string
+	var detach bool
 	cmd := &cobra.Command{
-		Use: "edit SLUG", Short: "Change the title or the Markdown; --if-match guards the document.", Args: cobra.ExactArgs(1),
+		Use: "edit SLUG", Short: "Change the title, the Markdown, the kind or what the page hangs on; --if-match guards the document.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			anchor, err := anchorOf(machine, installation)
+			if err != nil {
+				return err
+			}
+			if detach && anchor != nil {
+				return &config.UsageError{Message: "--detach gives the page to the instance; it does not go with --machine or --installation."}
+			}
 			changes := map[string]any{}
 			if title != "" {
 				changes["title"] = title
@@ -127,14 +174,30 @@ func newPageEdit(g *globals) *cobra.Command {
 			if body != nil {
 				changes["body"] = *body
 			}
+			if kind != "" {
+				changes["kind"] = kind
+			}
+			// Leaving the flags off lets the page hang where it hangs; only
+			// --detach says out loud that it should hang on nothing, and that
+			// is the null the contract wants.
+			switch {
+			case detach:
+				changes["attached_to"] = nil
+			case anchor != nil:
+				changes["attached_to"] = anchor
+			}
 			if len(changes) == 0 {
-				return &config.UsageError{Message: "nothing to change: --title or --body-file. The slug is `ha page rename`."}
+				return &config.UsageError{Message: "nothing to change: --title, --body-file, --kind, --machine, --installation or --detach. The slug is `ha page rename`."}
 			}
 			return changePage(g, cmd, args[0], changes, ifMatch)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "the new title")
 	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
+	cmd.Flags().StringVar(&kind, "kind", "", "how the page is to be read: runbook, decision or note")
+	cmd.Flags().StringVar(&machine, "machine", "", "hang the page on this machine, by `key`")
+	cmd.Flags().StringVar(&installation, "installation", "", "hang the page on this installation, by `key`")
+	cmd.Flags().BoolVar(&detach, "detach", false, "hang the page on nothing: it belongs to the instance as a whole")
 	cmd.Flags().StringVar(&ifMatch, "if-match", "", "the updated_at as last read; refused as stale when it moved")
 	return cmd
 }

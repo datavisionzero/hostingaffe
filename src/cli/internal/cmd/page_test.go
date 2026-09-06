@@ -11,6 +11,7 @@ import (
 )
 
 const page = `{"slug":"architecture","title":"Architecture","body":"# The four layers\n\nDependencies point inward.",
+"kind":"decision","attached_to":{"kind":"machine","key":"caddy"},
 "author":{"id":"0198e0c0-0000-7000-8000-000000000002","kind":"user","name":"maintainer"},
 "updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 "created_at":"2026-09-05T10:00:00.000000Z","updated_at":"2026-09-05T12:00:00.000000Z"}`
@@ -18,7 +19,7 @@ const page = `{"slug":"architecture","title":"Architecture","body":"# The four l
 func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 	f := &fake{t: t, version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
 		if r.Method == http.MethodGet && r.URL.Path == "/api/pages" {
-			return 200, `[{"slug":"architecture","title":"Architecture",
+			return 200, `[{"slug":"architecture","title":"Architecture","kind":"note","attached_to":null,
 			"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 			"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"}]`
 		}
@@ -73,6 +74,9 @@ func TestPageViewPrintsTheStoredMarkdown(t *testing.T) {
 	}
 	if !strings.HasPrefix(out, "architecture  Architecture\n") {
 		t.Fatalf("the head names the address and the title:\n%s", out)
+	}
+	if !strings.Contains(out, "kind: decision  hangs on: machine caddy") {
+		t.Fatalf("the head says the kind and what it hangs on:\n%s", out)
 	}
 	if !strings.Contains(out, "updated: 2026-09-05T12:00:00Z by quiet-otter-42") {
 		t.Fatalf("the head says when and by whom:\n%s", out)
@@ -155,6 +159,10 @@ func TestPageUsageMistakesAreExitTwo(t *testing.T) {
 	for _, args := range [][]string{
 		{"page", "create", "architecture"},
 		{"page", "edit", "architecture"},
+		{"page", "create", "architecture", "--title", "T", "--machine", "caddy", "--installation", "logaffe-prod"},
+		{"page", "edit", "architecture", "--machine", "caddy", "--installation", "logaffe-prod"},
+		{"page", "edit", "architecture", "--machine", "caddy", "--detach"},
+		{"page", "list", "--machine", "caddy", "--installation", "logaffe-prod"},
 	} {
 		if code, _, stderr := run(t, server, args...); code != exit.Usage || stderr == "" {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
@@ -236,5 +244,139 @@ func TestADeleteWithNoBodyIsStillASuccess(t *testing.T) {
 	}
 	if !strings.Contains(out, "deleted") {
 		t.Errorf("stdout %q", out)
+	}
+}
+
+// The two fields HOST-17 gave the record reach the wire, and the anchor goes as
+// the kind and the key together — "machine caddy" and "software caddy" are
+// different things, and a key alone would not say which.
+func TestPageWritesCarryTheKindAndTheAnchor(t *testing.T) {
+	f := &fake{t: t, version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.Method == http.MethodPost {
+			return 201, page
+		}
+		return 200, page
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	sent := func(t *testing.T, args ...string) map[string]any {
+		t.Helper()
+		code, _, stderr := run(t, server, args...)
+		if code != exit.OK || stderr != "" {
+			t.Fatalf("%v: code %d, stderr %q", args, code, stderr)
+		}
+		var body map[string]any
+		if err := json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		return body
+	}
+
+	created := sent(t, "page", "create", "backup-restore", "--title", "Backup and restore",
+		"--kind", "runbook", "--machine", "caddy")
+	if created["kind"] != "runbook" {
+		t.Errorf("kind = %v", created["kind"])
+	}
+	if anchor, _ := created["attached_to"].(map[string]any); anchor["kind"] != "machine" || anchor["key"] != "caddy" {
+		t.Errorf("attached_to = %v", created["attached_to"])
+	}
+
+	// No --kind is no `kind`: the default is the instance's to apply, not ha's
+	// to guess, and a page created by an older ha still lands as `note`.
+	if plain := sent(t, "page", "create", "notes", "--title", "Notes"); plain["kind"] != nil {
+		t.Errorf("kind = %v, want absent", plain["kind"])
+	}
+
+	changed := sent(t, "page", "edit", "backup-restore", "--kind", "decision", "--installation", "logaffe-prod")
+	if changed["kind"] != "decision" {
+		t.Errorf("kind = %v", changed["kind"])
+	}
+	if anchor, _ := changed["attached_to"].(map[string]any); anchor["kind"] != "installation" || anchor["key"] != "logaffe-prod" {
+		t.Errorf("attached_to = %v", changed["attached_to"])
+	}
+
+	// Leaving the flags off lets the page hang where it hangs; only --detach
+	// says out loud that it should hang on nothing, and that is the null.
+	title := sent(t, "page", "edit", "backup-restore", "--title", "Restore")
+	if _, said := title["attached_to"]; said {
+		t.Errorf("an untouched anchor is not sent: %v", title)
+	}
+	detached := sent(t, "page", "edit", "backup-restore", "--detach")
+	value, said := detached["attached_to"]
+	if !said || value != nil {
+		t.Errorf("--detach sends null: %v", detached)
+	}
+}
+
+// Filtering by both fields, because otherwise they carry nothing at the console.
+func TestPageListFiltersByKindAndAnchor(t *testing.T) {
+	f := &fake{t: t, version: "0.0.0-dev", answer: func(*http.Request) (int, string) { return 200, `[]` }}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	for _, tc := range []struct {
+		args  []string
+		param string
+		want  string
+	}{
+		{[]string{"page", "list", "--kind", "decision"}, "kind", "decision"},
+		{[]string{"page", "list", "--machine", "caddy"}, "machine", "caddy"},
+		{[]string{"page", "list", "--installation", "logaffe-prod"}, "installation", "logaffe-prod"},
+	} {
+		if code, _, stderr := run(t, server, tc.args...); code != exit.OK || stderr != "" {
+			t.Fatalf("%v: code %d, stderr %q", tc.args, code, stderr)
+		}
+		query := f.requests[len(f.requests)-1].URL.Query()
+		if got := query.Get(tc.param); got != tc.want {
+			t.Errorf("%v: %s = %q", tc.args, tc.param, got)
+		}
+	}
+
+	// An empty filter is not a filter, as it already was for -q.
+	if code, _, _ := run(t, server, "page", "list"); code != exit.OK {
+		t.Fatal("code")
+	}
+	query := f.requests[len(f.requests)-1].URL.Query()
+	for _, name := range []string{"kind", "machine", "installation"} {
+		if query.Has(name) {
+			t.Errorf("an empty --%s is not sent", name)
+		}
+	}
+}
+
+// The list shows what the fields say, so that what was set is visible without
+// viewing every page one at a time. A page of the instance hangs on a dash.
+func TestPageListShowsTheKindAndTheAnchor(t *testing.T) {
+	f := &fake{t: t, version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
+		return 200, `[{"slug":"backup-restore","title":"Backup and restore","kind":"runbook",
+		"attached_to":{"kind":"machine","key":"caddy"},
+		"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
+		"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"},
+		{"slug":"tailscale-for-management","title":"Tailscale","kind":"decision","attached_to":null,
+		"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
+		"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"}]`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, out, stderr := run(t, server, "page", "list")
+
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("two pages, %d lines:\n%s", len(lines), out)
+	}
+	for _, want := range []string{"runbook", "machine caddy", "Backup and restore"} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("%q lacks %q", lines[0], want)
+		}
+	}
+	for _, want := range []string{"decision", "-", "Tailscale"} {
+		if !strings.Contains(lines[1], want) {
+			t.Errorf("%q lacks %q", lines[1], want)
+		}
 	}
 }

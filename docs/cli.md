@@ -92,6 +92,17 @@ the foundation has; `ha --help` lists them, and `ha <object> --help` the verbs
 under each. The table of the product's own objects — machine, software,
 installation, deployment, file — is written when those objects exist.
 
+A page carries the two fields the record gives it. `--kind` is `runbook`,
+`decision` or `note` on `create` and `edit`; left off at creation it is the
+instance that applies `note`, not `ha`. What the page hangs on is named by
+`--machine KEY` or `--installation KEY` — the kind belongs to the anchor,
+because the machine `caddy` and the software `caddy` are different things —
+and naming both at once is exit 2, said before any request goes out, since
+`attached_to` holds one anchor and no request says two. Leaving the flags off
+lets the page hang where it hangs; `--detach` is what gives it to the instance
+as a whole. `ha page list` narrows by the same three: `--kind`, `--machine`,
+`--installation`.
+
 ## Working on it
 
 ```sh
