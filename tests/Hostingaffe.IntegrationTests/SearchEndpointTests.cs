@@ -1,0 +1,235 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+namespace Hostingaffe.IntegrationTests;
+
+/// <summary>
+/// Searching (<c>docs/api.md</c>, Searching): "where was that again", asked
+/// once over every field, every Markdown body and every file.
+/// </summary>
+[Collection(nameof(PostgresCollection))]
+public sealed class SearchEndpointTests(PostgresFixture postgres)
+{
+    private static readonly CancellationToken Ct = TestContext.Current.CancellationToken;
+
+    /// <summary>
+    /// The three the ticket names — a port number in an installation, a word in
+    /// a page and a word in a file — each in one call, each saying where it was
+    /// found.
+    /// </summary>
+    [Fact]
+    public async Task A_port_a_page_and_a_file_are_each_one_call()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        var port = await HitsAsync(admin, "18502");
+        var hit = Assert.Single(port);
+        Assert.Equal("installation", Field(hit, "kind"));
+        Assert.Equal("logaffe-prod", Field(hit, "key"));
+        Assert.Equal("ports", Field(hit, "where"));
+
+        var page = await HitsAsync(admin, "tailscale");
+        Assert.Equal("page", Field(Assert.Single(page), "kind"));
+        Assert.Equal("backup-restore", Field(page[0], "key"));
+        Assert.Equal("body", Field(page[0], "where"));
+
+        var file = await HitsAsync(admin, "mem_limit");
+        Assert.Equal("file", Field(Assert.Single(file), "kind"));
+        Assert.Equal("compose.override.yml", Field(file[0], "key"));
+        Assert.Equal("content", Field(file[0], "where"));
+        Assert.Equal("logaffe-prod", file[0].GetProperty("owner").GetProperty("key").GetString());
+        Assert.Equal("installation", file[0].GetProperty("owner").GetProperty("kind").GetString());
+    }
+
+    /// <summary>
+    /// One word across the record: the software by its key, the installation by
+    /// its key, the deployment by what it deployed, the page by its title.
+    /// </summary>
+    [Fact]
+    public async Task One_word_answers_across_every_kind()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        var hits = await HitsAsync(admin, "logaffe");
+        var kinds = hits.Select(hit => Field(hit, "kind")).ToArray();
+
+        Assert.Contains("software", kinds);
+        Assert.Contains("installation", kinds);
+
+        // The kinds come in the order the record is read in, not in the order
+        // the query happened to find them.
+        Assert.Equal(kinds.OrderBy(kind => Array.IndexOf(Order, kind)), kinds);
+
+        var deployments = await HitsAsync(admin, "LOG-42");
+        var deployment = Assert.Single(deployments);
+        Assert.Equal("deployment", Field(deployment, "kind"));
+        Assert.Equal("logaffe-prod", Field(deployment, "key"));
+        Assert.Equal("1.4.0", Field(deployment, "name"));
+        Assert.Equal(1, deployment.GetProperty("number").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_deleted_row_is_not_a_hit()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        Assert.NotEmpty(await HitsAsync(admin, "18502"));
+
+        using var deleted = await admin.DeleteAsync("/api/installations/logaffe-prod", Ct);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        // The installation, its files and its deployments went with it, so
+        // nothing under it answers either.
+        Assert.Empty(await HitsAsync(admin, "18502"));
+        Assert.Empty(await HitsAsync(admin, "mem_limit"));
+        Assert.Empty(await HitsAsync(admin, "LOG-42"));
+    }
+
+    /// <summary>
+    /// A file is searched at the revision it is at: what an older one said
+    /// stopped being true when the next was written.
+    /// </summary>
+    [Fact]
+    public async Task A_file_answers_for_the_revision_it_is_at()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        Assert.NotEmpty(await HitsAsync(admin, "mem_limit"));
+
+        using var written = await admin.PutAsJsonAsync(
+            "/api/installations/logaffe-prod/files/compose.override.yml",
+            new { content = "services:\n  logaffe:\n    cpus: 2\n" },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        Assert.Empty(await HitsAsync(admin, "mem_limit"));
+        Assert.NotEmpty(await HitsAsync(admin, "cpus"));
+    }
+
+    [Fact]
+    public async Task It_is_capped_rather_than_paginated()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        for (var number = 1; number <= 12; number++)
+        {
+            using var made = await admin.PostAsJsonAsync(
+                "/api/machines",
+                new { key = $"ex{number}", kind = "dedicated", description = "Rented from hetzner." },
+                Ct);
+            Assert.Equal(HttpStatusCode.Created, made.StatusCode);
+        }
+
+        Assert.Equal(12, (await HitsAsync(admin, "hetzner")).Count);
+        Assert.Equal(5, (await HitsAsync(admin, "hetzner", limit: 5)).Count);
+
+        // The cap holds whatever is asked for.
+        Assert.Equal(12, (await HitsAsync(admin, "hetzner", limit: 5000)).Count);
+    }
+
+    [Fact]
+    public async Task A_search_for_nothing_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        var problem = await Refusals.Problem(
+            await admin.GetAsync("/api/search?q=%20", Ct), HttpStatusCode.BadRequest, "validation");
+        Assert.Equal("q", problem.GetProperty("errors").EnumerateObject().Single().Name);
+
+        await Refusals.Problem(
+            await admin.GetAsync("/api/search?q=logaffe&limit=0", Ct), HttpStatusCode.BadRequest, "validation");
+    }
+
+    [Fact]
+    public async Task A_search_needs_a_token()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var anyone = instance.ClientWith(null);
+
+        using var refused = await anyone.GetAsync("/api/search?q=logaffe", Ct);
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+    }
+
+    private static readonly string[] Order =
+        ["machine", "software", "installation", "deployment", "file", "page"];
+
+    private static string Field(JsonElement hit, string name) => hit.GetProperty(name).GetString()!;
+
+    private static async Task<IReadOnlyList<JsonElement>> HitsAsync(HttpClient client, string q, int? limit = null)
+    {
+        var address = $"/api/search?q={Uri.EscapeDataString(q)}" + (limit is { } n ? $"&limit={n}" : "");
+        var hits = await client.GetFromJsonAsync<JsonElement>(address, Ct);
+        return [.. hits.EnumerateArray()];
+    }
+
+    /// <summary>One of everything, each carrying a word only it has.</summary>
+    private static async Task AHostAsync(HttpClient client)
+    {
+        await Created(client, "/api/machines", new
+        {
+            key = "ex44",
+            kind = "dedicated",
+            provider = "hetzner",
+            location = "fsn1-dc14",
+            description = "The box everything else sits on.",
+        });
+
+        await Created(client, "/api/software", new
+        {
+            key = "logaffe",
+            name = "logaffe",
+            image = "ghcr.io/datavisionzero/logaffe",
+            description = "The log everything writes into.",
+        });
+
+        await Created(client, "/api/installations", new
+        {
+            key = "logaffe-prod",
+            name = "logaffe",
+            machine = "ex44",
+            software = "logaffe",
+            environment = "production",
+            role = "application",
+            ports = new object[] { new { port = 18502, protocol = "tcp", scope = "internal" } },
+            path = "/srv/logaffe",
+        });
+
+        await Created(client, "/api/installations/logaffe-prod/files", new
+        {
+            path = "compose.override.yml",
+            content = "services:\n  logaffe:\n    mem_limit: 512m\n",
+        });
+
+        await Created(client, "/api/installations/logaffe-prod/deployments", new
+        {
+            version = "1.4.0",
+            ticket = "LOG-42",
+            note = "Rolled forward.",
+        });
+
+        await Created(client, "/api/pages", new
+        {
+            slug = "backup-restore",
+            title = "Restoring a backup",
+            kind = "runbook",
+            body = "Reach the host over tailscale, stop it, restore the volume.",
+        });
+    }
+
+    private static async Task Created(HttpClient client, string address, object body)
+    {
+        using var response = await client.PostAsJsonAsync(address, body, Ct);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+}

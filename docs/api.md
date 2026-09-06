@@ -465,6 +465,49 @@ deployment is not necessarily who deployed. `ticket` is a planaffe key like
 `LOG-42` and stays a string: a reference to the other product, not a word of
 this model.
 
+### Searching
+
+| | |
+|---|---|
+| `GET /api/search?q=…` | every live record the words match, capped; `limit` defaults to 50 and never exceeds 200 |
+
+"Where was that again" is the question a host record is asked most often, and it
+is one call over every field, every Markdown body and every file. A hit says
+what was found and where:
+
+```json
+{"kind": "installation", "key": "logaffe-prod", "name": "logaffe",
+ "number": null, "owner": null, "where": "ports"}
+```
+
+`kind` is `machine`, `software`, `installation`, `deployment`, `file` or `page`,
+and the hits come in that order. `key` is the address — a key, a page's slug, a
+file's path, or the installation a deployment lives under; `number` is the
+deployment's number and nothing else has one; `owner` is what a file belongs to
+or a page hangs on. `where` names the surface that matched: `fields`,
+`description`, `ports`, `note`, `path`, `content`, `title` or `body`.
+
+**Postgres full text, and nothing beside it.** No second index and nothing to
+operate, which is part of the promise that an instance starts from a Compose
+file. Two things follow from that, and both are the honest shape of it rather
+than an omission:
+
+- **The words are matched the way Postgres splits text.** A fragment inside a
+  path is not a word — `logaffe` finds the software and the installation by
+  their keys, and does not find them inside `/srv/logaffe`.
+- **A port is a number, not a word.** `18502` inside `18502/tcp` is not a token
+  anyone would find by typing the number, so a query that *is* a port number is
+  looked up in the ports as well. That is what makes `ha search "18502"` answer.
+
+**A file is searched at the revision it is at.** What an older revision said
+stopped being true when the next one was written, and a hit in it would send
+somebody to a line that is not there. Deleted rows are not hits, and neither is
+anything a deletion took with it.
+
+**Not paginated, capped instead.** It is not a list of one thing and there is no
+order a cursor could walk; a word that occurs in every file would otherwise
+answer with the whole record, which is not an answer.
+
 ### Pages
 
 | | |

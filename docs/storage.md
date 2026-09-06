@@ -498,7 +498,8 @@ deletion.
 the navigation a tree would have been (VISION 7), so the search has to be part
 of the row. `simple` rather than a language configuration: the content is
 German and English and code, and stemming one of them wrongly is worse than
-stemming none.
+stemming none. Every other searchable table carries the same column for the same
+reason — see Searching, below.
 
 `page_slug` is both the uniqueness and the order a flat wiki is listed in.
 
@@ -603,6 +604,62 @@ create table idempotency (
 The key is scoped to the identity that used it, so two agents cannot collide on
 the same word. `request_hash` is what makes a repeat with a different body an
 `idempotency-mismatch` rather than a wrong answer.
+
+## Searching
+
+Every table something is looked for in carries a stored `tsvector` and a GIN
+index over it, generated from its own row:
+
+| table | column | what goes into it |
+|---|---|---|
+| `machine` | `search` | the key, the name and every text field, description included |
+| `software` | `search` | the key, the name, the image, the two URLs, the description |
+| `installation` | `search` | the key, the name, the path, the urls, the secret names, the description |
+| `deployment` | `search` | the version, the ref, the ticket, the note |
+| `file` | `search` | the path |
+| `file_revision` | `search` | what that revision said |
+| `page` | `search` | the title and the body |
+
+**A generated column, never a trigger.** The same reason the page's has always
+been one: a job that fills it is a second write that can be forgotten, and a
+column that is part of the row cannot fall behind it.
+
+```sql
+alter table machine add column search tsvector
+    generated always as (to_tsvector('simple', key || ' ' || name || ' ' || … )) stored;
+
+create index machine_search on machine using gin (search);
+```
+
+**`simple` everywhere**, for the reason the page gives: the content is German and
+English and code, and stemming one of them wrongly is worse than stemming none.
+
+**One function, and the schema owns it.**
+
+```sql
+create function words(value text[]) returns text
+    language sql immutable parallel safe returns null on null input
+    return array_to_string(value, ' ');
+```
+
+Postgres marks `array_to_string` **stable** rather than immutable, and a
+generated column takes only immutable expressions — while for a `text[]` and a
+constant separator the result depends on nothing at all. Without it an
+installation's `urls` and `secrets` would be the two fields nobody could search
+for. It is the only function in the schema.
+
+**Ports are not in any of these columns.** They are rows of
+`installation_port`, and `18502` inside the token `18502/tcp` is not something
+anyone would find by typing the number. A query that *is* a port number is
+looked up in that column instead, which is what makes VISION 5's own example
+answer.
+
+**A file is read at the revision it is at.** The query joins the revision whose
+number is the highest for that file: what an older one said stopped being true
+when the next was written.
+
+**Deleted rows are not hits**, and neither is anything under a deleted owner —
+a file of a deleted machine, a deployment of a deleted installation.
 
 ## What is derived rather than stored
 

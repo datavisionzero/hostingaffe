@@ -361,3 +361,17 @@ func executable(set bool) string {
 	}
 	return ""
 }
+
+// SearchHits prints what was found and where: the kind, the address, what it is
+// called, and which surface of it the words matched. A deployment carries its
+// number, a file and a page carry what they belong to.
+func SearchHits(w io.Writer, hits []api.SearchHit) {
+	for _, hit := range hits {
+		address := hit.Key
+		if hit.Number != nil {
+			address = fmt.Sprintf("%s #%d", hit.Key, *hit.Number)
+		}
+		fmt.Fprintf(w, "%-13s %-32s %-10s %-26s %s\n",
+			hit.Kind, address, hit.Where, Anchor(hit.Owner), hit.Name)
+	}
+}

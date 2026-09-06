@@ -6,6 +6,7 @@ using Hostingaffe.Domain.Machines;
 
 using File = Hostingaffe.Domain.Files.File;
 using FilePath = Hostingaffe.Domain.Files.FilePath;
+using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
@@ -67,6 +68,14 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
             revision.Property(r => r.Content).HasColumnName("content").IsRequired();
             revision.Property(r => r.Executable).HasColumnName("executable").IsRequired();
 
+            // Every revision is searchable, and the search reads only the
+            // current one: what an old revision said stopped being true when
+            // the next one was written (docs/storage.md, Searching).
+            revision.Property<NpgsqlTsVector>("Search")
+                .HasColumnName("search")
+                .HasComputedColumnSql("to_tsvector('simple', content)", stored: true);
+            revision.HasIndex("Search").HasMethod("GIN").HasDatabaseName("file_revision_search");
+
             revision.Property(r => r.By).HasColumnName("by").IsRequired();
             revision.HasOne<Identity>()
                 .WithMany()
@@ -82,6 +91,12 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
         // The revisions are what the file is: what it says now is the newest of
         // them, so a read without them is a file without a content.
         builder.Navigation(f => f.Revisions).AutoInclude();
+
+        // The path is the file's; what it says is the revision's, below.
+        builder.Property<NpgsqlTsVector>("Search")
+            .HasColumnName("search")
+            .HasComputedColumnSql("to_tsvector('simple', path)", stored: true);
+        builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("file_search");
 
         builder.Property(f => f.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()

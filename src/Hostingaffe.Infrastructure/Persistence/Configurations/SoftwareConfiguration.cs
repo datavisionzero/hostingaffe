@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
+using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
@@ -40,6 +41,15 @@ public sealed class SoftwareConfiguration : IEntityTypeConfiguration<Software>
             .HasColumnName("description")
             .HasDefaultValue(string.Empty)
             .IsRequired();
+
+        /// <inheritdoc cref="MachineConfiguration"/>
+        builder.Property<NpgsqlTsVector>("Search")
+            .HasColumnName("search")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(image, '') || ' ' "
+                + "|| coalesce(homepage, '') || ' ' || coalesce(repository, '') || ' ' || description)",
+                stored: true);
+        builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("software_search");
 
         builder.Property(s => s.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()

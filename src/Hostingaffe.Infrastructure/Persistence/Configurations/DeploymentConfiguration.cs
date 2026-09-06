@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Installations;
+using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
@@ -57,6 +58,16 @@ public sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploymen
 
         // `by` on the wire: who recorded it, which for a backfilled deployment
         // is not necessarily who deployed.
+        // A deployment is found by what it says it was: the version, what
+        // was actually deployed, the ticket, and the note beside it.
+        builder.Property<NpgsqlTsVector>("Search")
+            .HasColumnName("search")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', version || ' ' || coalesce(\"ref\", '') || ' ' "
+                + "|| coalesce(ticket, '') || ' ' || note)",
+                stored: true);
+        builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("deployment_search");
+
         builder.Property(d => d.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()
             .WithMany()

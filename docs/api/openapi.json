@@ -287,6 +287,67 @@
         }
       }
     },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every live record the words match: the fields of machines, software and installations, the versions, refs, tickets and notes of deployments, the paths and current contents of files, and the titles and bodies of pages. A port number is looked up in the ports as well. Each hit says what was found, where it lives, and which surface matched. Not paginated and capped instead — `limit` defaults to 50 and never exceeds 200.",
+        "operationId": "Search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHit"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users": {
       "post": {
         "tags": [
@@ -6912,6 +6973,48 @@
           "internal"
         ],
         "type": "string"
+      },
+      "SearchHit": {
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "number",
+          "owner",
+          "where"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "number": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
+            ]
+          },
+          "where": {
+            "type": "string"
+          }
+        }
       },
       "SecretPasswordRequest": {
         "required": [

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Machines;
+using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
@@ -88,6 +89,21 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             .HasColumnName("description")
             .HasDefaultValue(string.Empty)
             .IsRequired();
+
+        // What `ha search` reads (docs/storage.md, Searching). One
+        // `simple` configuration everywhere, and the closed sets left out:
+        // `status=retired` is a filter on the list, not something to find by
+        // typing the word.
+        builder.Property<NpgsqlTsVector>("Search")
+            .HasColumnName("search")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' "
+                + "|| coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' "
+                + "|| coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' "
+                + "|| coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' "
+                + "|| coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description)",
+                stored: true);
+        builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("machine_search");
 
         builder.Property(m => m.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()

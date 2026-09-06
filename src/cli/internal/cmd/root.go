@@ -100,8 +100,51 @@ func newRoot(env Env) *cobra.Command {
 	root.AddCommand(newDeployment(g))
 	root.AddCommand(newFile(g))
 	root.AddCommand(newPage(g))
+	root.AddCommand(newSearch(g))
 	root.AddCommand(identityCommands(g)...)
+
+	usageMistakes(root)
 	return root
+}
+
+// usageMistakes makes an argument mistake exit 2, like a flag mistake, wherever
+// it happens. Cobra answers "accepts 1 arg(s), received 0" and "unknown command"
+// with a plain error, which `report` would call unexpected — exit 1, the code
+// docs/cli.md keeps for a bug in ha. It is done once over the tree rather than
+// at each of the commands, so that a verb added later cannot forget it.
+func usageMistakes(cmd *cobra.Command) {
+	// An object with no verb prints its verbs, which is what cobra does for a
+	// command that cannot run. Saying it here makes the command runnable, and
+	// that is what lets the check below be reached at all.
+	if cmd.HasSubCommands() && !cmd.Runnable() {
+		cmd.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
+	}
+
+	switch {
+	case cmd.Args != nil:
+		check := cmd.Args
+		cmd.Args = func(c *cobra.Command, args []string) error {
+			if err := check(c, args); err != nil {
+				return &config.UsageError{Message: err.Error()}
+			}
+			return nil
+		}
+	case cmd.HasSubCommands():
+		// An object without a verb: what was typed is not one of its verbs,
+		// because cobra would have dispatched to it if it were.
+		cmd.Args = func(c *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return &config.UsageError{
+					Message: fmt.Sprintf("%q is not a verb of `%s`; --help lists them.", args[0], c.CommandPath()),
+				}
+			}
+			return nil
+		}
+	}
+
+	for _, child := range cmd.Commands() {
+		usageMistakes(child)
+	}
 }
 
 // load is what every command that talks to the instance starts with.

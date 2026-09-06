@@ -43,6 +43,7 @@ public static class InfrastructureServices
         services.AddScoped<IKeys, Keys>();
         services.AddScoped<IPages, Pages>();
         services.AddScoped<IHistory, History>();
+        services.AddScoped<ISearch, Persistence.Search>();
         services.AddScoped<ITransactions, Transactions>();
         services.AddScoped<IIdempotency, Idempotency>();
         services.AddScoped<IOneTimeSecrets, OneTimeSecrets>();

@@ -68,3 +68,25 @@ func run(t *testing.T, server *httptest.Server, args ...string) (code int, stdou
 	})
 	return code, out.String(), errOut.String()
 }
+
+// An argument mistake is exit 2 wherever it happens, like a flag mistake:
+// exit 1 is a bug in ha, and typing too few arguments is not one (docs/cli.md,
+// Exit codes).
+func TestAnArgumentMistakeIsExitTwo(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) { return 200, "{}" }}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	for _, args := range [][]string{
+		{"machine", "view"},
+		{"machine", "view", "ex44", "and-another"},
+		{"search"},
+		{"deploy", "view", "logaffe-prod"},
+		{"machine", "invent"},
+		{"files", "invent"},
+	} {
+		if code, _, stderr := run(t, server, args...); code != 2 || stderr == "" {
+			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
+		}
+	}
+}

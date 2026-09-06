@@ -98,6 +98,7 @@ says whether this binary and that instance fit.
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history` |
+| `ha search` | one call over every field, every Markdown body and every file |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
@@ -176,6 +177,24 @@ record *is* — a deployment with the wrong version is `ha deploy delete`d and
 recorded again, and its number is not handed out a second time. `--version` is
 on `set` all the same, and it is sent: the instance's refusal says the rule,
 which an unknown flag would not.
+
+## Searching
+
+```sh
+ha search "18502"        # the installation that listens on it
+ha search logaffe        # the software, the installation, the files that name it
+```
+
+One call over every field, every Markdown body and every file. A line per hit:
+the kind, the address, which surface matched, what it belongs to, and what it is
+called. `--limit` asks for fewer; the instance caps it whatever is asked, because
+a word that occurs everywhere would otherwise answer with the whole record.
+
+The words are matched the way Postgres splits text, so a fragment inside a path
+is not a word — `logaffe` finds the software and the installation by their keys
+and not inside `/srv/logaffe`. A port is a number rather than a word and is
+looked up as one, which is what makes the first example answer. A file answers
+for the revision it is at, and a deleted row is not a hit.
 
 ## Context
 

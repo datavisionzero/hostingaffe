@@ -4,6 +4,7 @@ using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
+using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
@@ -128,6 +129,23 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
         });
 
         builder.Navigation(i => i.Ports).AutoInclude();
+
+        // The ports are a table of their own and are searched as numbers,
+        // not as words: `18502` is looked up in the column, which is what makes
+        // VISION 5's example answer at all.
+        //
+        // `words` is the one function the schema owns, and it exists because
+        // Postgres marks `array_to_string` stable rather than immutable, which
+        // a generated column will not take. For a `text[]` and a constant
+        // separator the result depends on nothing, and the migration that
+        // creates it says so.
+        builder.Property<NpgsqlTsVector>("Search")
+            .HasColumnName("search")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(path, '') || ' ' "
+                + "|| words(urls) || ' ' || words(secrets) || ' ' || description)",
+                stored: true);
+        builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_search");
 
         builder.Property(i => i.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()
