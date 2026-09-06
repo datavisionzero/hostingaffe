@@ -458,9 +458,13 @@ The instance's flat wiki, addressed by a slug rather than a key
 
 ```sql
 create table page (
-    id         uuid        not null primary key,
-    slug       text        not null,
-    title      text        not null,
+    id              uuid   not null primary key,
+    slug            text   not null,
+    title           text   not null,
+    kind            text   not null default 'note'
+        check (kind in ('runbook', 'decision', 'note')),
+    machine_id      uuid   references machine (id),
+    installation_id uuid   references installation (id),
     body       text        not null default '',
     created_by uuid        not null references identity (id),
     created_at timestamptz not null,
@@ -471,9 +475,22 @@ create table page (
     search     tsvector generated always as (to_tsvector('simple', title || ' ' || body)) stored
 );
 
-create unique index page_slug   on page (slug);
-create        index page_search on page using gin (search);
+create unique index page_slug           on page (slug);
+create        index page_on_machine      on page (machine_id)      where machine_id is not null;
+create        index page_on_installation on page (installation_id) where installation_id is not null;
+create        index page_search          on page using gin (search);
 ```
+
+**`kind` says how a page is to be read, and nothing more**: no status, no
+supersedes, no template enforced beyond it (VISION 7). Pages written before the
+column existed are `note`, which is the kind that claims nothing, and the
+default in the migration is what made them so.
+
+**`attached_to` is one anchor or none**, and the check constraint says "one":
+`machine_id` and `installation_id` are never both set. A page that hangs on
+nothing belongs to the instance as a whole, which is a state the model has on
+purpose. Neither foreign key cascades — a page does not follow its anchor into
+deletion.
 
 **The search is a column, not a job.** The wiki is flat because search replaces
 the navigation a tree would have been (VISION 7), so the search has to be part

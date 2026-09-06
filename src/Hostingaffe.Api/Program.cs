@@ -148,6 +148,9 @@ builder.Services.AddScoped<ReadDeploymentHistory>();
 builder.Services.AddScoped<RecordDeployment>();
 builder.Services.AddScoped<CorrectDeployment>();
 
+// What a file hangs on and what a page is attached to, resolved in one place.
+builder.Services.AddScoped<Anchorage>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();

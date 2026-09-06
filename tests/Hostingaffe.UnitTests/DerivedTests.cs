@@ -1,4 +1,5 @@
 using Hostingaffe.Domain.Deployments;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Files;
 
 using File = Hostingaffe.Domain.Files.File;
@@ -82,7 +83,7 @@ public sealed class DerivedTests
     [Fact]
     public void Files_are_the_revisions_that_were_current_at_that_moment()
     {
-        var owner = new FileOwner(OwnerKind.Installation, Installation, "logaffe-prod");
+        var owner = new Anchor(AnchorKind.Installation, Installation, "logaffe-prod");
 
         var compose = File.Create(owner, "compose.override.yml", "one", false, Actor, Now.AddDays(-10));
         compose.Write("two", null, Actor, Now.AddDays(-5));

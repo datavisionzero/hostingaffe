@@ -1,3 +1,4 @@
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Files;
 
 using File = Hostingaffe.Domain.Files.File;
@@ -12,10 +13,10 @@ namespace Hostingaffe.Application.Ports;
 public interface IFiles
 {
     /// <summary>By owner and path, deleted or not — for the <c>deleted</c> answer and for restore.</summary>
-    Task<File?> FindAnyAsync(FileOwner owner, string path, CancellationToken cancellationToken);
+    Task<File?> FindAnyAsync(Anchor owner, string path, CancellationToken cancellationToken);
 
     /// <summary>Every live file of one owner, by path.</summary>
-    Task<IReadOnlyList<File>> ListAsync(FileOwner owner, CancellationToken cancellationToken);
+    Task<IReadOnlyList<File>> ListAsync(Anchor owner, CancellationToken cancellationToken);
 
     /// <summary>The row and its revisions, tracked and locked for the rest of the transaction.</summary>
     Task<File?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);

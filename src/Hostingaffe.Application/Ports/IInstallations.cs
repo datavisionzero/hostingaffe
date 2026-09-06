@@ -29,6 +29,10 @@ public interface IInstallations
     Task<IReadOnlyList<Installation>> ListAsync(
         InstallationFilter filter, CancellationToken cancellationToken);
 
+    /// <summary>The keys of the given rows, for the shapes that name one.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken);
+
     /// <summary>The row, tracked and locked for the rest of the transaction.</summary>
     Task<Installation?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);
 

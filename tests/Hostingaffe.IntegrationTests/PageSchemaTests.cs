@@ -26,7 +26,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
             await using var context = Migrated.ContextFor(db.ConnectionString);
             try
             {
-                context.Pages.Add(Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now));
+                context.Pages.Add(Page.Create("architecture", "Architecture", null, PageKind.Note, db.User.Id, Migrated.Now));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
                 return true;
             }
@@ -50,13 +50,13 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
     public async Task A_deleted_page_keeps_its_slug_until_the_purge()
     {
         await using var db = await Migrated.SeededAsync(postgres);
-        var page = Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now);
+        var page = Page.Create("architecture", "Architecture", null, PageKind.Note, db.User.Id, Migrated.Now);
         page.Delete(db.User.Id, Migrated.Now);
         db.Context.Pages.Add(page);
         await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
         db.Context.ChangeTracker.Clear();
 
-        db.Context.Pages.Add(Page.Create("architecture", "Architecture again", null, db.User.Id, Migrated.Now));
+        db.Context.Pages.Add(Page.Create("architecture", "Architecture again", null, PageKind.Note, db.User.Id, Migrated.Now));
 
         var refusal = await Assert.ThrowsAsync<DbUpdateException>(() =>
             db.Context.SaveChangesAsync(TestContext.Current.CancellationToken));
@@ -70,7 +70,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         await using var db = await Migrated.SeededAsync(postgres);
         var grace = TimeSpan.FromDays(7);
 
-        var page = Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now);
+        var page = Page.Create("architecture", "Architecture", null, PageKind.Note, db.User.Id, Migrated.Now);
         page.Delete(db.User.Id, DateTimeOffset.UtcNow - grace - TimeSpan.FromDays(1));
         db.Context.Pages.Add(page);
         db.Context.History.Add(Domain.History.HistoryEntry.OnPage(
@@ -85,7 +85,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
             var transactions = new Transactions(context, new InstanceSettings(grace));
             await transactions.RunAsync(async () =>
             {
-                context.Pages.Add(Page.Create("onboarding", "Onboarding", null, db.User.Id, Migrated.Now));
+                context.Pages.Add(Page.Create("onboarding", "Onboarding", null, PageKind.Note, db.User.Id, Migrated.Now));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
                 return true;
             }, TestContext.Current.CancellationToken);
@@ -94,7 +94,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         // The slug is free, so the same name can be taken again.
         await using (var context = Migrated.ContextFor(db.ConnectionString))
         {
-            context.Pages.Add(Page.Create("architecture", "Architecture again", null, db.User.Id, Migrated.Now));
+            context.Pages.Add(Page.Create("architecture", "Architecture again", null, PageKind.Note, db.User.Id, Migrated.Now));
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 

@@ -130,7 +130,9 @@ Each write makes a `revision`, and two revisions can be diffed.
 
 An owner is named by its kind and its key together — `{"kind": "machine", "key":
 "ex44"}` — because a key is unique per entity type and not across them, and a
-machine `caddy` and an installation `caddy` both exist.
+machine `caddy` and an installation `caddy` both exist. A page's `attached_to`
+takes the same shape; the two field names stay what they are, because a file is
+owned and a page is attached.
 
 Paths that carry secrets are refused: `.env` and any `.env.*` but
 `.env.example`, and anything under `secrets/`. So is any path outside the
@@ -146,8 +148,10 @@ instance as a whole. Where everything goes that is longer than a description.
 | `kind` | `runbook` · `decision` · `note` |
 
 Pages are flat and addressed by their slug, which is their address and may be
-renamed; nothing forwards afterwards. `attached_to` names a machine or an
-installation, or is empty for a page of the instance.
+renamed; nothing forwards afterwards. `kind` says how a page is to be read and
+nothing more — a `decision` has no status, no supersedes and no enforced
+template. `attached_to` names a machine or an installation, or is empty for a
+page of the instance, and a page does not follow its anchor into deletion.
 
 ## History
 

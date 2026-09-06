@@ -70,6 +70,18 @@ public sealed class Installations(HostingaffeDbContext context) : IInstallations
         return await rows.OrderBy(i => i.Key).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var wanted = ids?.Distinct().ToArray() ?? [];
+
+        return wanted.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await context.Installations
+                .Where(i => wanted.Contains(i.Id))
+                .ToDictionaryAsync(i => i.Id, i => i.Key, cancellationToken);
+    }
+
     public async Task<Installation?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken)
     {
         if (context.Database.CurrentTransaction is null)

@@ -245,4 +245,182 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         using var created = await admin.PostAsJsonAsync("/api/agents", new { name }, Ct);
         return instance.ClientWith((await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("token").GetProperty("secret").GetString());
     }
+
+    [Fact]
+    public async Task A_page_is_of_a_kind_and_hangs_on_something_or_on_nothing()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var runbook = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new
+            {
+                slug = "backup-restore",
+                title = "Backup and restore",
+                kind = "runbook",
+                attached_to = new { kind = "machine", key = "ex44" },
+            },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, runbook.StatusCode);
+
+        var page = await admin.GetFromJsonAsync<JsonElement>("/api/pages/backup-restore", TestContext.Current.CancellationToken);
+        Assert.Equal("runbook", page.GetProperty("kind").GetString());
+        Assert.Equal("machine", page.GetProperty("attached_to").GetProperty("kind").GetString());
+        Assert.Equal("ex44", page.GetProperty("attached_to").GetProperty("key").GetString());
+
+        // A page of the instance as a whole hangs on nothing, and says so.
+        using var decision = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "tailscale-for-management", title = "Tailscale for management", kind = "decision" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, decision.StatusCode);
+
+        var instanceWide = await admin.GetFromJsonAsync<JsonElement>(
+            "/api/pages/tailscale-for-management", TestContext.Current.CancellationToken);
+        Assert.Equal("decision", instanceWide.GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, instanceWide.GetProperty("attached_to").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_page_written_before_the_two_fields_existed_is_a_note()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var created = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "architecture", title = "Architecture" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var page = await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        Assert.Equal("note", page.GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, page.GetProperty("attached_to").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_kind_outside_the_set_and_an_anchor_that_is_not_there_are_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var kind = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "a", title = "A", kind = "howto" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, kind.StatusCode);
+
+        using var nowhere = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "b", title = "B", attached_to = new { kind = "machine", key = "nowhere" } },
+            TestContext.Current.CancellationToken);
+        await Refusals.Problem(nowhere, HttpStatusCode.BadRequest, "validation");
+
+        // The kind is part of the anchor: there is no installation `ex44`.
+        using var wrongKind = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "c", title = "C", attached_to = new { kind = "installation", key = "ex44" } },
+            TestContext.Current.CancellationToken);
+        await Refusals.Problem(wrongKind, HttpStatusCode.BadRequest, "validation");
+    }
+
+    [Fact]
+    public async Task Both_fields_change_and_the_history_carries_them()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var created = await admin.PostAsJsonAsync(
+            "/api/pages",
+            new { slug = "backup-restore", title = "Backup and restore" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var changed = await admin.PatchAsJsonAsync(
+            "/api/pages/backup-restore",
+            new { kind = "runbook", attached_to = new { kind = "installation", key = "logaffe-prod" } },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+
+        var moved = await changed.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        Assert.Equal("runbook", moved.GetProperty("kind").GetString());
+        Assert.Equal("logaffe-prod", moved.GetProperty("attached_to").GetProperty("key").GetString());
+
+        // Null unhooks it; leaving the field out would have left it alone.
+        using var unhooked = await admin.PatchAsJsonAsync(
+            "/api/pages/backup-restore",
+            new { attached_to = (object?)null },
+            TestContext.Current.CancellationToken);
+        var loose = await unhooked.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        Assert.Equal(JsonValueKind.Null, loose.GetProperty("attached_to").ValueKind);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>(
+            "/api/pages/backup-restore/history", TestContext.Current.CancellationToken);
+        Assert.Equal(
+            ["created", "kind", "attached_to", "attached_to"],
+            history.EnumerateArray().Select(entry => entry.GetProperty("field").GetString()!));
+        Assert.Equal("installation logaffe-prod", history[2].GetProperty("new_value").GetString());
+        Assert.Equal(JsonValueKind.Null, history[3].GetProperty("new_value").ValueKind);
+    }
+
+    [Fact]
+    public async Task Both_fields_filter()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        await Attach(admin, "backup-restore", "runbook", new { kind = "machine", key = "ex44" });
+        await Attach(admin, "log-rotation", "runbook", new { kind = "installation", key = "logaffe-prod" });
+        await Attach(admin, "tailscale-for-management", "decision", null);
+
+        var runbooks = await admin.GetFromJsonAsync<JsonElement>("/api/pages?kind=runbook", TestContext.Current.CancellationToken);
+        Assert.Equal(
+            ["backup-restore", "log-rotation"],
+            runbooks.EnumerateArray().Select(p => p.GetProperty("slug").GetString()!));
+
+        var onTheMachine = await admin.GetFromJsonAsync<JsonElement>("/api/pages?machine=ex44", TestContext.Current.CancellationToken);
+        Assert.Equal(["backup-restore"], onTheMachine.EnumerateArray().Select(p => p.GetProperty("slug").GetString()!));
+
+        var onTheInstallation = await admin.GetFromJsonAsync<JsonElement>(
+            "/api/pages?installation=logaffe-prod", TestContext.Current.CancellationToken);
+        Assert.Equal(["log-rotation"], onTheInstallation.EnumerateArray().Select(p => p.GetProperty("slug").GetString()!));
+
+        // A page hangs on one thing, so asking for both is a question with no answer.
+        using var both = await admin.GetAsync(
+            "/api/pages?machine=ex44&installation=logaffe-prod", TestContext.Current.CancellationToken);
+        await Refusals.Problem(both, HttpStatusCode.BadRequest, "validation");
+    }
+
+    private static async Task Attach(HttpClient client, string slug, string kind, object? anchor)
+    {
+        using var created = await client.PostAsJsonAsync(
+            "/api/pages",
+            new { slug, title = slug, kind, attached_to = anchor },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    /// <summary>A machine and an installation for the pages below to hang on.</summary>
+    private static async Task Ground(HttpClient client)
+    {
+        using var machine = await client.PostAsJsonAsync(
+            "/api/machines", new { key = "ex44", kind = "dedicated" }, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, machine.StatusCode);
+
+        using var software = await client.PostAsJsonAsync(
+            "/api/software", new { key = "logaffe" }, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, software.StatusCode);
+
+        using var installation = await client.PostAsJsonAsync(
+            "/api/installations",
+            new { key = "logaffe-prod", machine = "ex44", software = "logaffe", environment = "production", role = "application" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, installation.StatusCode);
+    }
 }

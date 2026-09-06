@@ -11,27 +11,12 @@ using FilePath = Hostingaffe.Domain.Files.FilePath;
 namespace Hostingaffe.Application.Acts;
 
 /// <summary>
-/// Who a file belongs to, as the contract carries it:
-/// <c>{ "kind": "machine", "key": "ex44" }</c>. The kind is part of the answer,
-/// because a key alone would name a machine and an installation at once
-/// (<c>CONTEXT.md</c>, Key).
-/// </summary>
-public sealed record OwnerShape(OwnerKind Kind, string Key)
-{
-    public static OwnerShape Of(FileOwner owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
-        return new OwnerShape(owner.Kind, owner.Key);
-    }
-}
-
-/// <summary>
 /// The slim file every list returns: where it is, what it is, and how often it
 /// has been written. The content is what would make it expensive, and the
 /// content is not in it (ADR 0012).
 /// </summary>
 public sealed record FileSummaryShape(
-    OwnerShape Owner,
+    AnchorShape Owner,
     string Path,
     bool Executable,
     int Revision,
@@ -43,7 +28,7 @@ public sealed record FileSummaryShape(
 /// shape is the same either way, because "the file as it was" is the file.
 /// </summary>
 public sealed record FileShape(
-    OwnerShape Owner,
+    AnchorShape Owner,
     string Path,
     bool Executable,
     string Content,
@@ -88,7 +73,7 @@ public sealed record WriteFileRequest(string? Content, bool? Executable)
 public sealed class FileAssembler(IIdentities identities)
 {
     public async Task<IReadOnlyList<FileSummaryShape>> SummariesAsync(
-        FileOwner owner, IReadOnlyList<File> rows, CancellationToken cancellationToken)
+        Anchor owner, IReadOnlyList<File> rows, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(rows);
 
@@ -98,7 +83,7 @@ public sealed class FileAssembler(IIdentities identities)
         return
         [
             .. rows.Select(row => new FileSummaryShape(
-                OwnerShape.Of(owner),
+                AnchorShape.Of(owner),
                 row.Path,
                 row.Executable,
                 row.Revision,
@@ -108,7 +93,7 @@ public sealed class FileAssembler(IIdentities identities)
     }
 
     public async Task<FileShape> CompleteAsync(
-        FileOwner owner, File file, FileRevision revision, CancellationToken cancellationToken)
+        Anchor owner, File file, FileRevision revision, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(revision);
@@ -116,7 +101,7 @@ public sealed class FileAssembler(IIdentities identities)
         var people = await identities.FindManyAsync([file.CreatedBy, revision.By], cancellationToken);
 
         return new FileShape(
-            OwnerShape.Of(owner),
+            AnchorShape.Of(owner),
             file.Path,
             revision.Executable,
             revision.Content,
@@ -159,17 +144,17 @@ public sealed class FileLookup(IMachines machines, IInstallations installations,
     /// the way they always are, so a deleted one says <c>deleted</c> and an
     /// unknown one says <c>not-found</c>.
     /// </summary>
-    public async Task<FileOwner> OwnerAsync(OwnerKind kind, string key, CancellationToken cancellationToken)
+    public async Task<Anchor> OwnerAsync(AnchorKind kind, string key, CancellationToken cancellationToken)
     {
-        var id = kind is OwnerKind.Machine
+        var id = kind is AnchorKind.Machine
             ? (await machines.LiveAsync(key, settings, cancellationToken)).Id
             : (await installations.LiveAsync(key, settings, cancellationToken)).Id;
 
-        return new FileOwner(kind, id, key.Trim());
+        return new Anchor(kind, id, key.Trim());
     }
 
     /// <exception cref="Refusal"><c>not-found</c>, or <c>deleted</c> with <c>restorable_until</c>.</exception>
-    public async Task<File> LiveAsync(FileOwner owner, string path, CancellationToken cancellationToken)
+    public async Task<File> LiveAsync(Anchor owner, string path, CancellationToken cancellationToken)
     {
         var file = await AnyAsync(owner, path, cancellationToken);
 
@@ -181,7 +166,7 @@ public sealed class FileLookup(IMachines machines, IInstallations installations,
             : file;
     }
 
-    public async Task<File> AnyAsync(FileOwner owner, string path, CancellationToken cancellationToken)
+    public async Task<File> AnyAsync(Anchor owner, string path, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -199,7 +184,7 @@ public sealed class FileLookup(IMachines machines, IInstallations installations,
 public sealed class ListFiles(IFiles files, FileLookup lookup, FileAssembler assembler)
 {
     public async Task<IReadOnlyList<FileSummaryShape>> ExecuteAsync(
-        OwnerKind kind, string key, CancellationToken cancellationToken)
+        AnchorKind kind, string key, CancellationToken cancellationToken)
     {
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         return await assembler.SummariesAsync(owner, await files.ListAsync(owner, cancellationToken), cancellationToken);
@@ -213,7 +198,7 @@ public sealed class ListFiles(IFiles files, FileLookup lookup, FileAssembler ass
 public sealed class ReadFile(FileLookup lookup, FileAssembler assembler)
 {
     public async Task<FileShape> ExecuteAsync(
-        OwnerKind kind, string key, string path, int? revision, CancellationToken cancellationToken)
+        AnchorKind kind, string key, string path, int? revision, CancellationToken cancellationToken)
     {
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var file = await lookup.LiveAsync(owner, path, cancellationToken);
@@ -231,7 +216,7 @@ public sealed class ReadFile(FileLookup lookup, FileAssembler assembler)
 public sealed class ReadFileRevisions(FileLookup lookup, FileAssembler assembler)
 {
     public async Task<IReadOnlyList<FileRevisionShape>> ExecuteAsync(
-        OwnerKind kind, string key, string path, CancellationToken cancellationToken)
+        AnchorKind kind, string key, string path, CancellationToken cancellationToken)
     {
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         return await assembler.RevisionsAsync(
@@ -243,7 +228,7 @@ public sealed class ReadFileRevisions(FileLookup lookup, FileAssembler assembler
 public sealed class ReadFileHistory(FileLookup lookup, IIdentities identities, IHistory history)
 {
     public async Task<IReadOnlyList<HistoryEntryShape>> ExecuteAsync(
-        OwnerKind kind, string key, string path, CancellationToken cancellationToken)
+        AnchorKind kind, string key, string path, CancellationToken cancellationToken)
     {
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var file = await lookup.LiveAsync(owner, path, cancellationToken);
@@ -278,7 +263,7 @@ public sealed class CreateFile(
     TimeProvider clock)
 {
     public async Task<FileShape> ExecuteAsync(
-        OwnerKind kind, string key, CreateFileRequest request, CancellationToken cancellationToken)
+        AnchorKind kind, string key, CreateFileRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         FileWrites.Closed(request.UnknownFields);
@@ -322,7 +307,7 @@ public sealed class WriteFile(
     TimeProvider clock)
 {
     public async Task<FileShape> ExecuteAsync(
-        OwnerKind kind, string key, string path, WriteFileRequest request, string? ifMatch, CancellationToken cancellationToken)
+        AnchorKind kind, string key, string path, WriteFileRequest request, string? ifMatch, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         FileWrites.Closed(request.UnknownFields);
@@ -393,7 +378,7 @@ internal static class FileWrites
     /// and a deleted file's path says so rather than pretending it is free.
     /// </summary>
     public static async Task TakenAsync(
-        IFiles files, FileOwner owner, string path, InstanceSettings settings, CancellationToken cancellationToken)
+        IFiles files, Anchor owner, string path, InstanceSettings settings, CancellationToken cancellationToken)
     {
         if (await files.FindAnyAsync(owner, path, cancellationToken) is not { } existing)
         {

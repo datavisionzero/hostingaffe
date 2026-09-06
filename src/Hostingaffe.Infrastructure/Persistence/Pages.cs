@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 using Hostingaffe.Application.Ports;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Infrastructure.Persistence;
@@ -11,9 +12,24 @@ public sealed class Pages(HostingaffeDbContext context) : IPages
     public Task<Page?> FindAnyAsync(string slug, CancellationToken cancellationToken) =>
         context.Pages.SingleOrDefaultAsync(p => p.Slug == slug, cancellationToken);
 
-    public async Task<IReadOnlyList<Page>> ListAsync(string? search, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Page>> ListAsync(
+        string? search, PageKind? kind, Anchor? anchor, CancellationToken cancellationToken)
     {
         var rows = context.Pages.Where(p => p.DeletedAt == null);
+
+        if (kind is { } wanted)
+        {
+            rows = rows.Where(p => p.Kind == wanted);
+        }
+
+        if (anchor is { Kind: AnchorKind.Machine } machine)
+        {
+            rows = rows.Where(p => p.MachineId == machine.Id);
+        }
+        else if (anchor is { } installation)
+        {
+            rows = rows.Where(p => p.InstallationId == installation.Id);
+        }
 
         // The same `simple` configuration and the same words a search box
         // takes as everywhere else (docs/storage.md, Full-text search): a

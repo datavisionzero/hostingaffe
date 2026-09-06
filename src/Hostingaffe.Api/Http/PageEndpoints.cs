@@ -1,16 +1,26 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hostingaffe.Application.Acts;
+using Hostingaffe.Domain;
+using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Api.Http;
 
 /// <summary>
 /// A <c>PATCH</c> body where <c>null</c> and absent mean different things:
-/// <c>"body": null</c> empties the document, an absent body leaves it. The
-/// converter below is what tells the two apart.
+/// <c>"body": null</c> empties the document and <c>"attached_to": null</c>
+/// unhooks the page, while leaving either out leaves it alone. The converter
+/// below is what tells the two apart.
 /// </summary>
 [JsonConverter(typeof(ChangePageRequestConverter))]
-public sealed record ChangePageRequest(string? Slug, string? Title, bool BodyGiven, string? Body);
+public sealed record ChangePageRequest(
+    string? Slug,
+    string? Title,
+    bool BodyGiven,
+    string? Body,
+    PageKind? Kind,
+    bool AttachedToGiven,
+    AnchorShape? AttachedTo);
 
 /// <inheritdoc cref="ChangePageRequest"/>
 public sealed class ChangePageRequestConverter : JsonConverter<ChangePageRequest>
@@ -27,7 +37,10 @@ public sealed class ChangePageRequestConverter : JsonConverter<ChangePageRequest
             Text(body, "slug"),
             Text(body, "title"),
             body.TryGetProperty("body", out _),
-            Text(body, "body"));
+            Text(body, "body"),
+            Closed<PageKind>(body, "kind"),
+            body.TryGetProperty("attached_to", out _),
+            Anchor(body));
     }
 
     public override void Write(Utf8JsonWriter writer, ChangePageRequest value, JsonSerializerOptions options)
@@ -51,11 +64,43 @@ public sealed class ChangePageRequestConverter : JsonConverter<ChangePageRequest
             writer.WriteString("body", value.Body);
         }
 
+        if (value.Kind is { } kind)
+        {
+            writer.WriteString("kind", Spelling.Of(kind));
+        }
+
+        if (value.AttachedToGiven)
+        {
+            writer.WritePropertyName("attached_to");
+            JsonSerializer.Serialize(writer, value.AttachedTo, options);
+        }
+
         writer.WriteEndObject();
     }
 
     private static string? Text(JsonElement body, string property) =>
         body.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.String ? value.GetString() : null;
+
+    /// <summary>
+    /// One word of a closed set, spelled the way the contract spells it. A word
+    /// outside the set is refused here rather than read as nothing.
+    /// </summary>
+    private static T? Closed<T>(JsonElement body, string property) where T : struct, Enum =>
+        Text(body, property) is { } spelled
+            ? Spelling.TryRead<T>(spelled, out var value)
+                ? value
+                : throw new JsonException($"A {property} is one of {string.Join(", ", Enum.GetValues<T>().Select(Spelling.Of))}.")
+            : null;
+
+    /// <summary>The anchor, where the body carried one that is not null.</summary>
+    private static AnchorShape? Anchor(JsonElement body) =>
+        body.TryGetProperty("attached_to", out var value) && value.ValueKind is JsonValueKind.Object
+            ? new AnchorShape(
+                Spelling.TryRead<AnchorKind>(Text(value, "kind"), out var kind)
+                    ? kind
+                    : throw new JsonException("An attached_to is a machine or an installation."),
+                Text(value, "key") ?? string.Empty)
+            : null;
 }
 
 /// <summary>
@@ -71,18 +116,20 @@ public static class PageEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        door.MapGet(string.Empty, (string? q, ListPages list, CancellationToken cancellationToken) =>
-                list.ExecuteAsync(q, cancellationToken))
+        door.MapGet(string.Empty, (string? q, string? kind, string? machine, string? installation, ListPages list, CancellationToken cancellationToken) =>
+                list.ExecuteAsync(q, kind, machine, installation, cancellationToken))
             .WithName("ListPages")
-            .WithSummary("Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.");
+            .WithSummary("Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; `kind`, `machine` and `installation` narrow it. Not paginated.")
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         door.MapPost(string.Empty, async (CreatePageRequest? request, CreatePage create, CancellationToken cancellationToken) =>
             {
-                var page = await create.ExecuteAsync(request ?? new CreatePageRequest(null, null, null), cancellationToken);
+                var page = await create.ExecuteAsync(
+                    request ?? new CreatePageRequest(null, null, null, null, null), cancellationToken);
                 return Results.Created($"{Routes.Api}/pages/{page.Slug}", page);
             })
             .WithName("CreatePage")
-            .WithSummary("Create a page: the slug is given, never derived from the title.")
+            .WithSummary("Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance.")
             .Produces<PageShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -100,11 +147,18 @@ public static class PageEndpoints
         door.MapPatch("/{slug}", (string slug, ChangePageRequest? request, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
                     slug,
-                    new PageChanges(request?.Slug, request?.Title, request?.BodyGiven ?? false, request?.Body),
+                    new PageChanges(
+                        request?.Slug,
+                        request?.Title,
+                        request?.BodyGiven ?? false,
+                        request?.Body,
+                        request?.Kind,
+                        request?.AttachedToGiven ?? false,
+                        request?.AttachedTo),
                     http.Headers.IfMatch.ToString(),
                     cancellationToken))
             .WithName("ChangePage")
-            .WithSummary("Change the title, the Markdown or the slug; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug.")
+            .WithSummary("Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole.")
             .Produces<PageShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);

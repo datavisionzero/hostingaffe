@@ -72,7 +72,8 @@ public static class OpenApiDocument
                     || type == typeof(CreateFileRequest)
                     || type == typeof(WriteFileRequest)
                     || type == typeof(RecordDeploymentRequest)
-                    || type == typeof(CorrectDeploymentRequest))
+                    || type == typeof(CorrectDeploymentRequest)
+                    || type == typeof(CreatePageRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;
                 }

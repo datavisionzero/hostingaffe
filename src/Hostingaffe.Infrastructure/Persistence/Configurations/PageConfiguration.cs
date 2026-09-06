@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NpgsqlTypes;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Installations;
+using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
@@ -15,7 +18,14 @@ public sealed class PageConfiguration : IEntityTypeConfiguration<Page>
 {
     public void Configure(EntityTypeBuilder<Page> builder)
     {
-        builder.ToTable("page");
+        builder.ToTable("page", table =>
+        {
+            table.HasCheckConstraint("ck_page_kind", "kind in ('runbook', 'decision', 'note')");
+
+            // Attached to one thing, or to nothing at all — and the third
+            // state, both, is not one the model has.
+            table.HasCheckConstraint("ck_page_attached_to", "num_nonnulls(machine_id, installation_id) <= 1");
+        });
 
         builder.HasKey(p => p.Id).HasName("pk_page");
         builder.Property(p => p.Id).HasColumnName("id");
@@ -27,6 +37,39 @@ public sealed class PageConfiguration : IEntityTypeConfiguration<Page>
         builder.HasIndex(p => p.Slug).IsUnique().HasDatabaseName("page_slug");
 
         builder.Property(p => p.Title).HasColumnName("title").IsRequired();
+
+        // No database default. `runbook` is the first value of the enum and so
+        // the CLR default, and a column default would make EF leave it out of
+        // every insert that meant it — the row would come back a `note`. What
+        // the pages written before the column existed became is the migration's
+        // business, and it is a one-line backfill there.
+        builder.Property(p => p.Kind)
+            .HasColumnName("kind")
+            .HasConversion(new SnakeCaseEnumConverter<PageKind>())
+            .IsRequired();
+
+        // What the page hangs on, or nothing — then it is the instance's. No
+        // cascade either way: a page does not follow its anchor into deletion.
+        builder.Property(p => p.MachineId).HasColumnName("machine_id");
+        builder.HasOne<Machine>()
+            .WithMany()
+            .HasForeignKey(p => p.MachineId)
+            .HasConstraintName("fk_page_machine")
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.Property(p => p.InstallationId).HasColumnName("installation_id");
+        builder.HasOne<Installation>()
+            .WithMany()
+            .HasForeignKey(p => p.InstallationId)
+            .HasConstraintName("fk_page_installation")
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Read by whenever the pages of a machine or an installation are asked
+        // for, which is what makes `attached_to` a filter rather than a label.
+        builder.HasIndex(p => p.MachineId).HasDatabaseName("page_on_machine").HasFilter("machine_id is not null");
+        builder.HasIndex(p => p.InstallationId).HasDatabaseName("page_on_installation").HasFilter("installation_id is not null");
+
+        builder.Ignore(p => p.Attached);
 
         builder.Property(p => p.Body)
             .HasColumnName("body")

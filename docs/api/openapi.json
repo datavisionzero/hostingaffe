@@ -3276,11 +3276,32 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.",
+        "summary": "Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; `kind`, `machine` and `installation` narrow it. Not paginated.",
         "operationId": "ListPages",
         "parameters": [
           {
             "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "machine",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "installation",
             "in": "query",
             "schema": {
               "type": "string"
@@ -3320,6 +3341,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -3327,7 +3358,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create a page: the slug is given, never derived from the title.",
+        "summary": "Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance.",
         "operationId": "CreatePage",
         "requestBody": {
           "content": {
@@ -3447,7 +3478,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change the title, the Markdown or the slug; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug.",
+        "summary": "Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole.",
         "operationId": "ChangePage",
         "parameters": [
           {
@@ -3912,6 +3943,28 @@
             "format": "date-time"
           }
         }
+      },
+      "Anchor": {
+        "required": [
+          "kind",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AnchorKind"
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "AnchorKind": {
+        "enum": [
+          "machine",
+          "installation"
+        ],
+        "type": "string"
       },
       "Arch": {
         "enum": [
@@ -4754,7 +4807,9 @@
         "required": [
           "slug",
           "title",
-          "body"
+          "body",
+          "kind",
+          "attached_to"
         ],
         "type": "object",
         "properties": {
@@ -4775,8 +4830,29 @@
               "null",
               "string"
             ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PageKind"
+              }
+            ]
+          },
+          "attached_to": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
+            ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "CreateSoftwareRequest": {
         "required": [
@@ -5068,7 +5144,7 @@
         "type": "object",
         "properties": {
           "owner": {
-            "$ref": "#/components/schemas/Owner"
+            "$ref": "#/components/schemas/Anchor"
           },
           "path": {
             "type": "string"
@@ -5136,7 +5212,7 @@
         "type": "object",
         "properties": {
           "owner": {
-            "$ref": "#/components/schemas/Owner"
+            "$ref": "#/components/schemas/Anchor"
           },
           "path": {
             "type": "string"
@@ -5729,32 +5805,12 @@
         ],
         "type": "string"
       },
-      "Owner": {
-        "required": [
-          "kind",
-          "key"
-        ],
-        "type": "object",
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/OwnerKind"
-          },
-          "key": {
-            "type": "string"
-          }
-        }
-      },
-      "OwnerKind": {
-        "enum": [
-          "machine",
-          "installation"
-        ],
-        "type": "string"
-      },
       "Page": {
         "required": [
           "slug",
           "title",
+          "kind",
+          "attached_to",
           "body",
           "author",
           "updated_by",
@@ -5768,6 +5824,19 @@
           },
           "title": {
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind"
+          },
+          "attached_to": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
+            ]
           },
           "body": {
             "type": "string"
@@ -5788,10 +5857,20 @@
           }
         }
       },
+      "PageKind": {
+        "enum": [
+          "runbook",
+          "decision",
+          "note"
+        ],
+        "type": "string"
+      },
       "PageSummary": {
         "required": [
           "slug",
           "title",
+          "kind",
+          "attached_to",
           "updated_by",
           "created_at",
           "updated_at"
@@ -5803,6 +5882,19 @@
           },
           "title": {
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind"
+          },
+          "attached_to": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
+            ]
           },
           "updated_by": {
             "$ref": "#/components/schemas/IdentityRef"

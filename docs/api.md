@@ -358,7 +358,7 @@ this model.
 
 | | |
 |---|---|
-| `GET /api/pages` | every page, by slug, without the bodies; `q` is the full-text filter |
+| `GET /api/pages` | every page, by slug, without the bodies; `q`, `kind`, `machine`, `installation` filter |
 | `POST /api/pages` | the slug is given, never derived from the title (planaffe ADR 0021) |
 | `GET /api/pages/{slug}` | the complete page |
 | `PATCH /api/pages/{slug}` | title, body or slug; `If-Match` guards it |
@@ -368,3 +368,23 @@ this model.
 A page's slug is its address and may be renamed; nothing forwards afterwards,
 and the rename stands in the history. A deleted page keeps its slug until the
 purge, so a restore never lands on a name somebody else has taken.
+
+**`kind` is `runbook`, `decision` or `note`**, and it says how the page is to be
+read and nothing more: no status, no supersedes, no template enforced beyond it.
+It defaults to `note`, which is the kind that claims nothing.
+
+**`attached_to` names a machine or an installation, or is left out** — and then
+the page belongs to the instance as a whole:
+
+```json
+{"attached_to": {"kind": "machine", "key": "ex44"}}
+```
+
+The kind is part of it because a key alone would name two things: a machine
+`caddy` and an installation `caddy` both exist. In `PATCH`, `"attached_to":
+null` unhooks the page and leaving the field out leaves the anchor where it is —
+the same rule the body follows.
+
+Filtering is `?kind=runbook`, `?machine=ex44` and `?installation=logaffe-prod`.
+Asking for both a machine and an installation is `validation`: a page hangs on
+one thing.

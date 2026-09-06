@@ -1,5 +1,5 @@
 using Hostingaffe.Application.Acts;
-using Hostingaffe.Domain.Files;
+using Hostingaffe.Domain;
 
 namespace Hostingaffe.Api.Http;
 
@@ -24,15 +24,15 @@ public static class FileEndpoints
 {
     public static IEndpointRouteBuilder MapFiles(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapFilesOf(OwnerKind.Machine, "machines");
-        endpoints.MapFilesOf(OwnerKind.Installation, "installations");
+        endpoints.MapFilesOf(AnchorKind.Machine, "machines");
+        endpoints.MapFilesOf(AnchorKind.Installation, "installations");
 
         return endpoints;
     }
 
-    private static void MapFilesOf(this IEndpointRouteBuilder endpoints, OwnerKind kind, string collection)
+    private static void MapFilesOf(this IEndpointRouteBuilder endpoints, AnchorKind kind, string collection)
     {
-        var owner = kind is OwnerKind.Machine ? "machine" : "installation";
+        var owner = kind is AnchorKind.Machine ? "machine" : "installation";
 
         var door = endpoints.MapGroup($"/{collection}/{{key}}")
             .RequireAuthorization()

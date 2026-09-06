@@ -76,7 +76,7 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("File", schemas);
         Assert.Contains("FileSummary", schemas);
         Assert.Contains("FileRevision", schemas);
-        Assert.Contains("Owner", schemas);
+        Assert.Contains("Anchor", schemas);
         Assert.Contains("Installation", schemas);
         Assert.Contains("InstallationSummary", schemas);
         Assert.Contains("Port", schemas);

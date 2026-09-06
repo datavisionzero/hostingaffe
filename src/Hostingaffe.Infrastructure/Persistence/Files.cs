@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Hostingaffe.Application.Ports;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Files;
 
 using File = Hostingaffe.Domain.Files.File;
@@ -17,14 +18,14 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// </remarks>
 public sealed class Files(HostingaffeDbContext context) : IFiles
 {
-    public async Task<File?> FindAnyAsync(FileOwner owner, string path, CancellationToken cancellationToken)
+    public async Task<File?> FindAnyAsync(Anchor owner, string path, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
         return await Owned(owner).SingleOrDefaultAsync(f => f.Path == path, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<File>> ListAsync(FileOwner owner, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<File>> ListAsync(Anchor owner, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -49,8 +50,8 @@ public sealed class Files(HostingaffeDbContext context) : IFiles
 
     public Task SaveAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
 
-    private IQueryable<File> Owned(FileOwner owner) =>
-        owner.Kind is OwnerKind.Machine
+    private IQueryable<File> Owned(Anchor owner) =>
+        owner.Kind is AnchorKind.Machine
             ? context.Files.Where(f => f.MachineId == owner.Id)
             : context.Files.Where(f => f.InstallationId == owner.Id);
 }

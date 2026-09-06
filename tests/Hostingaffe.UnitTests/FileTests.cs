@@ -1,3 +1,4 @@
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Files;
 
 using File = Hostingaffe.Domain.Files.File;
@@ -16,7 +17,7 @@ public sealed class FileTests
 
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly FileOwner Owner = new(OwnerKind.Installation, Guid.CreateVersion7(), "logaffe-prod");
+    private static readonly Anchor Owner = new(AnchorKind.Installation, Guid.CreateVersion7(), "logaffe-prod");
 
     private static File A(string path = "compose.override.yml", string content = "services:") =>
         File.Create(Owner, path, content, executable: false, Actor, Now);
@@ -137,6 +138,6 @@ public sealed class FileTests
     public void An_owner_is_a_kind_and_a_key()
     {
         Assert.Equal("installation logaffe-prod", Owner.ToString());
-        Assert.Equal("machine ex44", new FileOwner(OwnerKind.Machine, Guid.CreateVersion7(), "ex44").ToString());
+        Assert.Equal("machine ex44", new Anchor(AnchorKind.Machine, Guid.CreateVersion7(), "ex44").ToString());
     }
 }

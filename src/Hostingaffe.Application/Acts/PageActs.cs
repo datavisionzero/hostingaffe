@@ -9,6 +9,8 @@ namespace Hostingaffe.Application.Acts;
 public sealed record PageSummaryShape(
     string Slug,
     string Title,
+    PageKind Kind,
+    AnchorShape? AttachedTo,
     IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -17,19 +19,33 @@ public sealed record PageSummaryShape(
 public sealed record PageShape(
     string Slug,
     string Title,
+    PageKind Kind,
+    AnchorShape? AttachedTo,
     string Body,
     IdentityRef Author,
     IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record CreatePageRequest(string? Slug, string? Title, string? Body);
+public sealed record CreatePageRequest(
+    string? Slug, string? Title, string? Body, PageKind? Kind, AnchorShape? AttachedTo);
 
 /// <param name="BodyGiven">Present, even as <c>null</c>, which empties the document.</param>
-public sealed record PageChanges(string? Slug, string? Title, bool BodyGiven, string? Body);
+/// <param name="AttachedToGiven">
+/// Present, even as <c>null</c>, which unhooks the page and gives it to the
+/// instance as a whole. Absent leaves the anchor where it is.
+/// </param>
+public sealed record PageChanges(
+    string? Slug,
+    string? Title,
+    bool BodyGiven,
+    string? Body,
+    PageKind? Kind,
+    bool AttachedToGiven,
+    AnchorShape? AttachedTo);
 
 /// <summary>Turns page rows into the two shapes, resolving the identities once for the whole list.</summary>
-public sealed class PageAssembler(IIdentities identities)
+public sealed class PageAssembler(IIdentities identities, Anchorage anchorage)
 {
     public async Task<IReadOnlyList<PageSummaryShape>> SummariesAsync(
         IReadOnlyList<Page> rows, CancellationToken cancellationToken)
@@ -40,12 +56,15 @@ public sealed class PageAssembler(IIdentities identities)
         }
 
         var people = await PeopleAsync(rows.Select(p => p.UpdatedBy), cancellationToken);
+        var anchors = await Anchors(rows, cancellationToken);
 
         return
         [
             .. rows.Select(p => new PageSummaryShape(
                 p.Slug,
                 p.Title,
+                p.Kind,
+                Named(p, anchors),
                 people[p.UpdatedBy],
                 p.CreatedAt,
                 p.UpdatedAt)),
@@ -57,16 +76,28 @@ public sealed class PageAssembler(IIdentities identities)
         ArgumentNullException.ThrowIfNull(page);
 
         var people = await PeopleAsync([page.CreatedBy, page.UpdatedBy], cancellationToken);
+        var anchors = await Anchors([page], cancellationToken);
 
         return new PageShape(
             page.Slug,
             page.Title,
+            page.Kind,
+            Named(page, anchors),
             page.Body,
             people[page.CreatedBy],
             people[page.UpdatedBy],
             page.CreatedAt,
             page.UpdatedAt);
     }
+
+    private Task<IReadOnlyDictionary<Guid, AnchorShape>> Anchors(
+        IReadOnlyList<Page> rows, CancellationToken cancellationToken) =>
+        anchorage.NamesAsync(
+            rows.Select(p => p.MachineId), rows.Select(p => p.InstallationId), cancellationToken);
+
+    /// <summary>What the page hangs on, or nothing — then it is the instance's.</summary>
+    private static AnchorShape? Named(Page page, IReadOnlyDictionary<Guid, AnchorShape> anchors) =>
+        (page.MachineId ?? page.InstallationId) is { } id ? anchors.GetValueOrDefault(id) : null;
 
     private async Task<Dictionary<Guid, IdentityRef>> PeopleAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
     {
@@ -130,10 +161,35 @@ public static class PageLookup
 /// small, and <c>q</c> is what a reader navigates it by, since the search is
 /// what the product put in a hierarchy's place (VISION 7).
 /// </summary>
-public sealed class ListPages(IPages pages, PageAssembler assembler)
+public sealed class ListPages(IPages pages, PageAssembler assembler, Anchorage anchorage)
 {
-    public async Task<IReadOnlyList<PageSummaryShape>> ExecuteAsync(string? search, CancellationToken cancellationToken) =>
-        await assembler.SummariesAsync(await pages.ListAsync(search, cancellationToken), cancellationToken);
+    public async Task<IReadOnlyList<PageSummaryShape>> ExecuteAsync(
+        string? search,
+        string? kind,
+        string? machine,
+        string? installation,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(machine) && !string.IsNullOrWhiteSpace(installation))
+        {
+            throw Refusal.Validation(
+                "attached_to", "A page hangs on one thing; ask for the pages of a machine or of an installation, not of both.");
+        }
+
+        var anchor = !string.IsNullOrWhiteSpace(machine)
+            ? await anchorage.FromAsync(new AnchorShape(AnchorKind.Machine, machine), "machine", cancellationToken)
+            : !string.IsNullOrWhiteSpace(installation)
+                ? await anchorage.FromAsync(new AnchorShape(AnchorKind.Installation, installation), "installation", cancellationToken)
+                : null;
+
+        var rows = await pages.ListAsync(
+            search,
+            Validated.Field("kind", () => Spelling.Read<PageKind>(kind, "kind")),
+            anchor,
+            cancellationToken);
+
+        return await assembler.SummariesAsync(rows, cancellationToken);
+    }
 }
 
 public sealed class ReadPage(IPages pages, PageAssembler assembler, InstanceSettings settings)
@@ -179,6 +235,7 @@ public sealed class CreatePage(
     IHistory history,
     ITransactions transactions,
     PageAssembler assembler,
+    Anchorage anchorage,
     InstanceSettings settings,
     TimeProvider clock)
 {
@@ -189,13 +246,15 @@ public sealed class CreatePage(
 
         var slug = Validated.Field("slug", () => Slug.Normalize(request.Slug ?? string.Empty));
         var title = Validated.Field("title", () => Page.NormalizeTitle(request.Title!));
+        var anchor = await anchorage.FromAsync(request.AttachedTo, "attached_to", cancellationToken);
 
         await PageWrites.TakenAsync(pages, slug, settings, cancellationToken);
 
         var page = await transactions.RunAsync(async () =>
         {
             var now = clock.GetUtcNow();
-            var created = Page.Create(slug, title, request.Body, caller.Id, now);
+            var created = Page.Create(slug, title, request.Body, request.Kind ?? PageKind.Note, caller.Id, now);
+            created.AttachTo(anchor, caller.Id, now);
 
             pages.Add(created);
             history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Created));
@@ -220,6 +279,7 @@ public sealed class ChangePage(
     IHistory history,
     ITransactions transactions,
     PageAssembler assembler,
+    Anchorage anchorage,
     InstanceSettings settings,
     TimeProvider clock)
 {
@@ -231,6 +291,10 @@ public sealed class ChangePage(
 
         var before = await pages.LiveAsync(slug, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
+
+        var anchor = changes.AttachedToGiven
+            ? await anchorage.FromAsync(changes.AttachedTo, "attached_to", cancellationToken)
+            : null;
 
         var renamed = changes.Slug is null ? null : Validated.Field("slug", () => Slug.Normalize(changes.Slug));
         if (renamed is not null && renamed != before.Slug)
@@ -271,6 +335,19 @@ public sealed class ChangePage(
             {
                 row.Rewrite(changes.Body, caller.Id, now);
                 history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Body));
+            }
+
+            if (changes.Kind is { } kind
+                && Validated.Field("kind", () => row.Reclassify(kind, caller.Id, now)) is { } reclassified)
+            {
+                history.Add(HistoryEntry.OnPage(
+                    row.Id, caller.Id, now, reclassified.Field, reclassified.OldValue, reclassified.NewValue));
+            }
+
+            if (changes.AttachedToGiven && row.AttachTo(anchor, caller.Id, now) is { } attached)
+            {
+                history.Add(HistoryEntry.OnPage(
+                    row.Id, caller.Id, now, attached.Field, attached.OldValue, attached.NewValue));
             }
 
             await pages.SaveAsync(cancellationToken);

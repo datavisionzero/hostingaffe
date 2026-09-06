@@ -1,3 +1,4 @@
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Pages;
 
 namespace Hostingaffe.Application.Ports;
@@ -18,10 +19,13 @@ public interface IPages
     Task<Page?> FindAnyAsync(string slug, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Every live page, by slug; <paramref name="search"/> filters by the words
-    /// in the title and the body.
+    /// Every live page, by slug. <paramref name="search"/> filters by the words
+    /// in the title and the body, <paramref name="kind"/> by what a page is to
+    /// be read as, and <paramref name="anchor"/> by what it hangs on. Each is
+    /// optional, and none of them is a search but the first.
     /// </summary>
-    Task<IReadOnlyList<Page>> ListAsync(string? search, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Page>> ListAsync(
+        string? search, PageKind? kind, Anchor? anchor, CancellationToken cancellationToken);
 
     /// <summary>The row, tracked and locked for the rest of the transaction.</summary>
     Task<Page?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);

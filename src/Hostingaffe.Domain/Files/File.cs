@@ -43,11 +43,11 @@ public sealed class File
         // EF Core materializes through this; every other route goes through Create.
     }
 
-    private File(Guid id, FileOwner owner, string path, Guid createdBy, DateTimeOffset createdAt)
+    private File(Guid id, Anchor owner, string path, Guid createdBy, DateTimeOffset createdAt)
     {
         Id = id;
-        MachineId = owner.Kind is OwnerKind.Machine ? owner.Id : null;
-        InstallationId = owner.Kind is OwnerKind.Installation ? owner.Id : null;
+        MachineId = owner.Kind is AnchorKind.Machine ? owner.Id : null;
+        InstallationId = owner.Kind is AnchorKind.Installation ? owner.Id : null;
         Path = path;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
@@ -103,7 +103,7 @@ public sealed class File
 
     /// <exception cref="ArgumentException">The path is refused, or the content is not text this holds.</exception>
     public static File Create(
-        FileOwner owner, string path, string? content, bool executable, Guid createdBy, DateTimeOffset createdAt)
+        Anchor owner, string path, string? content, bool executable, Guid createdBy, DateTimeOffset createdAt)
     {
         ArgumentNullException.ThrowIfNull(owner);
 

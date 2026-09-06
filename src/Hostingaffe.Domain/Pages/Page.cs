@@ -1,3 +1,5 @@
+using Hostingaffe.Domain.History;
+
 namespace Hostingaffe.Domain.Pages;
 
 /// <summary>
@@ -31,12 +33,13 @@ public sealed class Page
         // EF Core materializes through this; every other route goes through Create.
     }
 
-    private Page(Guid id, string slug, string title, string body, Guid createdBy, DateTimeOffset createdAt)
+    private Page(Guid id, string slug, string title, string body, PageKind kind, Guid createdBy, DateTimeOffset createdAt)
     {
         Id = id;
         Slug = slug;
         Title = title;
         Body = body;
+        Kind = kind;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedBy = createdBy;
@@ -52,6 +55,21 @@ public sealed class Page
 
     /// <summary>Markdown, rendered in the browser and never as HTML (ADR 0007).</summary>
     public string Body { get; private set; } = null!;
+
+    /// <summary>What it is to be read as, and nothing beyond that.</summary>
+    public PageKind Kind { get; private set; }
+
+    /// <summary>Set when the page hangs on a machine, and then the other one is not.</summary>
+    public Guid? MachineId { get; private set; }
+
+    /// <summary>Set when the page hangs on an installation, and then the other one is not.</summary>
+    public Guid? InstallationId { get; private set; }
+
+    /// <summary>
+    /// Whether it hangs on anything at all. A page that does not belongs to the
+    /// instance as a whole, which is a state the model has on purpose (VISION 7).
+    /// </summary>
+    public bool Attached => MachineId is not null || InstallationId is not null;
 
     public Guid CreatedBy { get; private init; }
 
@@ -69,14 +87,59 @@ public sealed class Page
 
     public bool Deleted => DeletedAt is not null;
 
-    public static Page Create(string slug, string title, string? body, Guid createdBy, DateTimeOffset createdAt) =>
+    public static Page Create(
+        string slug, string title, string? body, PageKind kind, Guid createdBy, DateTimeOffset createdAt) =>
         new(
             Guid.CreateVersion7(),
             Domain.Pages.Slug.Normalize(slug),
             NormalizeTitle(title),
             body ?? string.Empty,
+            Enum.IsDefined(kind) ? kind : throw new ArgumentException("Not a kind.", nameof(kind)),
             createdBy,
             createdAt);
+
+    /// <summary>What the page is to be read as. Answers the change, or nothing where there is none.</summary>
+    public FieldChange? Reclassify(PageKind kind, Guid by, DateTimeOffset at)
+    {
+        if (kind == Kind)
+        {
+            return null;
+        }
+
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentException("Not a kind.", nameof(kind));
+        }
+
+        var change = new FieldChange("kind", Spelling.Of(Kind), Spelling.Of(kind));
+        Kind = kind;
+        Touch(by, at);
+
+        return change;
+    }
+
+    /// <summary>
+    /// What the page hangs on, or nothing — and then it belongs to the instance
+    /// as a whole. Answers the change, or nothing where there is none.
+    /// </summary>
+    public FieldChange? AttachTo(Anchor? anchor, Guid by, DateTimeOffset at)
+    {
+        var was = MachineId ?? InstallationId;
+
+        if (anchor?.Id == was && (anchor is null) == (was is null))
+        {
+            return null;
+        }
+
+        MachineId = anchor?.Kind is AnchorKind.Machine ? anchor.Id : null;
+        InstallationId = anchor?.Kind is AnchorKind.Installation ? anchor.Id : null;
+
+        Touch(by, at);
+
+        // The old anchor is a row the Domain does not resolve, so the entry
+        // carries what it became — the same way a machine's host does.
+        return new FieldChange("attached_to", null, anchor?.ToString());
+    }
 
     /// <summary>The address changes and the old one leads nowhere; nothing forwards (ADR 0021).</summary>
     public void Rename(string slug, Guid by, DateTimeOffset at)

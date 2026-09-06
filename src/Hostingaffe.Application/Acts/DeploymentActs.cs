@@ -124,8 +124,7 @@ public sealed class DeploymentAssembler(IIdentities identities, IFiles files)
 
         var people = await identities.FindManyAsync([one.CreatedBy, one.UpdatedBy], cancellationToken);
 
-        var owner = new Domain.Files.FileOwner(
-            Domain.Files.OwnerKind.Installation, installation.Id, installation.Key);
+        var owner = new Anchor(AnchorKind.Installation, installation.Id, installation.Key);
 
         return new DeploymentShape(
             installation.Key,

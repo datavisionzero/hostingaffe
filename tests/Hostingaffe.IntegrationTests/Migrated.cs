@@ -48,7 +48,7 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
 
         migrated.User = User.Create("maintainer", administrator: true, Now);
         migrated.Agent = Agent.Create("quiet-otter-42", migrated.User.Id, Now);
-        migrated.Page = Page.Create("welcome", "Welcome", "The seeded page.", migrated.User.Id, Now);
+        migrated.Page = Page.Create("welcome", "Welcome", "The seeded page.", PageKind.Note, migrated.User.Id, Now);
         migrated.Machine = Machine.Create("ex44", null, MachineKind.Dedicated, migrated.User.Id, Now);
         migrated.Software = Software.Create("logaffe", null, migrated.User.Id, Now);
         migrated.Installation = Installation.Create(
