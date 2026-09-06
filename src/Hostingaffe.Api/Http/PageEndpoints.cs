@@ -79,7 +79,7 @@ public static class PageEndpoints
         door.MapPost(string.Empty, async (CreatePageRequest? request, CreatePage create, CancellationToken cancellationToken) =>
             {
                 var page = await create.ExecuteAsync(request ?? new CreatePageRequest(null, null, null), cancellationToken);
-                return Results.Created($"/pages/{page.Slug}", page);
+                return Results.Created($"{Routes.Api}/pages/{page.Slug}", page);
             })
             .WithName("CreatePage")
             .WithSummary("Create a page: the slug is given, never derived from the title.")

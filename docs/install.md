@@ -57,7 +57,7 @@ The instance migrates its own schema, creates the first administrator, and
 serves on `8080`. It is up when this answers:
 
 ```sh
-curl -s localhost:8080/version
+curl -s localhost:8080/api/version
 ```
 
 ## Sign in

@@ -8,7 +8,7 @@ namespace Hostingaffe.Api.Hosting;
 /// </summary>
 /// <remarks>
 /// It is the same string in the <c>Hostingaffe-Version</c> header of every
-/// response and under <c>GET /version</c>, and the CLI compares it with its own
+/// response and under <c>GET /api/version</c>, and the CLI compares it with its own
 /// to report skew as what it is (ADR 0011). The build metadata after the
 /// <c>+</c> — the commit — is not part of the semver the CLI compares, and is
 /// left off.

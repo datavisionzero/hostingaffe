@@ -54,8 +54,8 @@ rules and not suggestions: a plaintext hop or an `http` link would hand it to
 whoever is listening. Both stop the start rather than degrading quietly, and
 the line the instance writes names the variable.
 
-`GET /admin/smtp` says whether it is configured, and the administration screen
-sends a test mail to an address you name.
+`GET /api/admin/smtp` says whether it is configured, and the administration
+screen sends a test mail to an address you name.
 
 ### Logs
 
@@ -109,7 +109,7 @@ the first start says whether it created the administrator or found identities
 already there. If the token was lost, a second administrator cannot be made
 from the environment — it is a `psql` job or a restore.
 
-**An invitation never arrives.** `GET /admin/smtp` first: unset is not
+**An invitation never arrives.** `GET /api/admin/smtp` first: unset is not
 misconfigured. Then the test mail from the administration screen, which reports
 what the server said.
 

@@ -26,11 +26,11 @@ public sealed class BootstrapTests(PostgresFixture postgres)
         await using var second = first.StartedAgain("somebody-else", "another-secret-of-more-than-thirty-two-characters");
 
         using var oldToken = second.ClientWith(AnInstance.BootstrapToken);
-        using var stillAdmitted = await oldToken.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var stillAdmitted = await oldToken.GetAsync("/api/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, stillAdmitted.StatusCode);
 
         using var newToken = second.ClientWith("another-secret-of-more-than-thirty-two-characters");
-        using var refused = await newToken.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var refused = await newToken.GetAsync("/api/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
 
         await using var context = Migrated.ContextFor(second.ConnectionString);
@@ -56,10 +56,10 @@ public sealed class BootstrapTests(PostgresFixture postgres)
         await using var instance = await AnInstance.StartedAsync(postgres, null, null);
 
         using var client = instance.ClientWith(AnInstance.BootstrapToken);
-        using var refused = await client.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var refused = await client.GetAsync("/api/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
 
-        using var version = await client.GetAsync("/version", TestContext.Current.CancellationToken);
+        using var version = await client.GetAsync("/api/version", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, version.StatusCode);
     }
 

@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Api">
-    <!-- Serves the document at /openapi/v1.json that CI captures into
+    <!-- Serves the document at /api/openapi/v1.json that CI captures into
          docs/api/openapi.json and compares against the checked-in one
          (ADR 0005). Generating it at build time was tried in the sibling and
          dropped: the tooling starts the host, and the host migrates on start. -->

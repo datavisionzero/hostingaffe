@@ -22,29 +22,29 @@ public sealed class IdempotencyTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         var body = new { slug = "architecture", title = "Architecture", body = "# The four layers" };
 
-        using var first = await Send(admin, HttpMethod.Post, "/pages", body, "create-architecture");
+        using var first = await Send(admin, HttpMethod.Post, "/api/pages", body, "create-architecture");
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var firstBody = await first.Content.ReadAsStringAsync(Ct);
 
-        using var replay = await Send(admin, HttpMethod.Post, "/pages", body, "create-architecture");
+        using var replay = await Send(admin, HttpMethod.Post, "/api/pages", body, "create-architecture");
         Assert.Equal(HttpStatusCode.Created, replay.StatusCode);
         // The same answer — structurally: the store is jsonb, which spells its JSON its own way.
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(firstBody), JsonNode.Parse(await replay.Content.ReadAsStringAsync(Ct))));
         Assert.Equal("true", Assert.Single(replay.Headers.GetValues("Idempotent-Replayed")));
 
-        Assert.Single((await admin.GetFromJsonAsync<JsonElement>("/pages", Ct)).EnumerateArray());
+        Assert.Single((await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct)).EnumerateArray());
 
         // The same key with a different body is a reuse, not a replay.
         var mismatch = await Refusals.Problem(
-            await Send(admin, HttpMethod.Post, "/pages", new { slug = "other", title = "Other" }, "create-architecture"),
+            await Send(admin, HttpMethod.Post, "/api/pages", new { slug = "other", title = "Other" }, "create-architecture"),
             HttpStatusCode.Conflict, "idempotency-mismatch");
         Assert.Contains("create-architecture", mismatch.GetProperty("detail").GetString(), StringComparison.Ordinal);
 
         // A fresh key creates again.
         using var fresh = await Send(
-            admin, HttpMethod.Post, "/pages", new { slug = "onboarding", title = "Onboarding" }, "create-onboarding");
+            admin, HttpMethod.Post, "/api/pages", new { slug = "onboarding", title = "Onboarding" }, "create-onboarding");
         Assert.Equal(HttpStatusCode.Created, fresh.StatusCode);
-        Assert.Equal(2, (await admin.GetFromJsonAsync<JsonElement>("/pages", Ct)).EnumerateArray().Count());
+        Assert.Equal(2, (await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct)).EnumerateArray().Count());
     }
 
     [Fact]
@@ -54,28 +54,28 @@ public sealed class IdempotencyTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         using var other = instance.ClientWith(await instance.AddActiveUserAsync("other"));
 
-        using var mine = await Send(admin, HttpMethod.Post, "/pages", new { slug = "mine", title = "Mine" }, "shared-key");
-        using var theirs = await Send(other, HttpMethod.Post, "/pages", new { slug = "theirs", title = "Theirs" }, "shared-key");
+        using var mine = await Send(admin, HttpMethod.Post, "/api/pages", new { slug = "mine", title = "Mine" }, "shared-key");
+        using var theirs = await Send(other, HttpMethod.Post, "/api/pages", new { slug = "theirs", title = "Theirs" }, "shared-key");
         Assert.Equal(HttpStatusCode.Created, mine.StatusCode);
         Assert.Equal(HttpStatusCode.Created, theirs.StatusCode);
-        Assert.Equal(2, (await admin.GetFromJsonAsync<JsonElement>("/pages", Ct)).EnumerateArray().Count());
+        Assert.Equal(2, (await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct)).EnumerateArray().Count());
 
         // A refused write is kept and replayed as the same refusal.
         var bad = new { slug = "", title = "" };
         await Refusals.Problem(
-            await Send(admin, HttpMethod.Post, "/pages", bad, "bad-key"), HttpStatusCode.BadRequest, "validation");
-        using var replayed = await Send(admin, HttpMethod.Post, "/pages", bad, "bad-key");
+            await Send(admin, HttpMethod.Post, "/api/pages", bad, "bad-key"), HttpStatusCode.BadRequest, "validation");
+        using var replayed = await Send(admin, HttpMethod.Post, "/api/pages", bad, "bad-key");
         Assert.Equal(HttpStatusCode.BadRequest, replayed.StatusCode);
         Assert.Equal("application/problem+json", replayed.Content.Headers.ContentType?.MediaType);
         Assert.Equal("true", Assert.Single(replayed.Headers.GetValues("Idempotent-Replayed")));
 
         // A key on a read is ignored; an overlong key is refused; a key without a caller changes nothing about the 401.
-        using var read = await Send(admin, HttpMethod.Get, "/pages", null, "shared-key");
+        using var read = await Send(admin, HttpMethod.Get, "/api/pages", null, "shared-key");
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         await Refusals.Problem(
-            await Send(admin, HttpMethod.Post, "/pages", bad, new string('k', 201)), HttpStatusCode.BadRequest, "validation");
+            await Send(admin, HttpMethod.Post, "/api/pages", bad, new string('k', 201)), HttpStatusCode.BadRequest, "validation");
         using var anonymous = instance.ClientWith(null);
-        using var refused = await Send(anonymous, HttpMethod.Post, "/pages", bad, "no-caller");
+        using var refused = await Send(anonymous, HttpMethod.Post, "/api/pages", bad, "no-caller");
         Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
     }
 

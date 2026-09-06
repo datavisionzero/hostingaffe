@@ -19,7 +19,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var client = instance.ClientWith(null);
 
-        await Unauthenticated(await client.GetAsync("/me", TestContext.Current.CancellationToken));
+        await Unauthenticated(await client.GetAsync("/api/me", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var client = instance.ClientWith(TokenSecret.Generate());
 
-        await Unauthenticated(await client.GetAsync("/me", TestContext.Current.CancellationToken));
+        await Unauthenticated(await client.GetAsync("/api/me", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var client = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var before = await client.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var before = await client.GetAsync("/api/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, before.StatusCode);
 
         await using (var context = Migrated.ContextFor(instance.ConnectionString))
@@ -47,7 +47,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        await Unauthenticated(await client.GetAsync("/me", TestContext.Current.CancellationToken));
+        await Unauthenticated(await client.GetAsync("/api/me", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
         using var client = instance.CreateClient();
         client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Basic {AnInstance.BootstrapToken}");
 
-        await Unauthenticated(await client.GetAsync("/me", TestContext.Current.CancellationToken));
+        await Unauthenticated(await client.GetAsync("/api/me", TestContext.Current.CancellationToken));
     }
 
     private static async Task Unauthenticated(HttpResponseMessage response)
@@ -70,7 +70,7 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
             var problem = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
             Assert.Equal("/problems/unauthenticated", problem.GetProperty("type").GetString());
             Assert.Equal(401, problem.GetProperty("status").GetInt32());
-            Assert.Equal("/me", problem.GetProperty("instance").GetString());
+            Assert.Equal("/api/me", problem.GetProperty("instance").GetString());
             Assert.False(string.IsNullOrEmpty(problem.GetProperty("title").GetString()));
         }
     }

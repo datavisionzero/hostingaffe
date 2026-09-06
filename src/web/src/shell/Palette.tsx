@@ -88,7 +88,7 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const pages = await api.GET("/pages", {
+          const pages = await api.GET("/api/pages", {
             params: { query: { q: needle } },
             signal: controller.signal,
           });

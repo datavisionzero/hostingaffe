@@ -21,7 +21,7 @@ public sealed class InstanceEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var client = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var response = await client.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/api/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var me = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
@@ -53,7 +53,7 @@ public sealed class InstanceEndpointTests(PostgresFixture postgres)
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var me = await client.GetFromJsonAsync<JsonElement>("/me", TestContext.Current.CancellationToken);
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/me", TestContext.Current.CancellationToken);
 
         Assert.Equal("agent", me.GetProperty("kind").GetString());
         Assert.Equal("quiet-otter-42", me.GetProperty("name").GetString());
@@ -69,7 +69,7 @@ public sealed class InstanceEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var client = instance.ClientWith(null);
 
-        using var version = await client.GetAsync("/version", TestContext.Current.CancellationToken);
+        using var version = await client.GetAsync("/api/version", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, version.StatusCode);
 
         var body = await version.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
@@ -77,7 +77,7 @@ public sealed class InstanceEndpointTests(PostgresFixture postgres)
         Assert.Equal(InstanceVersion.Value, Assert.Single(version.Headers.GetValues("Hostingaffe-Version")));
 
         // A refusal is an answer too, and the CLI reports skew from whatever it got.
-        using var refused = await client.GetAsync("/me", TestContext.Current.CancellationToken);
+        using var refused = await client.GetAsync("/api/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
         Assert.Equal(InstanceVersion.Value, Assert.Single(refused.Headers.GetValues("Hostingaffe-Version")));
     }

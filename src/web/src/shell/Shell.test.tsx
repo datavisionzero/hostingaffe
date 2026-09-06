@@ -19,7 +19,7 @@ function aPage(slug: string, title: string) {
 
 function shell(path: string) {
   const instance = installInstance({
-    "GET /pages": (request) =>
+    "GET /api/pages": (request) =>
       new URL(request.url).searchParams.get("q") === "nothing" ? [] : [aPage("architecture", "The web shell")],
   });
 

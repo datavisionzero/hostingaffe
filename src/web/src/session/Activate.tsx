@@ -11,9 +11,9 @@ export function Activate({ onActivated }: { onActivated: (me: Me) => void }) {
   const [refusal, setRefusal] = useState<string | null>(null);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = invitation ? await api.POST("/invitations/accept", { body: { secret: invitation, password } }) : await api.POST("/session/bootstrap", { body: { token, password } });
+    const result = invitation ? await api.POST("/api/invitations/accept", { body: { secret: invitation, password } }) : await api.POST("/api/session/bootstrap", { body: { token, password } });
     if (!result.response.ok) { setRefusal(describe(result.error, result.response.status)); return; }
-    const me = await api.GET("/me");
+    const me = await api.GET("/api/me");
     if (me.data) onActivated(me.data); else setRefusal(describe(me.error, me.response.status));
   }
   return <AuthFrame><div><h1 className="text-xl font-semibold">Set your password</h1><p className="text-muted-foreground mt-1 text-sm">Use at least 12 characters.</p></div>

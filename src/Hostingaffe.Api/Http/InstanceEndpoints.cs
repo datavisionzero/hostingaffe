@@ -3,7 +3,7 @@ using Hostingaffe.Application.Acts;
 
 namespace Hostingaffe.Api.Http;
 
-/// <summary>What <c>GET /version</c> answers.</summary>
+/// <summary>What <c>GET /api/version</c> answers.</summary>
 public sealed record VersionResponse(string Version);
 
 /// <summary>

@@ -23,28 +23,28 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         using var agent = await Agent(instance, admin, "one");
 
         using var created = await agent.PostAsJsonAsync(
-            "/pages",
+            "/api/pages",
             new { slug = "architecture", title = "Architecture", body = "# The four layers" },
             Ct);
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        Assert.Equal("/pages/architecture", created.Headers.Location?.ToString());
+        Assert.Equal("/api/pages/architecture", created.Headers.Location?.ToString());
         var page = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
         Assert.Equal("architecture", page.GetProperty("slug").GetString());
         Assert.Equal("# The four layers", page.GetProperty("body").GetString());
         Assert.Equal("one", page.GetProperty("author").GetProperty("name").GetString());
         Assert.Equal("one", page.GetProperty("updated_by").GetProperty("name").GetString());
 
-        await agent.PostAsJsonAsync("/pages", new { slug = "onboarding", title = "Onboarding" }, Ct);
+        await agent.PostAsJsonAsync("/api/pages", new { slug = "onboarding", title = "Onboarding" }, Ct);
 
         // The list is by slug and carries no body: a wiki of thirty pages would
         // otherwise be a context eater (ADR 0012).
-        var list = await admin.GetFromJsonAsync<JsonElement>("/pages", Ct);
+        var list = await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct);
         Assert.Equal(["architecture", "onboarding"], list.EnumerateArray().Select(p => p.GetProperty("slug").GetString()));
         Assert.False(list[0].TryGetProperty("body", out _));
 
         // The empty page is a page: an absent body is the empty document.
-        Assert.Equal(string.Empty, (await admin.GetFromJsonAsync<JsonElement>("/pages/onboarding", Ct)).GetProperty("body").GetString());
+        Assert.Equal(string.Empty, (await admin.GetFromJsonAsync<JsonElement>("/api/pages/onboarding", Ct)).GetProperty("body").GetString());
     }
 
     [Fact]
@@ -54,21 +54,21 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
         await Refusals.Problem(
-            await admin.PostAsJsonAsync("/pages", new { slug = "Not A Slug", title = "No" }, Ct),
+            await admin.PostAsJsonAsync("/api/pages", new { slug = "Not A Slug", title = "No" }, Ct),
             HttpStatusCode.BadRequest, "validation");
         await Refusals.Problem(
-            await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "" }, Ct),
+            await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "" }, Ct),
             HttpStatusCode.BadRequest, "validation");
 
-        await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture" }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture" }, Ct);
         await Refusals.Problem(
-            await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Again" }, Ct),
+            await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Again" }, Ct),
             HttpStatusCode.BadRequest, "validation");
 
         // An address that could not be a slug names nothing; it arrived in the
         // path and not in a body, so it is `not-found` and not `validation`.
-        await Refusals.Problem(await admin.GetAsync("/pages/Nothing%20Here", Ct), HttpStatusCode.NotFound, "not-found");
-        await Refusals.Problem(await admin.GetAsync("/pages/onboarding", Ct), HttpStatusCode.NotFound, "not-found");
+        await Refusals.Problem(await admin.GetAsync("/api/pages/Nothing%20Here", Ct), HttpStatusCode.NotFound, "not-found");
+        await Refusals.Problem(await admin.GetAsync("/api/pages/onboarding", Ct), HttpStatusCode.NotFound, "not-found");
     }
 
     [Fact]
@@ -76,10 +76,10 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        using var created = await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture", body = "v1" }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture", body = "v1" }, Ct);
         var version = (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("updated_at").GetString()!;
 
-        using var request = new HttpRequestMessage(HttpMethod.Patch, "/pages/architecture")
+        using var request = new HttpRequestMessage(HttpMethod.Patch, "/api/pages/architecture")
         {
             Content = JsonContent.Create(new { title = "The four layers", body = "v2" }),
         };
@@ -90,7 +90,7 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal("v2", after.GetProperty("body").GetString());
         Assert.Equal("The four layers", after.GetProperty("title").GetString());
 
-        using var staleRequest = new HttpRequestMessage(HttpMethod.Patch, "/pages/architecture")
+        using var staleRequest = new HttpRequestMessage(HttpMethod.Patch, "/api/pages/architecture")
         {
             Content = JsonContent.Create(new { body = "v3" }),
         };
@@ -102,13 +102,13 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal("v2", problem.GetProperty("current").GetProperty("body").GetString());
 
         // Without the header the write goes through, as everywhere.
-        using var unguarded = await admin.PatchAsJsonAsync("/pages/architecture", new { body = "v3" }, Ct);
+        using var unguarded = await admin.PatchAsJsonAsync("/api/pages/architecture", new { body = "v3" }, Ct);
         Assert.Equal(HttpStatusCode.OK, unguarded.StatusCode);
 
         // An explicit null empties the document; an absent body leaves it.
-        using var emptied = await admin.PatchAsJsonAsync("/pages/architecture", new { body = (string?)null }, Ct);
+        using var emptied = await admin.PatchAsJsonAsync("/api/pages/architecture", new { body = (string?)null }, Ct);
         Assert.Equal(string.Empty, (await emptied.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("body").GetString());
-        using var untouched = await admin.PatchAsJsonAsync("/pages/architecture", new { title = "Architecture" }, Ct);
+        using var untouched = await admin.PatchAsJsonAsync("/api/pages/architecture", new { title = "Architecture" }, Ct);
         Assert.Equal(string.Empty, (await untouched.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("body").GetString());
 
         await using var reader = Migrated.ContextFor(instance.ConnectionString);
@@ -117,7 +117,7 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.All(await reader.History.Where(h => h.Field == "body").ToListAsync(Ct), entry => Assert.Null(entry.NewValue));
 
         // The same history, as the API serves it: who, when, from what to what.
-        var served = await admin.GetFromJsonAsync<JsonElement>("/pages/architecture/history", Ct);
+        var served = await admin.GetFromJsonAsync<JsonElement>("/api/pages/architecture/history", Ct);
         Assert.Equal(fields, served.EnumerateArray().Select(entry => entry.GetProperty("field").GetString()));
         var titled = served.EnumerateArray().Last(entry => entry.GetProperty("field").GetString() == "title");
         Assert.Equal("The four layers", titled.GetProperty("old_value").GetString());
@@ -133,22 +133,22 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture", body = "# The four layers" }, Ct);
-        await admin.PostAsJsonAsync("/pages", new { slug = "onboarding", title = "Onboarding" }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture", body = "# The four layers" }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "onboarding", title = "Onboarding" }, Ct);
 
         await Refusals.Problem(
-            await admin.PatchAsJsonAsync("/pages/architecture", new { slug = "onboarding" }, Ct),
+            await admin.PatchAsJsonAsync("/api/pages/architecture", new { slug = "onboarding" }, Ct),
             HttpStatusCode.BadRequest, "validation");
 
-        using var renamed = await admin.PatchAsJsonAsync("/pages/architecture", new { slug = "betriebshandbuch" }, Ct);
+        using var renamed = await admin.PatchAsJsonAsync("/api/pages/architecture", new { slug = "betriebshandbuch" }, Ct);
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
         var page = await renamed.Content.ReadFromJsonAsync<JsonElement>(Ct);
         Assert.Equal("betriebshandbuch", page.GetProperty("slug").GetString());
         Assert.Equal("# The four layers", page.GetProperty("body").GetString());
 
         // Nothing forwards: the old address is gone (ADR 0021).
-        await Refusals.Problem(await admin.GetAsync("/pages/architecture", Ct), HttpStatusCode.NotFound, "not-found");
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/pages/betriebshandbuch", Ct)).StatusCode);
+        await Refusals.Problem(await admin.GetAsync("/api/pages/architecture", Ct), HttpStatusCode.NotFound, "not-found");
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/pages/betriebshandbuch", Ct)).StatusCode);
 
         // The rename is the one place the old name survives.
         await using var reader = Migrated.ContextFor(instance.ConnectionString);
@@ -162,25 +162,25 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture", body = "# The four layers" }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture", body = "# The four layers" }, Ct);
 
-        using var deleted = await admin.DeleteAsync("/pages/architecture", Ct);
+        using var deleted = await admin.DeleteAsync("/api/pages/architecture", Ct);
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
-        var gone = await Refusals.Problem(await admin.GetAsync("/pages/architecture", Ct), HttpStatusCode.NotFound, "deleted");
+        var gone = await Refusals.Problem(await admin.GetAsync("/api/pages/architecture", Ct), HttpStatusCode.NotFound, "deleted");
         Assert.True(gone.TryGetProperty("restorable_until", out _));
-        Assert.Empty((await admin.GetFromJsonAsync<JsonElement>("/pages", Ct)).EnumerateArray());
+        Assert.Empty((await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct)).EnumerateArray());
 
         // The slug is not free while the page can come back.
         await Refusals.Problem(
-            await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Something else" }, Ct),
+            await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Something else" }, Ct),
             HttpStatusCode.BadRequest, "validation");
 
-        using var restored = await admin.PostAsync("/pages/architecture/restore", null, Ct);
+        using var restored = await admin.PostAsync("/api/pages/architecture/restore", null, Ct);
         Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
         Assert.Equal("# The four layers", (await restored.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("body").GetString());
         await Refusals.Problem(
-            await admin.PostAsync("/pages/architecture/restore", null, Ct),
+            await admin.PostAsync("/api/pages/architecture/restore", null, Ct),
             HttpStatusCode.UnprocessableEntity, "transition");
     }
 
@@ -193,8 +193,8 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture", body = "Dependencies point inward and only inward." }, Ct);
-        await admin.PostAsJsonAsync("/pages", new { slug = "onboarding", title = "Onboarding", body = "Start with docker compose up." }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture", body = "Dependencies point inward and only inward." }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "onboarding", title = "Onboarding", body = "Start with docker compose up." }, Ct);
 
         Assert.Equal(["architecture"], await Found(admin, "inward"));
         Assert.Equal(["architecture"], await Found(admin, "Architecture"));
@@ -208,7 +208,7 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal(["architecture", "onboarding"], await Found(admin, "docker OR inward"));
 
         // A deleted page is not found while it is in its grace period (ADR 0013).
-        await admin.DeleteAsync("/pages/architecture", Ct);
+        await admin.DeleteAsync("/api/pages/architecture", Ct);
         Assert.Empty(await Found(admin, "inward"));
     }
 
@@ -222,27 +222,27 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Architecture" }, Ct);
+        await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Architecture" }, Ct);
 
         using var somebody = instance.ClientWith(await instance.AddActiveUserAsync("somebody"));
 
         Assert.Equal(
             ["architecture"],
-            (await somebody.GetFromJsonAsync<JsonElement>("/pages", Ct))
+            (await somebody.GetFromJsonAsync<JsonElement>("/api/pages", Ct))
                 .EnumerateArray().Select(p => p.GetProperty("slug").GetString()));
-        Assert.Equal(HttpStatusCode.OK, (await somebody.GetAsync("/pages/architecture", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await somebody.GetAsync("/api/pages/architecture", Ct)).StatusCode);
         Assert.Equal(
             HttpStatusCode.Created,
-            (await somebody.PostAsJsonAsync("/pages", new { slug = "onboarding", title = "Onboarding" }, Ct)).StatusCode);
+            (await somebody.PostAsJsonAsync("/api/pages", new { slug = "onboarding", title = "Onboarding" }, Ct)).StatusCode);
     }
 
     private static async Task<string[]> Found(HttpClient client, string query) =>
-        [.. (await client.GetFromJsonAsync<JsonElement>($"/pages?q={Uri.EscapeDataString(query)}", Ct))
+        [.. (await client.GetFromJsonAsync<JsonElement>($"/api/pages?q={Uri.EscapeDataString(query)}", Ct))
             .EnumerateArray().Select(p => p.GetProperty("slug").GetString()!)];
 
     private static async Task<HttpClient> Agent(AnInstance instance, HttpClient admin, string name)
     {
-        using var created = await admin.PostAsJsonAsync("/agents", new { name }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/agents", new { name }, Ct);
         return instance.ClientWith((await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("token").GetProperty("secret").GetString());
     }
 }

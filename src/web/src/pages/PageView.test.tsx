@@ -27,13 +27,13 @@ const summary = {
 };
 
 function renderPage(routes: Parameters<typeof installInstance>[0] = {}) {
-  const instance = installInstance({ "GET /pages/architecture": { body: page }, ...routes });
+  const instance = installInstance({ "GET /api/pages/architecture": { body: page }, ...routes });
   renderAt("/pages/architecture", <Routes><Route path="/pages/:slug" element={<PageView />} /></Routes>);
   return instance;
 }
 
 it("lists the wiki flat, by slug, and says who touched what last", async () => {
-  installInstance({ "GET /pages": [summary] });
+  installInstance({ "GET /api/pages": [summary] });
   renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByRole("link", { name: /architecture/ })).toHaveAttribute("href", "/pages/architecture");
@@ -45,20 +45,20 @@ it("lists the wiki flat, by slug, and says who touched what last", async () => {
 // different state from a wiki nobody has written in yet.
 it("filters out of the URL and says which empty it is", async () => {
   const instance = installInstance({
-    "GET /pages": (request) =>
+    "GET /api/pages": (request) =>
       new URL(request.url).searchParams.get("q") === "nothing" ? [] : [summary],
   });
   renderAt("/pages?q=nothing", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
-  const asked = instance.calls.find((call) => new URL(call.url).pathname === "/pages")!;
+  const asked = instance.calls.find((call) => new URL(call.url).pathname === "/api/pages")!;
   expect(new URL(asked.url).searchParams.get("q")).toBe("nothing");
 });
 
 // The wiki is flat, so an empty one has to say what a page is for; a list that
 // is simply empty teaches nobody what the screen is.
 it("says what a page is for while there are none", async () => {
-  installInstance({ "GET /pages": [] });
+  installInstance({ "GET /api/pages": [] });
   renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByText("No pages yet.")).toBeInTheDocument();
@@ -68,7 +68,7 @@ it("says what a page is for while there are none", async () => {
 // have been, so the search stands over the list rather than behind a sheet.
 it("searches the wiki out of the URL, and says when nothing matched", async () => {
   const instance = installInstance({
-    "GET /pages": (request) =>
+    "GET /api/pages": (request) =>
       new URL(request.url).searchParams.get("q") === "inward" ? [summary] : [],
   });
   renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
@@ -79,7 +79,7 @@ it("searches the wiki out of the URL, and says when nothing matched", async () =
   expect(await screen.findByRole("link", { name: /architecture/ })).toBeInTheDocument();
   await vi.waitFor(() => {
     const asked = instance.calls.map((call) => new URL(call.url)).find((url) => url.searchParams.get("q") === "inward");
-    expect(asked?.pathname).toBe("/pages");
+    expect(asked?.pathname).toBe("/api/pages");
   });
 
   await user.clear(screen.getByLabelText("Search"));
@@ -97,7 +97,7 @@ it("opens the page itself: the Markdown and who changed it last", async () => {
 });
 
 it("edits the body under If-Match", async () => {
-  const instance = renderPage({ "PATCH /pages/architecture": { body: { ...page, body: "Rewritten." } } });
+  const instance = renderPage({ "PATCH /api/pages/architecture": { body: { ...page, body: "Rewritten." } } });
   const user = userEvent.setup();
 
   await user.click(await screen.findByRole("button", { name: "Edit" }));
@@ -117,7 +117,7 @@ it("edits the body under If-Match", async () => {
 it("keeps what was typed when somebody came between, and shows what they wrote", async () => {
   const theirs = { ...page, body: "Their version.", updated_at: "2026-09-05T13:00:00Z" };
   const instance = renderPage({
-    "PATCH /pages/architecture": (request) =>
+    "PATCH /api/pages/architecture": (request) =>
       request.headers.get("If-Match") === "2026-09-05T12:00:00Z"
         ? { status: 412, body: { type: "/problems/stale", title: "stale", status: 412, detail: "It changed.", current: theirs } }
         : { body: { ...page, body: "Mine." } },
@@ -152,7 +152,7 @@ it("keeps what was typed when somebody came between, and shows what they wrote",
  */
 it("warns that nothing forwards before it renames a page", async () => {
   const instance = renderPage({
-    "PATCH /pages/architecture": { body: { ...page, slug: "betriebshandbuch" } },
+    "PATCH /api/pages/architecture": { body: { ...page, slug: "betriebshandbuch" } },
   });
   const user = userEvent.setup();
 
@@ -171,8 +171,8 @@ it("warns that nothing forwards before it renames a page", async () => {
 
 it("says the slug is held while a deleted page can come back", async () => {
   const instance = renderPage({
-    "DELETE /pages/architecture": { status: 204 },
-    "POST /pages/architecture/restore": { body: page },
+    "DELETE /api/pages/architecture": { status: 204 },
+    "POST /api/pages/architecture/restore": { body: page },
   });
   const user = userEvent.setup();
 
@@ -189,7 +189,7 @@ it("says the slug is held while a deleted page can come back", async () => {
 /** The slug is given, never derived from the title (ADR 0021). */
 it("asks for the slug when a page is created", async () => {
   const instance = installInstance({
-    "POST /pages": { status: 201, body: page },
+    "POST /api/pages": { status: 201, body: page },
   });
   renderAt("/pages/new", <Routes><Route path="/pages/new" element={<NewPageView />} /></Routes>);
   const user = userEvent.setup();

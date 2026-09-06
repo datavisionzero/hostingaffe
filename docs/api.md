@@ -2,12 +2,22 @@
 
 One API, for the web application, the CLI and whatever an agent writes. It
 carries no version in its path: the contract is
-[`api/openapi.json`](api/openapi.json), captured from a running instance and
-checked in, and both clients are generated from it (planaffe ADRs 0005, 0011).
+[`api/openapi.json`](api/openapi.json), served at `/api/openapi/v1.json`,
+captured from a running instance and checked in, and both clients are generated
+from it (planaffe ADRs 0005, 0011).
 
 The endpoint tables below cover what the foundation serves. The objects of
 the product — machine, software, installation, deployment, file — arrive with
 their own sections.
+
+## Where it is
+
+Every endpoint is under `/api`, and every other address on the instance belongs
+to the web application ([ADR 0002](adr/0002-the-api-lives-under-api.md)). The
+two share a process and a port, and without the prefix they would share words:
+`/pages` is a screen a person bookmarks and a collection a client reads, and
+`machines`, `installations` and `deployments` are next. The paths below are
+written out, prefix and all, because that is what an instance answers.
 
 ## Conventions
 
@@ -19,7 +29,7 @@ their own sections.
   `unknown-field`, rather than silently ignoring what somebody meant.
 - **Authentication is a bearer token or the browser's session cookie.** The
   server tells a user token from an agent token; nothing else does. Only
-  `GET /version` is outside the door.
+  `GET /api/version` is outside the door.
 
 ## Errors
 
@@ -31,7 +41,7 @@ Every refusal is one `application/problem+json` document, written in one place:
   "title": "Nothing by that key or id",
   "status": 404,
   "detail": "No page architecture.",
-  "instance": "/pages/architecture"
+  "instance": "/api/pages/architecture"
 }
 ```
 
@@ -98,8 +108,8 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
 
 - Every identity reads everything and writes content. One instance holds one
   team's infrastructure, and there are no scopes inside it.
-- **An agent administers no identities** (planaffe ADR 0015). `/users`,
-  `/agents` and `/tokens` under an agent token are `forbidden`, and an agent
+- **An agent administers no identities** (planaffe ADR 0015). `/api/users`,
+  `/api/agents` and `/api/tokens` under an agent token are `forbidden`, and an agent
   token never carries the administrator role.
 - An administrator invites users, grants and revokes the administrator role,
   deactivates and reactivates, and configures the instance.
@@ -110,46 +120,46 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
 
 | | |
 |---|---|
-| `GET /version` | the instance's version; the one endpoint outside the door |
-| `GET /me` | who the token says you are |
-| `PATCH /me`, `POST /me/password`, `POST /me/email` | your own name, password, address |
-| `PATCH /me/metadata` | what an agent reports about itself |
-| `GET /admin/smtp`, `POST /admin/smtp/test` | whether mail is configured, and one test mail |
+| `GET /api/version` | the instance's version; the one endpoint outside the door |
+| `GET /api/me` | who the token says you are |
+| `PATCH /api/me`, `POST /api/me/password`, `POST /api/me/email` | your own name, password, address |
+| `PATCH /api/me/metadata` | what an agent reports about itself |
+| `GET /api/admin/smtp`, `POST /api/admin/smtp/test` | whether mail is configured, and one test mail |
 
 ### Sessions
 
 | | |
 |---|---|
-| `POST /session` | sign in with name and password; sets the browser's cookie |
-| `POST /session/bootstrap` | exchange the bootstrap token for a session, once |
-| `DELETE /session` | sign out |
-| `GET /sessions`, `DELETE /sessions/{id}` | your browser sessions, and ending one |
+| `POST /api/session` | sign in with name and password; sets the browser's cookie |
+| `POST /api/session/bootstrap` | exchange the bootstrap token for a session, once |
+| `DELETE /api/session` | sign out |
+| `GET /api/sessions`, `DELETE /api/sessions/{id}` | your browser sessions, and ending one |
 
 ### Users, agents and tokens
 
 | | |
 |---|---|
-| `GET /users`, `POST /users` | the humans; creating one sends an invitation |
-| `PATCH /users/{id}` | the administrator role |
-| `POST /users/{id}/invitation` | send the invitation again |
-| `POST /users/{id}/deactivate`, `/reactivate` | identities are never deleted |
-| `POST /invitations/accept` | set a password and become active |
-| `POST /password-recovery`, `/password-recovery/complete` | the link, and what it leads to |
-| `POST /email-changes/confirm` | confirm a new address |
-| `GET /agents`, `POST /agents` | agents; creating one prints its token once |
-| `PATCH /agents/{id}`, `DELETE /agents/{id}` | rename, and revoke the token |
-| `GET /tokens`, `POST /tokens`, `DELETE /tokens/{id}` | your own user tokens |
+| `GET /api/users`, `POST /api/users` | the humans; creating one sends an invitation |
+| `PATCH /api/users/{id}` | the administrator role |
+| `POST /api/users/{id}/invitation` | send the invitation again |
+| `POST /api/users/{id}/deactivate`, `/reactivate` | identities are never deleted |
+| `POST /api/invitations/accept` | set a password and become active |
+| `POST /api/password-recovery`, `/api/password-recovery/complete` | the link, and what it leads to |
+| `POST /api/email-changes/confirm` | confirm a new address |
+| `GET /api/agents`, `POST /api/agents` | agents; creating one prints its token once |
+| `PATCH /api/agents/{id}`, `DELETE /api/agents/{id}` | rename, and revoke the token |
+| `GET /api/tokens`, `POST /api/tokens`, `DELETE /api/tokens/{id}` | your own user tokens |
 
 ### Pages
 
 | | |
 |---|---|
-| `GET /pages` | every page, by slug, without the bodies; `q` is the full-text filter |
-| `POST /pages` | the slug is given, never derived from the title (planaffe ADR 0021) |
-| `GET /pages/{slug}` | the complete page |
-| `PATCH /pages/{slug}` | title, body or slug; `If-Match` guards it |
-| `DELETE /pages/{slug}`, `POST /pages/{slug}/restore` | soft, with the grace period |
-| `GET /pages/{slug}/history` | who changed what, oldest first |
+| `GET /api/pages` | every page, by slug, without the bodies; `q` is the full-text filter |
+| `POST /api/pages` | the slug is given, never derived from the title (planaffe ADR 0021) |
+| `GET /api/pages/{slug}` | the complete page |
+| `PATCH /api/pages/{slug}` | title, body or slug; `If-Match` guards it |
+| `DELETE /api/pages/{slug}`, `POST /api/pages/{slug}/restore` | soft, with the grace period |
+| `GET /api/pages/{slug}/history` | who changed what, oldest first |
 
 A page's slug is its address and may be renamed; nothing forwards afterwards,
 and the rename stands in the history. A deleted page keeps its slug until the

@@ -11,7 +11,7 @@ namespace Hostingaffe.Api.Http;
 
 /// <summary>
 /// The one door: <c>Authorization: Bearer &lt;token&gt;</c> on everything but
-/// <c>GET /version</c>, and <see cref="AuthenticateToken"/> deciding whom it
+/// <c>GET /api/version</c>, and <see cref="AuthenticateToken"/> deciding whom it
 /// admits (<c>docs/api.md</c>, Conventions).
 /// </summary>
 /// <remarks>
@@ -104,5 +104,5 @@ public sealed class CallerIdentity(IHttpContextAccessor accessor) : ICallerIdent
     public Caller Caller =>
         accessor.HttpContext?.Features.Get<Caller>()
         ?? throw new InvalidOperationException(
-            "No authenticated caller on this request. Every endpoint but GET /version is behind the door.");
+            "No authenticated caller on this request. Every endpoint but GET /api/version is behind the door.");
 }

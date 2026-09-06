@@ -57,7 +57,10 @@ problem document, `TokenAuthentication` and `BrowserSecurity` guard the door,
 instance's version on every answer, `Rfc3339` spells every timestamp.
 `Hosting/` holds what runs before anything is served: the schema migration and
 the bootstrap, in that order. `Program.cs` is the composition root and the only
-place that knows all four layers.
+place that knows all four layers — and the one that says where the API is:
+every endpoint is mapped into the `/api` group, everything else is the web
+application's, and `Routes` carries that prefix for what routing does not
+write itself (ADR 0002).
 
 ## The CLI
 
@@ -96,11 +99,15 @@ src/api         the generated client and its wrapper
 ```
 
 The frame is rendered before any data arrives and is never remounted by
-navigation (planaffe ADR 0006).
+navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
+`/pages`, `/settings`, `/admin` — because the API is out of the way under
+`/api`; in development Vite forwards that one prefix to the API and serves
+everything else itself.
 
 ## The contract
 
-`docs/api/openapi.json` is captured from a running instance and checked in.
+`docs/api/openapi.json` is served at `/api/openapi/v1.json`, captured from a
+running instance and checked in.
 Both clients are generated from it, and a test compares what an instance serves
 against what is committed (planaffe ADR 0005). Regenerating it is that test
 with `HOSTINGAFFE_CAPTURE_CONTRACT=1`, and the change is committed with the

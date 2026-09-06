@@ -6,7 +6,7 @@ using Hostingaffe.Domain.Identities;
 namespace Hostingaffe.Api.Http;
 
 /// <summary>
-/// The document at <c>/openapi/v1.json</c>: captured into
+/// The document at <c>/api/openapi/v1.json</c>: captured into
 /// <c>docs/api/openapi.json</c>, checked in, and compared by CI against what a
 /// running instance serves (ADR 0005). Both clients are generated from it, so
 /// it has to describe the shape of the API and nothing about the machine that
@@ -107,7 +107,8 @@ public static class OpenApiDocument
                 document.Info.Version = InstanceVersion.Value;
                 document.Info.Description =
                     "The HTTP surface of one hostingaffe instance. Every instance is at its own address; "
-                    + "everything but GET /version takes `Authorization: Bearer <token>`.";
+                    + "every endpoint is under `/api` (ADR 0002), and everything but GET /api/version "
+                    + "takes `Authorization: Bearer <token>`.";
 
                 // Whoever captured it was at some address; nobody else is.
                 document.Servers?.Clear();

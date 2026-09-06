@@ -13,9 +13,9 @@ export function SignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   async function submit(event: FormEvent) {
     event.preventDefault(); setAsking(true); setRefusal(null);
     try {
-      const signedIn = await api.POST("/session", { body: { email, password } });
+      const signedIn = await api.POST("/api/session", { body: { email, password } });
       if (!signedIn.response.ok) { setRefusal(describe(signedIn.error, signedIn.response.status)); return; }
-      const me = await api.GET("/me");
+      const me = await api.GET("/api/me");
       if (me.data) onSignedIn(me.data); else setRefusal(describe(me.error, me.response.status));
     } catch { setRefusal("The instance did not answer."); }
     finally { setAsking(false); }

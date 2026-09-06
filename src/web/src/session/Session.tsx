@@ -4,7 +4,7 @@ import { SessionContext } from "./context";
 
 /**
  * Who is signed in, for every screen under the shell. The value is what
- * `GET /me` answered on load; a screen that needs the identity reads it here
+ * `GET /api/me` answered on load; a screen that needs the identity reads it here
  * rather than asking again.
  */
 export type Session = {

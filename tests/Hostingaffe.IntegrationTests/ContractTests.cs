@@ -29,7 +29,7 @@ public sealed class ContractTests(PostgresFixture postgres)
         await using var instance = await AnInstance.StartedAsync(postgres, null, null);
         using var client = instance.ClientWith(null);
 
-        using var response = await client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/api/openapi/v1.json", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var document = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
@@ -40,16 +40,16 @@ public sealed class ContractTests(PostgresFixture postgres)
         var paths = document["paths"]!.AsObject().Select(path => path.Key).Order(StringComparer.Ordinal);
         Assert.Equal(
             [
-                "/admin/smtp", "/admin/smtp/test",
-                "/agents", "/agents/{id}",
-                "/email-changes/confirm",
-                "/invitations/accept",
-                "/me", "/me/email", "/me/metadata", "/me/password",
-                "/pages", "/pages/{slug}", "/pages/{slug}/history", "/pages/{slug}/restore",
-                "/password-recovery", "/password-recovery/complete",
-                "/session", "/session/bootstrap", "/sessions", "/sessions/{id}",
-                "/tokens", "/tokens/{id}", "/users", "/users/{id}", "/users/{id}/deactivate",
-                "/users/{id}/invitation", "/users/{id}/reactivate", "/version",
+                "/api/admin/smtp", "/api/admin/smtp/test",
+                "/api/agents", "/api/agents/{id}",
+                "/api/email-changes/confirm",
+                "/api/invitations/accept",
+                "/api/me", "/api/me/email", "/api/me/metadata", "/api/me/password",
+                "/api/pages", "/api/pages/{slug}", "/api/pages/{slug}/history", "/api/pages/{slug}/restore",
+                "/api/password-recovery", "/api/password-recovery/complete",
+                "/api/session", "/api/session/bootstrap", "/api/sessions", "/api/sessions/{id}",
+                "/api/tokens", "/api/tokens/{id}", "/api/users", "/api/users/{id}", "/api/users/{id}/deactivate",
+                "/api/users/{id}/invitation", "/api/users/{id}/reactivate", "/api/version",
             ],
             paths);
 
@@ -73,7 +73,7 @@ public sealed class ContractTests(PostgresFixture postgres)
         using var client = instance.ClientWith(null);
 
         var served = JsonNode.Parse(
-            await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken))!;
+            await client.GetStringAsync("/api/openapi/v1.json", TestContext.Current.CancellationToken))!;
 
         var path = Path.Combine(RepositoryRoot(), "docs", "api", "openapi.json");
 

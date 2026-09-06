@@ -213,7 +213,7 @@ jobs:
         run: |
           set -euo pipefail
           for _ in $(seq 1 45); do
-            curl --fail --silent http://localhost:5142/openapi/v1.json -o /tmp/openapi.json && break
+            curl --fail --silent http://localhost:5142/api/openapi/v1.json -o /tmp/openapi.json && break
             sleep 2
           done
           test -s /tmp/openapi.json || { echo "the installation never served a document"; exit 1; }

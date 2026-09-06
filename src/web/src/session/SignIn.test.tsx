@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("password sign in", () => {
   it("creates a session and asks who it belongs to", async () => {
-    const { calls } = installInstance({ "POST /session": { status: 204 }, "GET /me": aUser });
+    const { calls } = installInstance({ "POST /api/session": { status: 204 }, "GET /api/me": aUser });
     const signedIn = vi.fn(); renderAt("/login", <SignIn onSignedIn={signedIn} />); const user = userEvent.setup();
     await user.type(screen.getByLabelText("Email"), "maintainer@example.test");
     await user.type(screen.getByLabelText("Password"), "a long password");
@@ -27,7 +27,7 @@ describe("password sign in", () => {
   });
 
   it("shows the indistinguishable refusal", async () => {
-    installInstance({ "POST /session": { status: 401, body: { detail: "The email or password is not correct." } } });
+    installInstance({ "POST /api/session": { status: 401, body: { detail: "The email or password is not correct." } } });
     renderAt("/login", <SignIn onSignedIn={vi.fn()} />); const user = userEvent.setup();
     await user.type(screen.getByLabelText("Email"), "nobody@example.test"); await user.type(screen.getByLabelText("Password"), "wrong");
     await user.click(screen.getByRole("button", { name: "Sign in" }));

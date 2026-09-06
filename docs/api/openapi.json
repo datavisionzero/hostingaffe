@@ -2,11 +2,11 @@
   "openapi": "3.1.1",
   "info": {
     "title": "hostingaffe",
-    "description": "The HTTP surface of one hostingaffe instance. Every instance is at its own address; everything but GET /version takes `Authorization: Bearer <token>`.",
+    "description": "The HTTP surface of one hostingaffe instance. Every instance is at its own address; every endpoint is under `/api` (ADR 0002), and everything but GET /api/version takes `Authorization: Bearer <token>`.",
     "version": "0.0.0-dev"
   },
   "paths": {
-    "/version": {
+    "/api/version": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -27,7 +27,7 @@
         }
       }
     },
-    "/me": {
+    "/api/me": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -117,7 +117,7 @@
         }
       }
     },
-    "/email-changes/confirm": {
+    "/api/email-changes/confirm": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -151,7 +151,7 @@
         }
       }
     },
-    "/session": {
+    "/api/session": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -195,7 +195,7 @@
         }
       }
     },
-    "/session/bootstrap": {
+    "/api/session/bootstrap": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -218,7 +218,7 @@
         }
       }
     },
-    "/invitations/accept": {
+    "/api/invitations/accept": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -241,7 +241,7 @@
         }
       }
     },
-    "/password-recovery": {
+    "/api/password-recovery": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -264,7 +264,7 @@
         }
       }
     },
-    "/password-recovery/complete": {
+    "/api/password-recovery/complete": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -287,7 +287,7 @@
         }
       }
     },
-    "/users": {
+    "/api/users": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -390,7 +390,7 @@
         }
       }
     },
-    "/users/{id}/invitation": {
+    "/api/users/{id}/invitation": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -444,7 +444,7 @@
         }
       }
     },
-    "/users/{id}/deactivate": {
+    "/api/users/{id}/deactivate": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -505,7 +505,7 @@
         }
       }
     },
-    "/users/{id}/reactivate": {
+    "/api/users/{id}/reactivate": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -556,7 +556,7 @@
         }
       }
     },
-    "/users/{id}": {
+    "/api/users/{id}": {
       "patch": {
         "tags": [
           "hostingaffe"
@@ -627,7 +627,7 @@
         }
       }
     },
-    "/me/email": {
+    "/api/me/email": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -671,7 +671,7 @@
         }
       }
     },
-    "/agents": {
+    "/api/agents": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -774,7 +774,7 @@
         }
       }
     },
-    "/agents/{id}": {
+    "/api/agents/{id}": {
       "patch": {
         "tags": [
           "hostingaffe"
@@ -907,7 +907,7 @@
         }
       }
     },
-    "/me/metadata": {
+    "/api/me/metadata": {
       "patch": {
         "tags": [
           "hostingaffe"
@@ -968,7 +968,7 @@
         }
       }
     },
-    "/tokens": {
+    "/api/tokens": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1051,7 +1051,7 @@
         }
       }
     },
-    "/tokens/{id}": {
+    "/api/tokens/{id}": {
       "delete": {
         "tags": [
           "hostingaffe"
@@ -1106,7 +1106,7 @@
         }
       }
     },
-    "/sessions": {
+    "/api/sessions": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1140,7 +1140,7 @@
         }
       }
     },
-    "/sessions/{id}": {
+    "/api/sessions/{id}": {
       "delete": {
         "tags": [
           "hostingaffe"
@@ -1164,7 +1164,7 @@
         }
       }
     },
-    "/me/password": {
+    "/api/me/password": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -1187,7 +1187,7 @@
         }
       }
     },
-    "/pages": {
+    "/api/pages": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1309,7 +1309,7 @@
         }
       }
     },
-    "/pages/{slug}": {
+    "/api/pages/{slug}": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1481,7 +1481,7 @@
         }
       }
     },
-    "/pages/{slug}/history": {
+    "/api/pages/{slug}/history": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1535,7 +1535,7 @@
         }
       }
     },
-    "/pages/{slug}/restore": {
+    "/api/pages/{slug}/restore": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -1596,7 +1596,7 @@
         }
       }
     },
-    "/admin/smtp": {
+    "/api/admin/smtp": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1637,7 +1637,7 @@
         }
       }
     },
-    "/admin/smtp/test": {
+    "/api/admin/smtp/test": {
       "post": {
         "tags": [
           "hostingaffe"

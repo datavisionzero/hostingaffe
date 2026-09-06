@@ -20,10 +20,10 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        var before = await admin.GetFromJsonAsync<JsonElement>("/me", Ct);
+        var before = await admin.GetFromJsonAsync<JsonElement>("/api/me", Ct);
         Assert.Equal("maintainer@example.test", before.GetProperty("email").GetString());
 
-        using var changed = await admin.PatchAsJsonAsync("/me", new { name = "new maintainer" }, Ct);
+        using var changed = await admin.PatchAsJsonAsync("/api/me", new { name = "new maintainer" }, Ct);
         Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
         Assert.Equal("new maintainer", (await changed.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("name").GetString());
     }
@@ -35,21 +35,21 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         var userSecret = await instance.AddActiveUserAsync("second");
         using var user = instance.ClientWith(userSecret);
-        using var createdAgent = await user.PostAsJsonAsync("/agents", new { name = "owned-agent-1" }, Ct);
+        using var createdAgent = await user.PostAsJsonAsync("/api/agents", new { name = "owned-agent-1" }, Ct);
         var agentSecret = (await createdAgent.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("token").GetProperty("secret").GetString()!;
         using var agent = instance.ClientWith(agentSecret);
-        var users = await admin.GetFromJsonAsync<JsonElement>("/users", Ct);
+        var users = await admin.GetFromJsonAsync<JsonElement>("/api/users", Ct);
         var id = users.EnumerateArray().Single(x => x.GetProperty("name").GetString() == "second").GetProperty("id").GetGuid();
 
-        using var deactivated = await admin.PostAsync($"/users/{id}/deactivate", null, Ct);
+        using var deactivated = await admin.PostAsync($"/api/users/{id}/deactivate", null, Ct);
         Assert.Equal(HttpStatusCode.OK, deactivated.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await user.GetAsync("/me", Ct)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await agent.GetAsync("/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await user.GetAsync("/api/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await agent.GetAsync("/api/me", Ct)).StatusCode);
 
-        using var reactivated = await admin.PostAsync($"/users/{id}/reactivate", null, Ct);
+        using var reactivated = await admin.PostAsync($"/api/users/{id}/reactivate", null, Ct);
         Assert.Equal(HttpStatusCode.OK, reactivated.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync("/me", Ct)).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await agent.GetAsync("/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync("/api/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await agent.GetAsync("/api/me", Ct)).StatusCode);
     }
 
     [Fact]
@@ -57,11 +57,11 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        var users = await admin.GetFromJsonAsync<JsonElement>("/users", Ct);
+        var users = await admin.GetFromJsonAsync<JsonElement>("/api/users", Ct);
         var id = Assert.Single(users.EnumerateArray()).GetProperty("id").GetGuid();
 
-        await Problem(await admin.PostAsync($"/users/{id}/deactivate", null, Ct), HttpStatusCode.Conflict, "last-administrator");
-        await Problem(await admin.PatchAsJsonAsync($"/users/{id}", new { administrator = false }, Ct),
+        await Problem(await admin.PostAsync($"/api/users/{id}/deactivate", null, Ct), HttpStatusCode.Conflict, "last-administrator");
+        await Problem(await admin.PatchAsJsonAsync($"/api/users/{id}", new { administrator = false }, Ct),
             HttpStatusCode.Conflict, "last-administrator");
     }
 
@@ -70,12 +70,12 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        using var created = await admin.PostAsJsonAsync("/agents", new { name = "quiet-otter-42" }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/agents", new { name = "quiet-otter-42" }, Ct);
         var agent = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
         var id = agent.GetProperty("id").GetGuid();
         using var asAgent = instance.ClientWith(agent.GetProperty("token").GetProperty("secret").GetString()!);
 
-        using var first = await asAgent.PatchAsJsonAsync("/me/metadata", new
+        using var first = await asAgent.PatchAsJsonAsync("/api/me/metadata", new
         {
             kind = "codex", harness = "cli", environment = "container", version = "1.2.3",
         }, Ct);
@@ -86,7 +86,7 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         Assert.NotEqual(JsonValueKind.Null, reported.GetProperty("metadata_reported_at").ValueKind);
 
         // Absent keeps the old value; null clears it.
-        using var second = await asAgent.PatchAsJsonAsync("/me/metadata", new { harness = (string?)null, version = "1.2.4" }, Ct);
+        using var second = await asAgent.PatchAsJsonAsync("/api/me/metadata", new { harness = (string?)null, version = "1.2.4" }, Ct);
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         reported = await second.Content.ReadFromJsonAsync<JsonElement>(Ct);
         var metadata = reported.GetProperty("metadata");
@@ -96,7 +96,7 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         Assert.Equal("1.2.4", metadata.GetProperty("version").GetString());
 
         // A user sees the last report in the management list.
-        var agents = await admin.GetFromJsonAsync<JsonElement>("/agents", Ct);
+        var agents = await admin.GetFromJsonAsync<JsonElement>("/api/agents", Ct);
         var listed = Assert.Single(agents.EnumerateArray());
         Assert.Equal("1.2.4", listed.GetProperty("metadata").GetProperty("version").GetString());
         Assert.NotEqual(JsonValueKind.Null, listed.GetProperty("metadata_reported_at").ValueKind);
@@ -121,15 +121,15 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var forbidden = await admin.PatchAsJsonAsync("/me/metadata", new { kind = "user" }, Ct);
+        using var forbidden = await admin.PatchAsJsonAsync("/api/me/metadata", new { kind = "user" }, Ct);
         await Problem(forbidden, HttpStatusCode.Forbidden, "forbidden", string.Join('\n', instance.Errors));
 
         using var asAgent = instance.ClientWith(await AgentSecretAsync(admin));
-        using var unknown = await asAgent.PatchAsJsonAsync("/me/metadata", new { model = "not-stable" }, Ct);
+        using var unknown = await asAgent.PatchAsJsonAsync("/api/me/metadata", new { model = "not-stable" }, Ct);
         var unknownProblem = await Problem(unknown, HttpStatusCode.BadRequest, "unknown-field");
         Assert.Equal("model", unknownProblem.GetProperty("field").GetString());
 
-        using var tooLong = await asAgent.PatchAsJsonAsync("/me/metadata", new { environment = new string('x', 101) }, Ct);
+        using var tooLong = await asAgent.PatchAsJsonAsync("/api/me/metadata", new { environment = new string('x', 101) }, Ct);
         var validation = await Problem(tooLong, HttpStatusCode.BadRequest, "validation");
         Assert.True(validation.GetProperty("errors").TryGetProperty("environment", out _));
     }
@@ -141,7 +141,7 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
         // The user creates an agent and gets the secret once.
-        using var created = await admin.PostAsJsonAsync("/agents", new { name = "quiet-otter-42" }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/agents", new { name = "quiet-otter-42" }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var agent = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
         Assert.Equal("agent", agent.GetProperty("kind").GetString());
@@ -152,27 +152,27 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
 
         // The agent's token authenticates as an agent.
         using var asAgent = instance.ClientWith(secret);
-        var me = await asAgent.GetFromJsonAsync<JsonElement>("/me", Ct);
+        var me = await asAgent.GetFromJsonAsync<JsonElement>("/api/me", Ct);
         Assert.Equal("agent", me.GetProperty("kind").GetString());
         Assert.Equal("quiet-otter-42", me.GetProperty("name").GetString());
 
         // The user revokes it; the next call fails.
         var id = agent.GetProperty("id").GetGuid();
-        using var revoked = await admin.DeleteAsync($"/agents/{id}", Ct);
+        using var revoked = await admin.DeleteAsync($"/api/agents/{id}", Ct);
         Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
 
-        using var refused = await asAgent.GetAsync("/me", Ct);
+        using var refused = await asAgent.GetAsync("/api/me", Ct);
         Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
 
         // And the agent still appears by name, with its revocation.
-        var agents = await admin.GetFromJsonAsync<JsonElement>("/agents", Ct);
+        var agents = await admin.GetFromJsonAsync<JsonElement>("/api/agents", Ct);
         var listed = Assert.Single(agents.EnumerateArray());
         Assert.Equal("quiet-otter-42", listed.GetProperty("name").GetString());
         Assert.NotEqual(JsonValueKind.Null, listed.GetProperty("token").GetProperty("revoked_at").ValueKind);
         Assert.False(listed.GetProperty("token").TryGetProperty("secret", out _));
 
         // Revoking twice is uneventful.
-        using var again = await admin.DeleteAsync($"/agents/{id}", Ct);
+        using var again = await admin.DeleteAsync($"/api/agents/{id}", Ct);
         Assert.Equal(HttpStatusCode.NoContent, again.StatusCode);
     }
 
@@ -182,7 +182,7 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var created = await admin.PostAsJsonAsync("/agents", new { }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/agents", new { }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         var agent = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
@@ -198,9 +198,9 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
 
         foreach (var (method, path) in new[]
         {
-            (HttpMethod.Post, "/users"), (HttpMethod.Get, "/users"),
-            (HttpMethod.Post, "/agents"), (HttpMethod.Get, "/agents"),
-            (HttpMethod.Get, "/tokens"), (HttpMethod.Post, "/tokens"),
+            (HttpMethod.Post, "/api/users"), (HttpMethod.Get, "/api/users"),
+            (HttpMethod.Post, "/api/agents"), (HttpMethod.Get, "/api/agents"),
+            (HttpMethod.Get, "/api/tokens"), (HttpMethod.Post, "/api/tokens"),
         })
         {
             using var request = new HttpRequestMessage(method, path);
@@ -223,11 +223,11 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         using var asUser = instance.ClientWith(await instance.AddActiveUserAsync("Second Person"));
 
         // A user who is not an administrator may not invite.
-        using var refused = await asUser.PostAsJsonAsync("/users", new { name = "third", email = "third@example.test" }, Ct);
+        using var refused = await asUser.PostAsJsonAsync("/api/users", new { name = "third", email = "third@example.test" }, Ct);
         await Problem(refused, HttpStatusCode.Forbidden, "forbidden");
 
         // Listing all users is instance administration too.
-        await Problem(await asUser.GetAsync("/users", Ct), HttpStatusCode.Forbidden, "forbidden");
+        await Problem(await asUser.GetAsync("/api/users", Ct), HttpStatusCode.Forbidden, "forbidden");
     }
 
     [Fact]
@@ -236,11 +236,11 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var taken = await admin.PostAsJsonAsync("/agents", new { name = "MAINTAINER" }, Ct);
+        using var taken = await admin.PostAsJsonAsync("/api/agents", new { name = "MAINTAINER" }, Ct);
         var problem = await Problem(taken, HttpStatusCode.BadRequest, "validation");
         Assert.True(problem.GetProperty("errors").TryGetProperty("name", out _));
 
-        using var blank = await admin.PostAsJsonAsync("/users", new { name = "   " }, Ct);
+        using var blank = await admin.PostAsJsonAsync("/api/users", new { name = "   " }, Ct);
         await Problem(blank, HttpStatusCode.BadRequest, "validation");
     }
 
@@ -253,24 +253,24 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         using var other = instance.ClientWith(await instance.AddActiveUserAsync("other"));
 
         // `other` owns the agent; the administrator does not.
-        using var created = await other.PostAsJsonAsync("/agents", new { name = "quiet-otter-42" }, Ct);
+        using var created = await other.PostAsJsonAsync("/api/agents", new { name = "quiet-otter-42" }, Ct);
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetGuid();
 
-        using var renamed = await other.PatchAsJsonAsync($"/agents/{id}", new { name = "brisk-heron-7" }, Ct);
+        using var renamed = await other.PatchAsJsonAsync($"/api/agents/{id}", new { name = "brisk-heron-7" }, Ct);
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
         Assert.Equal("brisk-heron-7", (await renamed.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("name").GetString());
 
         // An administrator may too; a third user may not; an unknown id is not found.
-        using var byAdmin = await admin.PatchAsJsonAsync($"/agents/{id}", new { name = "calm-badger-3" }, Ct);
+        using var byAdmin = await admin.PatchAsJsonAsync($"/api/agents/{id}", new { name = "calm-badger-3" }, Ct);
         Assert.Equal(HttpStatusCode.OK, byAdmin.StatusCode);
 
         using var third = instance.ClientWith(await instance.AddActiveUserAsync("third"));
-        using var refused = await third.PatchAsJsonAsync($"/agents/{id}", new { name = "stolen" }, Ct);
+        using var refused = await third.PatchAsJsonAsync($"/api/agents/{id}", new { name = "stolen" }, Ct);
         await Problem(refused, HttpStatusCode.Forbidden, "forbidden");
-        using var revokeRefused = await third.DeleteAsync($"/agents/{id}", Ct);
+        using var revokeRefused = await third.DeleteAsync($"/api/agents/{id}", Ct);
         await Problem(revokeRefused, HttpStatusCode.Forbidden, "forbidden");
 
-        using var unknown = await admin.PatchAsJsonAsync($"/agents/{Guid.NewGuid()}", new { name = "nobody" }, Ct);
+        using var unknown = await admin.PatchAsJsonAsync($"/api/agents/{Guid.NewGuid()}", new { name = "nobody" }, Ct);
         await Problem(unknown, HttpStatusCode.NotFound, "not-found");
     }
 
@@ -280,36 +280,36 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var created = await admin.PostAsJsonAsync("/agents", new { name = "quiet-otter-42" }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/agents", new { name = "quiet-otter-42" }, Ct);
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetGuid();
 
         // The name addresses the agent, whatever the case, and the rename that
         // answers is the same object the id would have reached.
-        using var renamed = await admin.PatchAsJsonAsync("/agents/QUIET-OTTER-42", new { name = "brisk-heron-7" }, Ct);
+        using var renamed = await admin.PatchAsJsonAsync("/api/agents/QUIET-OTTER-42", new { name = "brisk-heron-7" }, Ct);
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
         Assert.Equal(id, (await renamed.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetGuid());
 
         // The old name leads nowhere afterwards; the id still does.
-        using var stale = await admin.PatchAsJsonAsync("/agents/quiet-otter-42", new { name = "calm-badger-3" }, Ct);
+        using var stale = await admin.PatchAsJsonAsync("/api/agents/quiet-otter-42", new { name = "calm-badger-3" }, Ct);
         await Problem(stale, HttpStatusCode.NotFound, "not-found");
 
         // A name that belongs to a user is not an agent, and misses the same way.
         await instance.AddActiveUserAsync("other");
-        using var wrongKind = await admin.PatchAsJsonAsync("/agents/other", new { name = "nobody" }, Ct);
+        using var wrongKind = await admin.PatchAsJsonAsync("/api/agents/other", new { name = "nobody" }, Ct);
         await Problem(wrongKind, HttpStatusCode.NotFound, "not-found");
 
-        using var nobody = await admin.PatchAsJsonAsync("/agents/nobody-at-all", new { name = "nobody" }, Ct);
+        using var nobody = await admin.PatchAsJsonAsync("/api/agents/nobody-at-all", new { name = "nobody" }, Ct);
         await Problem(nobody, HttpStatusCode.NotFound, "not-found");
 
         // The user side of the same rule, and the revoke that ends it.
-        using var deactivated = await admin.PostAsync("/users/other/deactivate", null, Ct);
+        using var deactivated = await admin.PostAsync("/api/users/other/deactivate", null, Ct);
         Assert.Equal(HttpStatusCode.OK, deactivated.StatusCode);
         Assert.Equal("deactivated", (await deactivated.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("state").GetString());
 
-        using var missing = await admin.PostAsync("/users/nobody-at-all/deactivate", null, Ct);
+        using var missing = await admin.PostAsync("/api/users/nobody-at-all/deactivate", null, Ct);
         await Problem(missing, HttpStatusCode.NotFound, "not-found");
 
-        using var revoked = await admin.DeleteAsync("/agents/brisk-heron-7", Ct);
+        using var revoked = await admin.DeleteAsync("/api/agents/brisk-heron-7", Ct);
         Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
     }
 
@@ -319,36 +319,36 @@ public sealed class IdentityEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var created = await admin.PostAsync("/tokens", null, Ct);
+        using var created = await admin.PostAsync("/api/tokens", null, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var issued = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
         var secret = issued.GetProperty("secret").GetString()!;
         var id = issued.GetProperty("id").GetGuid();
 
         using var withNew = instance.ClientWith(secret);
-        Assert.Equal(HttpStatusCode.OK, (await withNew.GetAsync("/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await withNew.GetAsync("/api/me", Ct)).StatusCode);
 
-        var tokens = await admin.GetFromJsonAsync<JsonElement>("/tokens", Ct);
+        var tokens = await admin.GetFromJsonAsync<JsonElement>("/api/tokens", Ct);
         Assert.Equal(2, tokens.GetArrayLength());
         Assert.All(tokens.EnumerateArray(), t => Assert.False(t.TryGetProperty("secret", out _)));
 
         // Another user cannot see, and so cannot revoke, this token.
         using var other = instance.ClientWith(await instance.AddActiveUserAsync("other"));
-        using var notTheirs = await other.DeleteAsync($"/tokens/{id}", Ct);
+        using var notTheirs = await other.DeleteAsync($"/api/tokens/{id}", Ct);
         await Problem(notTheirs, HttpStatusCode.NotFound, "not-found");
 
         // The owner revokes it, and it stops working.
-        using var revoked = await admin.DeleteAsync($"/tokens/{id}", Ct);
+        using var revoked = await admin.DeleteAsync($"/api/tokens/{id}", Ct);
         Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await withNew.GetAsync("/me", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await withNew.GetAsync("/api/me", Ct)).StatusCode);
 
-        tokens = await admin.GetFromJsonAsync<JsonElement>("/tokens", Ct);
+        tokens = await admin.GetFromJsonAsync<JsonElement>("/api/tokens", Ct);
         Assert.Single(tokens.EnumerateArray(), t => t.GetProperty("revoked_at").ValueKind != JsonValueKind.Null);
     }
 
     private static async Task<string> AgentSecretAsync(HttpClient user)
     {
-        using var created = await user.PostAsJsonAsync("/agents", new { }, Ct);
+        using var created = await user.PostAsJsonAsync("/api/agents", new { }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         return (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("token").GetProperty("secret").GetString()!;
     }

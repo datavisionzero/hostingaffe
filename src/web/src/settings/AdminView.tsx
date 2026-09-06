@@ -31,7 +31,7 @@ export function AdminView() {
 function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [notice, setNotice] = useState("");
-  async function load() { setUsers((await api.GET("/users")).data ?? []); }
+  async function load() { setUsers((await api.GET("/api/users")).data ?? []); }
   useEffect(() => { void (async () => { await load(); })(); }, []);
   const report = reporting(setNotice, load);
 
@@ -43,7 +43,7 @@ function Users() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    const invited = await report(api.POST("/users", { body: { name: String(data.get("name")), email: String(data.get("email")), administrator: data.has("administrator") } }), "Invitation sent.");
+    const invited = await report(api.POST("/api/users", { body: { name: String(data.get("name")), email: String(data.get("email")), administrator: data.has("administrator") } }), "Invitation sent.");
     if (invited) form.reset();
   }
 
@@ -63,9 +63,9 @@ function Users() {
             detail={`${u.email} · ${u.state}${u.administrator ? " · administrator" : ""}`}
             action={
               <RowMenu label={`Actions for ${u.name}`}>
-                {u.state === "invited" && <DropdownMenuItem onClick={() => void report(api.POST("/users/{id}/invitation", { params: { path: { id: u.id } } }), "Invitation resent.")}>Resend invitation</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => void report(api.PATCH("/users/{id}", { params: { path: { id: u.id } }, body: { administrator: !u.administrator } }), u.administrator ? `${u.name} is no longer an administrator.` : `${u.name} is now an administrator.`)}>{u.administrator ? "Demote" : "Make admin"}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void report(api.POST(u.state === "deactivated" ? "/users/{id}/reactivate" : "/users/{id}/deactivate", { params: { path: { id: u.id } } }), u.state === "deactivated" ? `${u.name} is active again.` : `${u.name} is deactivated.`)}>{u.state === "deactivated" ? "Reactivate" : "Deactivate"}</DropdownMenuItem>
+                {u.state === "invited" && <DropdownMenuItem onClick={() => void report(api.POST("/api/users/{id}/invitation", { params: { path: { id: u.id } } }), "Invitation resent.")}>Resend invitation</DropdownMenuItem>}
+                <DropdownMenuItem onClick={() => void report(api.PATCH("/api/users/{id}", { params: { path: { id: u.id } }, body: { administrator: !u.administrator } }), u.administrator ? `${u.name} is no longer an administrator.` : `${u.name} is now an administrator.`)}>{u.administrator ? "Demote" : "Make admin"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void report(api.POST(u.state === "deactivated" ? "/api/users/{id}/reactivate" : "/api/users/{id}/deactivate", { params: { path: { id: u.id } } }), u.state === "deactivated" ? `${u.name} is active again.` : `${u.name} is deactivated.`)}>{u.state === "deactivated" ? "Reactivate" : "Deactivate"}</DropdownMenuItem>
               </RowMenu>
             }
           />
@@ -79,7 +79,7 @@ function Users() {
 function Email() {
   const [smtp, setSmtp] = useState<Smtp>();
   const [notice, setNotice] = useState("");
-  useEffect(() => { void (async () => { setSmtp((await api.GET("/admin/smtp")).data); })(); }, []);
+  useEffect(() => { void (async () => { setSmtp((await api.GET("/api/admin/smtp")).data); })(); }, []);
 
   return (
     <Section title="Transactional email" description="Credentials remain in environment variables.">
@@ -99,7 +99,7 @@ function Email() {
  */
 async function sendTest(email: string, setNotice: (notice: string) => void) {
   try {
-    const { error, response } = await api.POST("/admin/smtp/test", { body: { email } });
+    const { error, response } = await api.POST("/api/admin/smtp/test", { body: { email } });
     setNotice(response.ok ? "Test email sent." : describe(error, response.status));
   } catch {
     setNotice("The instance did not answer.");

@@ -73,7 +73,7 @@ public static class IdentityEndpoints
         door.MapPost("/users", async (CreateUserRequest? request, CreateUser create, CancellationToken cancellationToken) =>
             {
                 var created = await create.ExecuteAsync(request?.Name, request?.Email, request?.Administrator ?? false, cancellationToken);
-                return Results.Created($"/users/{created.Id}", created);
+                return Results.Created($"{Routes.Api}/users/{created.Id}", created);
             })
             .WithName("CreateUser")
             .WithSummary("Invite a user by email. Administrators only.")
@@ -125,7 +125,7 @@ public static class IdentityEndpoints
         door.MapPost("/agents", async (CreateAgentRequest? request, CreateAgent create, CancellationToken cancellationToken) =>
             {
                 var created = await create.ExecuteAsync(request?.Name, cancellationToken);
-                return Results.Created($"/agents/{created.Id}", created);
+                return Results.Created($"{Routes.Api}/agents/{created.Id}", created);
             })
             .WithName("CreateAgent")
             .WithSummary("Create an agent and its one token, shown once. Users only.")
@@ -179,7 +179,7 @@ public static class IdentityEndpoints
         door.MapPost("/tokens", async (CreateToken create, CancellationToken cancellationToken) =>
             {
                 var issued = await create.ExecuteAsync(cancellationToken);
-                return Results.Created($"/tokens/{issued.Id}", issued);
+                return Results.Created($"{Routes.Api}/tokens/{issued.Id}", issued);
             })
             .WithName("CreateToken")
             .WithSummary("A further user token for the caller, shown once.")

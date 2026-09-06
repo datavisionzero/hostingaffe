@@ -114,7 +114,7 @@ public sealed class CsrfWithoutAPublicUrlTests(PostgresFixture postgres)
             ["HOSTINGAFFE_SMTP_FROM_ADDRESS"] = string.Empty,
         });
         using var client = instance.ClientWith(null);
-        using var exchange = await client.PostAsJsonAsync("/session/bootstrap",
+        using var exchange = await client.PostAsJsonAsync("/api/session/bootstrap",
             new { token = AnInstance.BootstrapToken, password = "a long first password" }, Ct);
         var cookie = exchange.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
 
@@ -125,7 +125,7 @@ public sealed class CsrfWithoutAPublicUrlTests(PostgresFixture postgres)
 
     private static async Task<HttpResponseMessage> WriteAsync(HttpClient client, string cookie, string origin)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/me/password")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/me/password")
         {
             Content = JsonContent.Create(new { current_password = "a long first password", password = "a long second password" }),
         };
@@ -184,7 +184,7 @@ public sealed class LoginThrottleAddressTests(PostgresFixture postgres)
     private static async Task<HttpClient> SignedUpAsync(AnInstance instance)
     {
         var client = instance.ClientWith(null);
-        using var exchange = await client.PostAsJsonAsync("/session/bootstrap",
+        using var exchange = await client.PostAsJsonAsync("/api/session/bootstrap",
             new { token = AnInstance.BootstrapToken, password = Password }, Ct);
         Assert.Equal(HttpStatusCode.NoContent, exchange.StatusCode);
         return client;
@@ -199,7 +199,7 @@ public sealed class LoginThrottleAddressTests(PostgresFixture postgres)
     private static async Task<HttpResponseMessage> SignInAsync(
         HttpClient client, string email, string password, string? forwardedFor)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/session")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/session")
         {
             Content = JsonContent.Create(new { email, password }),
         };

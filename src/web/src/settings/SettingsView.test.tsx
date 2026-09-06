@@ -21,9 +21,9 @@ function At() {
 
 function settings(routes: Parameters<typeof installInstance>[0] = {}, at = "/settings") {
   const instance = installInstance({
-    "GET /sessions": [],
-    "GET /tokens": [],
-    "GET /agents": [],
+    "GET /api/sessions": [],
+    "GET /api/tokens": [],
+    "GET /api/agents": [],
     ...routes,
   });
 
@@ -35,7 +35,7 @@ function settings(routes: Parameters<typeof installInstance>[0] = {}, at = "/set
 // event has been dispatched: reading it back after the await threw, and the
 // `TypeError` was reported where "Saved." belonged.
 it("reports a changed password as saved and clears the fields", async () => {
-  settings({ "POST /me/password": { status: 204 } }, "/settings/security");
+  settings({ "POST /api/me/password": { status: 204 } }, "/settings/security");
   const user = userEvent.setup();
 
   await user.type(await screen.findByLabelText("Current password"), "a long first password");
@@ -48,7 +48,7 @@ it("reports a changed password as saved and clears the fields", async () => {
 });
 
 it("reports a created agent as saved, shows its secret once and clears the name", async () => {
-  settings({ "POST /agents": { status: 201, body: { ...anAgent, token: { ...anAgent.token, secret: "ha_thesecret" } } } }, "/settings/agents");
+  settings({ "POST /api/agents": { status: 201, body: { ...anAgent, token: { ...anAgent.token, secret: "ha_thesecret" } } } }, "/settings/agents");
   const user = userEvent.setup();
 
   await user.type(await screen.findByLabelText("Agent name"), "one");
@@ -66,8 +66,8 @@ const refusal = (status: number, detail: string) => ({ status, body: { type: "ab
 // that could not be revoked looked exactly like one that was.
 it("says why a token could not be revoked", async () => {
   settings({
-    "GET /tokens": [aToken],
-    [`DELETE /tokens/${aToken.id}`]: refusal(409, "The token was already revoked."),
+    "GET /api/tokens": [aToken],
+    [`DELETE /api/tokens/${aToken.id}`]: refusal(409, "The token was already revoked."),
   }, "/settings/tokens");
   const user = userEvent.setup();
 
@@ -79,8 +79,8 @@ it("says why a token could not be revoked", async () => {
 it("reports a revoked token and reloads the list", async () => {
   let revoked = false;
   settings({
-    "GET /tokens": () => (revoked ? [{ ...aToken, revoked_at: "2026-09-04T10:00:00Z" }] : [aToken]),
-    [`DELETE /tokens/${aToken.id}`]: () => { revoked = true; return { status: 204 }; },
+    "GET /api/tokens": () => (revoked ? [{ ...aToken, revoked_at: "2026-09-04T10:00:00Z" }] : [aToken]),
+    [`DELETE /api/tokens/${aToken.id}`]: () => { revoked = true; return { status: 204 }; },
   }, "/settings/tokens");
   const user = userEvent.setup();
 

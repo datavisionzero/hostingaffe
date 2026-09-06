@@ -17,12 +17,12 @@ const page = `{"slug":"architecture","title":"Architecture","body":"# The four l
 
 func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 	f := &fake{t: t, version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
-		if r.Method == http.MethodGet && r.URL.Path == "/pages" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/pages" {
 			return 200, `[{"slug":"architecture","title":"Architecture",
 			"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 			"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"}]`
 		}
-		if r.Method == http.MethodPost && r.URL.Path == "/pages" {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/pages" {
 			return 201, page
 		}
 		if r.Method == http.MethodDelete {
@@ -37,13 +37,13 @@ func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 		args                   []string
 		method, path, contains string
 	}{
-		{[]string{"page", "list"}, "GET", "/pages", "architecture"},
-		{[]string{"page", "view", "architecture"}, "GET", "/pages/architecture", "# The four layers"},
-		{[]string{"page", "create", "architecture", "--title", "Architecture"}, "POST", "/pages", "architecture"},
-		{[]string{"page", "edit", "architecture", "--title", "The four layers"}, "PATCH", "/pages/architecture", "architecture"},
-		{[]string{"page", "rename", "architecture", "betriebshandbuch"}, "PATCH", "/pages/architecture", "architecture"},
-		{[]string{"page", "delete", "architecture"}, "DELETE", "/pages/architecture", "ha page restore architecture"},
-		{[]string{"page", "restore", "architecture"}, "POST", "/pages/architecture/restore", "architecture"},
+		{[]string{"page", "list"}, "GET", "/api/pages", "architecture"},
+		{[]string{"page", "view", "architecture"}, "GET", "/api/pages/architecture", "# The four layers"},
+		{[]string{"page", "create", "architecture", "--title", "Architecture"}, "POST", "/api/pages", "architecture"},
+		{[]string{"page", "edit", "architecture", "--title", "The four layers"}, "PATCH", "/api/pages/architecture", "architecture"},
+		{[]string{"page", "rename", "architecture", "betriebshandbuch"}, "PATCH", "/api/pages/architecture", "architecture"},
+		{[]string{"page", "delete", "architecture"}, "DELETE", "/api/pages/architecture", "ha page restore architecture"},
+		{[]string{"page", "restore", "architecture"}, "POST", "/api/pages/architecture/restore", "architecture"},
 	} {
 		code, out, stderr := run(t, server, tc.args...)
 		if code != exit.OK || stderr != "" {
@@ -87,7 +87,7 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost:
 			return 201, page
-		case r.Method == http.MethodGet && r.URL.Path == "/pages":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/pages":
 			return 200, `[]`
 		default:
 			return 200, page
@@ -202,7 +202,7 @@ func TestAnEndpointTheInstanceDoesNotHaveIsNotACrash(t *testing.T) {
 	if out != "" {
 		t.Errorf("nothing goes to stdout: %q", out)
 	}
-	for _, want := range []string{"text/html", "/pages", "ha version"} {
+	for _, want := range []string{"text/html", "/api/pages", "ha version"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr %q lacks %q", stderr, want)
 		}

@@ -34,7 +34,7 @@ export function App() {
 
     void (async () => {
       try {
-        const { data, response } = await api.GET("/me");
+        const { data, response } = await api.GET("/api/me");
 
         if (!current) {
           return;
@@ -109,7 +109,7 @@ export function App() {
           value={{
             me: standing.me,
             signOut: () => {
-              void api.DELETE("/session").finally(() => setStanding({ at: "stranger" }));
+              void api.DELETE("/api/session").finally(() => setStanding({ at: "stranger" }));
             },
           }}
         >

@@ -8,7 +8,7 @@ namespace Hostingaffe.Application.Acts;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The first thing every endpoint but <c>GET /version</c> does, and the only
+/// The first thing every endpoint but <c>GET /api/version</c> does, and the only
 /// place any of them learns who is calling. The path is the one
 /// <c>docs/storage.md</c> describes: read the secret out of the header, hash
 /// it, find the row by the hash, and read the kind off the row — the server

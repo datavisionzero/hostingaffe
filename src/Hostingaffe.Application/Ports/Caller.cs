@@ -55,7 +55,7 @@ public interface ICallerIdentity
 {
     /// <summary>
     /// The authenticated caller. Asking on a request that has none is a bug in
-    /// the adapter — every endpoint but <c>GET /version</c> is behind the door —
+    /// the adapter — every endpoint but <c>GET /api/version</c> is behind the door —
     /// and throws rather than answering with nobody.
     /// </summary>
     Caller Caller { get; }

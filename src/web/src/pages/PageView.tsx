@@ -41,7 +41,7 @@ export function PageView() {
 
     void (async () => {
       try {
-        const { data, error, response } = await api.GET("/pages/{slug}", {
+        const { data, error, response } = await api.GET("/api/pages/{slug}", {
           params: { path: { slug: slug! } },
         });
 
@@ -151,7 +151,7 @@ export function PageView() {
               description="The page will be hidden from the wiki, but can be restored during the grace period. Its slug stays taken until then, so nothing else can move into the address."
               confirmLabel="Delete page"
               onConfirm={async () => {
-                const result = await api.DELETE("/pages/{slug}", {
+                const result = await api.DELETE("/api/pages/{slug}", {
                   params: { path: { slug: page.slug } },
                 });
                 if (!result.response.ok) throw new Error(describe(result.error, result.response.status));
@@ -181,7 +181,7 @@ function Restore({ page, onChanged }: { page: Page; onChanged: (page: Page) => v
     setBusy(true);
     setWhy(undefined);
     try {
-      const { data, error, response } = await api.POST("/pages/{slug}/restore", {
+      const { data, error, response } = await api.POST("/api/pages/{slug}/restore", {
         params: { path: { slug: page.slug } },
       });
       if (data === undefined) throw new Error(describe(error, response.status));
@@ -220,7 +220,7 @@ function Rename({ page, onChanged }: { page: Page; onChanged: (page: Page) => vo
       initialValue={page.slug}
       submitLabel="Rename page"
       onSubmit={async (slug) => {
-        const { data, error, response } = await api.PATCH("/pages/{slug}", {
+        const { data, error, response } = await api.PATCH("/api/pages/{slug}", {
           params: { path: { slug: page.slug } },
           body: { slug },
         });
@@ -254,7 +254,7 @@ function EditPageForm({ page, onSaved, onCancel }: {
       // and an agent both edit, and neither may overwrite the other silently.
       write={async (draft) => {
         setConflict(undefined);
-        const answer = await api.PATCH("/pages/{slug}", {
+        const answer = await api.PATCH("/api/pages/{slug}", {
           params: { path: { slug: page.slug } },
           headers: { "If-Match": version },
           body: { title: draft.title, body: draft.body },
@@ -284,7 +284,7 @@ export function NewPageView() {
         slugField
         submit="Create page"
         onCancel={() => void navigate("/pages")}
-        write={(draft) => api.POST("/pages", { body: draft })}
+        write={(draft) => api.POST("/api/pages", { body: draft })}
         onWritten={(page) => void navigate(pagePath(page.slug), { replace: true })}
       />
     </>

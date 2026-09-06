@@ -31,6 +31,7 @@ material value to understanding the decision.
 ## Decisions
 
 - [0001 – The foundation is a copy of planaffe](./0001-the-foundation-is-a-copy-of-planaffe.md)
+- [0002 – The API lives under /api](./0002-the-api-lives-under-api.md)
 
 ## Adopted from planaffe
 

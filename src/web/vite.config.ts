@@ -5,26 +5,13 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 /**
- * The first path segment of every route the contract has. Development runs
- * the two toolchains side by side (docs/codebase.md): Vite serves the SPA and
- * forwards what belongs to the instance, so that the application reaches the
- * API at its own origin there as well as in the image.
+ * Where the instance is (ADR 0002). Development runs the two toolchains side
+ * by side (docs/codebase.md): Vite serves the SPA and forwards `/api` to the
+ * instance, so that the application reaches the API at its own origin there as
+ * well as in the image. One prefix, so a new endpoint is never a second place
+ * to register it.
  */
-const instanceRoutes = [
-  "/admin",
-  "/agents",
-  "/email-changes",
-  "/invitations",
-  "/me",
-  "/openapi",
-  "/pages",
-  "/password-recovery",
-  "/session",
-  "/sessions",
-  "/tokens",
-  "/users",
-  "/version",
-];
+const instance = "/api";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -45,7 +32,7 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    proxy: Object.fromEntries(instanceRoutes.map((route) => [route, "http://localhost:5142"])),
+    proxy: { [instance]: "http://localhost:5142" },
   },
 
   test: {

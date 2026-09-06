@@ -38,7 +38,7 @@ export function PagesView() {
 
     void (async () => {
       try {
-        const { data, error, response } = await api.GET("/pages", {
+        const { data, error, response } = await api.GET("/api/pages", {
           params: { query: { q: query === "" ? undefined : query } },
         });
 

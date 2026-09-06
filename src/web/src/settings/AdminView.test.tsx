@@ -13,7 +13,7 @@ const invited = { id: "0199a000-0000-7000-8000-000000000002", name: "newcomer", 
 
 function admin(routes: Parameters<typeof installInstance>[0], at = "/admin/users") {
   const instance = installInstance({
-    "GET /admin/smtp": { configured: false, host: null, port: null, security: null, sender: null },
+    "GET /api/admin/smtp": { configured: false, host: null, port: null, security: null, sender: null },
     ...routes,
   });
 
@@ -37,8 +37,8 @@ async function act(user: ReturnType<typeof userEvent.setup>, of: string, what: s
 it("shows an invited user without a reload of the page", async () => {
   let sent = false;
   admin({
-    "GET /users": () => (sent ? [maintainer, invited] : [maintainer]),
-    "POST /users": () => { sent = true; return { status: 201, body: invited }; },
+    "GET /api/users": () => (sent ? [maintainer, invited] : [maintainer]),
+    "POST /api/users": () => { sent = true; return { status: 201, body: invited }; },
   });
   const user = userEvent.setup();
 
@@ -57,8 +57,8 @@ const refusal = (status: number, detail: string) => ({ status, body: { type: "ab
 
 it("says why the last administrator cannot be demoted", async () => {
   admin({
-    "GET /users": [maintainer],
-    [`PATCH /users/${maintainer.id}`]: refusal(422, "Deactivation or demotion would leave no active administrator."),
+    "GET /api/users": [maintainer],
+    [`PATCH /api/users/${maintainer.id}`]: refusal(422, "Deactivation or demotion would leave no active administrator."),
   });
   const user = userEvent.setup();
 
@@ -69,8 +69,8 @@ it("says why the last administrator cannot be demoted", async () => {
 
 it("says why the last administrator cannot be deactivated", async () => {
   admin({
-    "GET /users": [maintainer],
-    [`POST /users/${maintainer.id}/deactivate`]: refusal(422, "Deactivation or demotion would leave no active administrator."),
+    "GET /api/users": [maintainer],
+    [`POST /api/users/${maintainer.id}/deactivate`]: refusal(422, "Deactivation or demotion would leave no active administrator."),
   });
   const user = userEvent.setup();
 
@@ -83,8 +83,8 @@ it("says why the last administrator cannot be deactivated", async () => {
 // that failed reported the opposite of what happened.
 it("does not report a resent invitation that did not go out", async () => {
   admin({
-    "GET /users": [maintainer, invited],
-    [`POST /users/${invited.id}/invitation`]: refusal(503, "Transactional email is not configured."),
+    "GET /api/users": [maintainer, invited],
+    [`POST /api/users/${invited.id}/invitation`]: refusal(503, "Transactional email is not configured."),
   });
   const user = userEvent.setup();
 
@@ -96,14 +96,14 @@ it("does not report a resent invitation that did not go out", async () => {
 });
 
 it("lands on the users area when no area is named", async () => {
-  admin({ "GET /users": [maintainer] }, "/admin");
+  admin({ "GET /api/users": [maintainer] }, "/admin");
 
   expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
 });
 
 // An area that is not one used to draw the nav and nothing under it.
 it("lands there too when the area named is not one", async () => {
-  admin({ "GET /users": [maintainer] }, "/admin/nowhere");
+  admin({ "GET /api/users": [maintainer] }, "/admin/nowhere");
 
   expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
   expect(screen.getByTestId("at")).toHaveTextContent("/admin/users");
@@ -112,7 +112,7 @@ it("lands there too when the area named is not one", async () => {
 // An area is an address, and picking another one leaves the current one
 // rather than growing the address a segment at a time.
 it("leaves the current area behind when another is picked", async () => {
-  admin({ "GET /users": [maintainer] }, "/admin/email");
+  admin({ "GET /api/users": [maintainer] }, "/admin/email");
   const user = userEvent.setup();
 
   expect(await screen.findByRole("link", { name: "Transactional email" })).toHaveAttribute("aria-current", "page");

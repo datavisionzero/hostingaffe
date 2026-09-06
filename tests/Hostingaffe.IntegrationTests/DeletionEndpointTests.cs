@@ -20,31 +20,31 @@ public sealed class DeletionEndpointTests(PostgresFixture postgres)
         await Page(admin, "architecture", "Architecture");
         await Page(admin, "operations", "Operations");
 
-        using var deleted = await admin.DeleteAsync("/pages/architecture", Ct);
+        using var deleted = await admin.DeleteAsync("/api/pages/architecture", Ct);
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
         // Absent from the read and from the list, and the slug stays spent.
         var problem = await Refusals.Problem(
-            await admin.GetAsync("/pages/architecture", Ct), HttpStatusCode.NotFound, "deleted");
+            await admin.GetAsync("/api/pages/architecture", Ct), HttpStatusCode.NotFound, "deleted");
         Assert.True(problem.TryGetProperty("restorable_until", out _));
 
-        var listed = await admin.GetFromJsonAsync<JsonElement>("/pages", Ct);
+        var listed = await admin.GetFromJsonAsync<JsonElement>("/api/pages", Ct);
         Assert.Equal(["operations"], listed.EnumerateArray().Select(p => p.GetProperty("slug").GetString()));
 
         await Refusals.Problem(
-            await admin.PostAsJsonAsync("/pages", new { slug = "architecture", title = "Again" }, Ct),
+            await admin.PostAsJsonAsync("/api/pages", new { slug = "architecture", title = "Again" }, Ct),
             HttpStatusCode.BadRequest, "validation");
 
         // Back, under the slug nobody could take meanwhile.
-        using var restored = await admin.PostAsync("/pages/architecture/restore", null, Ct);
+        using var restored = await admin.PostAsync("/api/pages/architecture/restore", null, Ct);
         Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
         Assert.Equal("architecture", (await restored.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("slug").GetString());
 
         await Refusals.Problem(
-            await admin.PostAsync("/pages/architecture/restore", null, Ct),
+            await admin.PostAsync("/api/pages/architecture/restore", null, Ct),
             HttpStatusCode.UnprocessableEntity, "transition");
         await Refusals.Problem(
-            await admin.PostAsync("/pages/nowhere/restore", null, Ct),
+            await admin.PostAsync("/api/pages/nowhere/restore", null, Ct),
             HttpStatusCode.NotFound, "not-found");
     }
 
@@ -56,8 +56,8 @@ public sealed class DeletionEndpointTests(PostgresFixture postgres)
         await Page(admin, "old", "Old");
         await Page(admin, "recent", "Recent");
 
-        await admin.DeleteAsync("/pages/old", Ct);
-        await admin.DeleteAsync("/pages/recent", Ct);
+        await admin.DeleteAsync("/api/pages/old", Ct);
+        await admin.DeleteAsync("/api/pages/recent", Ct);
 
         await using (var context = Migrated.ContextFor(instance.ConnectionString))
         {
@@ -90,7 +90,7 @@ public sealed class DeletionEndpointTests(PostgresFixture postgres)
 
     private static async Task Page(HttpClient admin, string slug, string title)
     {
-        using var created = await admin.PostAsJsonAsync("/pages", new { slug, title }, Ct);
+        using var created = await admin.PostAsJsonAsync("/api/pages", new { slug, title }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
     }
 }

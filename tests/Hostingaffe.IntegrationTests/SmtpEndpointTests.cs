@@ -29,14 +29,14 @@ public sealed class SmtpEndpointTests(PostgresFixture postgres) : IAsyncLifetime
         await using var instance = await AnInstance.ConfiguredAsync(postgres, configuration);
         using var client = instance.ClientWith(AnInstance.BootstrapToken);
 
-        var status = await client.GetFromJsonAsync<JsonElement>("/admin/smtp", TestContext.Current.CancellationToken);
+        var status = await client.GetFromJsonAsync<JsonElement>("/api/admin/smtp", TestContext.Current.CancellationToken);
         Assert.True(status.GetProperty("configured").GetBoolean());
         Assert.Equal("127.0.0.1", status.GetProperty("host").GetString());
         Assert.Equal("none", status.GetProperty("security").GetString());
         Assert.False(status.TryGetProperty("username", out _));
         Assert.False(status.TryGetProperty("password", out _));
 
-        using var sent = await client.PostAsJsonAsync("/admin/smtp/test",
+        using var sent = await client.PostAsJsonAsync("/api/admin/smtp/test",
             new { email = "recipient@example.test" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
 
@@ -58,10 +58,10 @@ public sealed class SmtpEndpointTests(PostgresFixture postgres) : IAsyncLifetime
         await using var instance = await AnInstance.ConfiguredAsync(postgres, DisabledSmtp());
         using var client = instance.ClientWith(AnInstance.BootstrapToken);
 
-        var status = await client.GetFromJsonAsync<JsonElement>("/admin/smtp", TestContext.Current.CancellationToken);
+        var status = await client.GetFromJsonAsync<JsonElement>("/api/admin/smtp", TestContext.Current.CancellationToken);
         Assert.False(status.GetProperty("configured").GetBoolean());
 
-        using var sent = await client.PostAsJsonAsync("/admin/smtp/test",
+        using var sent = await client.PostAsJsonAsync("/api/admin/smtp/test",
             new { email = "recipient@example.test" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sent.StatusCode);
         var problem = await sent.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
@@ -73,29 +73,29 @@ public sealed class SmtpEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     {
         await using var instance = await AnInstance.ConfiguredAsync(postgres, ConfiguredMailpit());
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        using var invited = await admin.PostAsJsonAsync("/users",
+        using var invited = await admin.PostAsJsonAsync("/api/users",
             new { name = "other", email = "other@example.test" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
 
         var invitationSecret = await SecretFromLatestMessage("activate");
         using var browser = instance.ClientWith(null);
-        using var accepted = await browser.PostAsJsonAsync("/invitations/accept",
+        using var accepted = await browser.PostAsJsonAsync("/api/invitations/accept",
             new { secret = invitationSecret, password = "the first long password" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, accepted.StatusCode);
 
-        using var login = await browser.PostAsJsonAsync("/session",
+        using var login = await browser.PostAsJsonAsync("/api/session",
             new { email = "OTHER@example.test", password = "the first long password" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
-        using var requested = await browser.PostAsJsonAsync("/password-recovery",
+        using var requested = await browser.PostAsJsonAsync("/api/password-recovery",
             new { email = "other@example.test" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, requested.StatusCode);
         var recoverySecret = await SecretFromLatestMessage("recover");
-        using var completed = await browser.PostAsJsonAsync("/password-recovery/complete",
+        using var completed = await browser.PostAsJsonAsync("/api/password-recovery/complete",
             new { secret = recoverySecret, password = "the replacement password" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, completed.StatusCode);
 
-        using var replacement = await browser.PostAsJsonAsync("/session",
+        using var replacement = await browser.PostAsJsonAsync("/api/session",
             new { email = "other@example.test", password = "the replacement password" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, replacement.StatusCode);
     }
@@ -105,22 +105,22 @@ public sealed class SmtpEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     {
         await using var instance = await AnInstance.ConfiguredAsync(postgres, ConfiguredMailpit());
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        using var requested = await admin.PostAsJsonAsync("/me/email",
+        using var requested = await admin.PostAsJsonAsync("/api/me/email",
             new { email = "new-address@example.test" }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, requested.StatusCode);
 
-        var before = await admin.GetFromJsonAsync<JsonElement>("/users", TestContext.Current.CancellationToken);
+        var before = await admin.GetFromJsonAsync<JsonElement>("/api/users", TestContext.Current.CancellationToken);
         Assert.Equal("maintainer@example.test", Assert.Single(before.EnumerateArray()).GetProperty("email").GetString());
 
         var secret = await SecretFromLatestMessage("confirm-email");
         using var anonymous = instance.ClientWith(null);
-        using var confirmed = await anonymous.PostAsJsonAsync("/email-changes/confirm",
+        using var confirmed = await anonymous.PostAsJsonAsync("/api/email-changes/confirm",
             new { secret }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, confirmed.StatusCode);
-        var after = await admin.GetFromJsonAsync<JsonElement>("/users", TestContext.Current.CancellationToken);
+        var after = await admin.GetFromJsonAsync<JsonElement>("/api/users", TestContext.Current.CancellationToken);
         Assert.Equal("new-address@example.test", Assert.Single(after.EnumerateArray()).GetProperty("email").GetString());
 
-        using var reused = await anonymous.PostAsJsonAsync("/email-changes/confirm",
+        using var reused = await anonymous.PostAsJsonAsync("/api/email-changes/confirm",
             new { secret }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Gone, reused.StatusCode);
     }

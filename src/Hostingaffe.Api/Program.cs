@@ -168,20 +168,28 @@ app.UseMiddleware<BrowserCsrfMiddleware>();
 app.UseHostingaffeIdempotency();
 app.UseAuthorization();
 
+// Everything the instance serves as an API is under one prefix, and everything
+// else is the web application's (ADR 0002). Both worlds want the word `pages`,
+// and `machines`, `installations` and `deployments` are next; the prefix is
+// what keeps them from meeting. An endpoint outside this group is a decision,
+// not an oversight.
+var api = app.MapGroup(Routes.Api);
+
 // Outside the door: the contract is what a client compiles against before it
 // has a token, and what CI captures from an instance nobody has bootstrapped.
-app.MapOpenApi();
+app.MapOpenApi($"{Routes.Api}/openapi/{{documentName}}.json");
 
-app.MapInstance();
-app.MapIdentities();
-app.MapBrowserIdentity();
-app.MapPages();
-app.MapSmtp();
+api.MapInstance();
+api.MapIdentities();
+api.MapBrowserIdentity();
+api.MapPages();
+api.MapSmtp();
 
 // The web application: built by its own toolchain into wwwroot at image build
 // time (deploy/Dockerfile) or by a local `npm run build`; in development the
-// Vite dev server serves it and this finds nothing. Every path no endpoint
-// took is the SPA's — its router decides what `/pages/architecture` is.
+// Vite dev server serves it and this finds nothing. Every path outside `/api`
+// is the SPA's — its router decides what `/pages/architecture` is, and the
+// instance never answers that address itself.
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("index.html");
