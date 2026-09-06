@@ -175,13 +175,64 @@ public sealed class ConstraintTests(PostgresFixture postgres)
             "update machine set kind = 'vm', host_id = {0} where id = {0}", db.Machine.Id);
     }
 
+    // -- installation ----------------------------------------------------------
+
+    [Theory]
+    [InlineData("ck_installation_environment", "environment = 'prod'")]
+    [InlineData("ck_installation_role", "role = 'infrastructure'")]
+    [InlineData("ck_installation_status", "status = 'broken'")]
+    [InlineData("ck_installation_backup", "backup = 'maybe'")]
+    [InlineData("ck_installation_monitoring", "monitoring = 'internal'")]
+    [InlineData("ck_installation_logging", "logging = 'remote'")]
+    public async Task Six_closed_sets_are_closed_in_the_column_too(string constraint, string assignment)
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await Refused(constraint, db.Context, $"update installation set {assignment} where id = {{0}}", db.Installation.Id);
+    }
+
+    [Theory]
+    [InlineData("ck_installation_port_number", "0, 'tcp', 'public'")]
+    [InlineData("ck_installation_port_number", "70000, 'tcp', 'public'")]
+    [InlineData("ck_installation_port_protocol", "443, 'sctp', 'public'")]
+    [InlineData("ck_installation_port_scope", "443, 'tcp', 'everywhere'")]
+    public async Task A_port_is_a_number_a_transport_and_a_reach(string constraint, string values)
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await Refused(
+            constraint,
+            db.Context,
+            $"insert into installation_port (installation_id, port, protocol, scope) values ({{0}}, {values})",
+            db.Installation.Id);
+    }
+
+    [Fact]
+    public async Task The_same_port_and_transport_twice_is_a_contradiction_the_database_will_not_hold()
+    {
+        await using var db = await Migrated.SeededAsync(postgres);
+
+        await db.Context.Database.ExecuteSqlRawAsync(
+            "insert into installation_port (installation_id, port, protocol, scope) values ({0}, 443, 'tcp', 'public')",
+            [db.Installation.Id],
+            TestContext.Current.CancellationToken);
+
+        await Refused("pk_installation_port", db.Context,
+            "insert into installation_port (installation_id, port, protocol, scope) values ({0}, 443, 'tcp', 'private')",
+            db.Installation.Id);
+    }
+
     [Fact]
     public async Task A_history_row_names_a_subject_the_code_knows()
     {
         await using var db = await Migrated.SeededAsync(postgres);
 
+        // An identity is deliberately not a subject: the history is every change
+        // to a machine, a software, an installation, a file or a page
+        // (CONTEXT.md, History), and identities are deactivated and revoked
+        // rather than changed field by field.
         await Refused("ck_history_subject", db.Context,
-            "insert into history (subject, subject_id, actor_id, at, field) values ('installation', {0}, {1}, now(), 'created')",
+            "insert into history (subject, subject_id, actor_id, at, field) values ('identity', {0}, {1}, now(), 'created')",
             db.Machine.Id, db.User.Id);
     }
 

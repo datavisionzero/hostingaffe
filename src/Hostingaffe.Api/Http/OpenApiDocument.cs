@@ -66,7 +66,9 @@ public static class OpenApiDocument
                     || type == typeof(CreateMachineRequest)
                     || type == typeof(ChangeMachineRequest)
                     || type == typeof(CreateSoftwareRequest)
-                    || type == typeof(ChangeSoftwareRequest))
+                    || type == typeof(ChangeSoftwareRequest)
+                    || type == typeof(CreateInstallationRequest)
+                    || type == typeof(ChangeInstallationRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;
                 }

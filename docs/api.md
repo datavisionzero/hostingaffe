@@ -7,7 +7,7 @@ captured from a running instance and checked in, and both clients are generated
 from it (planaffe ADRs 0005, 0011).
 
 The endpoint tables below cover what the foundation serves. The objects of
-the product — installation, deployment, file — arrive with their own sections.
+the product — deployment, file — arrive with their own sections.
 
 ## Where it is
 
@@ -208,6 +208,56 @@ absolute `http` or `https` addresses.
 
 Deleting is not here yet: a software with installations is not deleted at all,
 and that refusal needs the installation.
+
+### Installations
+
+| | |
+|---|---|
+| `GET /api/installations` | every installation as a slim `InstallationSummary`, by key |
+| `POST /api/installations` | `key`, `machine`, `software`, `environment` and `role` are required |
+| `GET /api/installations/{key}` | the complete installation |
+| `PATCH /api/installations/{key}` | any field but the key; `If-Match` guards it |
+| `GET /api/installations/{key}/history` | who changed what, oldest first |
+
+The list filters by `machine`, `software`, `environment`, `role`, `status`,
+`backup`, `monitoring` and `logging`, each by one value. That is what makes the
+question VISION 7 names one call:
+
+```
+GET /api/installations?environment=production&backup=none
+```
+
+**Five fields are required and the rest have defaults that are true.** An
+installation is a software on a machine, so `machine` and `software` name
+existing keys; `environment` and `role` answer the two questions every
+installation answers, and neither has a default that would not be a guess. The
+three decisions start at `none`, `none` and `local` — nothing decided yet is no
+backup, which is the honest state and the one the filter above is meant to find.
+`status` starts `active`.
+
+**`ports` is a list of objects**, not of strings:
+
+```json
+{"ports": [{"port": 443, "protocol": "tcp", "scope": "public"},
+           {"port": 5432, "protocol": "tcp", "scope": "private"}]}
+```
+
+`443/tcp:public` is how a person writes and reads one — the CLI and the
+interface convert, and the history writes it that way — but the field is the
+object. `protocol` is `tcp` or `udp`, `scope` is `public`, `private` or
+`internal`, and two entries for the same port and protocol are refused.
+
+**A list is replaced whole**, never patched entry by entry: an entry has no
+address, and a caller who sends two of them means both. `[]` clears a list,
+leaving it out leaves it alone.
+
+`secrets` holds the **names** of the secrets the installation needs and never
+their values — the values live in vaultaffe or on the host. A name is one word;
+anything with a space or an `=` in it is `validation`, which is what keeps a
+line of an `.env` file from arriving here whole.
+
+`version` and `depends_on` are `unknown-field`. The first is derived from the
+deployments; the second is roadmap (VISION 15.2), not an omission.
 
 ### Pages
 

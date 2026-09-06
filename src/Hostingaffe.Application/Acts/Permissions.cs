@@ -43,6 +43,28 @@ public static class Validated
         }
     }
 
+    /// <inheritdoc cref="Field{T}(string, Func{T})"/>
+    public static async Task<T> FieldAsync<T>(string field, Func<Task<T>> normalize)
+    {
+        ArgumentNullException.ThrowIfNull(normalize);
+
+        try
+        {
+            return await normalize();
+        }
+        catch (ArgumentException refusal)
+        {
+            throw Refusal.Validation(field, Said(refusal));
+        }
+        catch (Refusal refusal) when (refusal.Code is RefusalCode.NotFound)
+        {
+            // A key that names nothing arrived in a field, not in an address:
+            // the caller sent a value the instance does not know, and that is
+            // `validation` on the field they sent it in.
+            throw Refusal.Validation(field, refusal.Detail);
+        }
+    }
+
     /// <summary>
     /// What the exception says, without the <c>(Parameter 'x')</c> the runtime
     /// appends: the document already names the field, and saying it twice reads

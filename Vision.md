@@ -385,7 +385,7 @@ means something else to systemd and to Docker Compose.
 | `role` | `application` · `platform` | closed set; `platform` is what the host runs for everyone — Caddy, Uptime Kuma, Beszel, ntfy — the template's "host service" |
 | `status` | `planned` · `active` · `retired` | |
 | `urls` | list of URL | where it is reachable, if anywhere |
-| `ports` | list of `port/protocol:scope` | scope is `public`, `private` (the operator's network) or `internal` (a Docker network) |
+| `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network) |
 | `path` | text | where it lives on the machine, `/srv/logaffe` — also where `files sync` writes by default |
 | `secrets` | list of names | the secret *names* it needs, never values |
 | `backup` | `none` · `planned` · `active` | the decision, as in the template |
@@ -403,6 +403,15 @@ was considered and rejected, because it would have made Caddy neither.
 `development` is for an installation that serves nobody but the operator — a
 test instance on the box at home. The home automation on that same box serves
 the household, and is `production`.
+
+A port is an object and not the string `443/tcp:public`. That spelling is a
+*rendering* — it is what the CLI and the interface show and take, and what a
+history row carries, because a person reads those. As a field it would have been
+the one value in the model with a grammar of its own: the check would move into a
+regular expression, "every installation with a public port" would become a text
+search instead of a query, and the generated clients would see a `string` they
+can read nothing out of. `protocol` and `scope` are closed sets like every other
+one here, with the same check constraint in the column.
 
 The three decision fields — backup, monitoring, logging — are fields rather
 than prose because they are the ones we want to *list*: "every production

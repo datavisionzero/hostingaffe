@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
 using Hostingaffe.Infrastructure.Persistence;
@@ -10,7 +12,7 @@ namespace Hostingaffe.IntegrationTests;
 
 /// <summary>
 /// A migrated database with the rows most tests need to say anything: a user,
-/// an agent the user owns, and one page.
+/// an agent the user owns, a page, and one of each thing the record is made of.
 /// </summary>
 internal sealed class Migrated(string connectionString) : IAsyncDisposable
 {
@@ -28,6 +30,10 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
 
     public Machine Machine { get; private set; } = null!;
 
+    public Software Software { get; private set; } = null!;
+
+    public Installation Installation { get; private set; } = null!;
+
     public static async Task<Migrated> EmptyAsync(PostgresFixture postgres)
     {
         var migrated = new Migrated(await postgres.CreateDatabaseAsync());
@@ -44,8 +50,20 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
         migrated.Agent = Agent.Create("quiet-otter-42", migrated.User.Id, Now);
         migrated.Page = Page.Create("welcome", "Welcome", "The seeded page.", migrated.User.Id, Now);
         migrated.Machine = Machine.Create("ex44", null, MachineKind.Dedicated, migrated.User.Id, Now);
+        migrated.Software = Software.Create("logaffe", null, migrated.User.Id, Now);
+        migrated.Installation = Installation.Create(
+            "logaffe-prod",
+            null,
+            migrated.Machine.Id,
+            migrated.Software.Id,
+            Hostingaffe.Domain.Installations.Environment.Production,
+            Role.Application,
+            migrated.User.Id,
+            Now);
 
-        context.AddRange(migrated.User, migrated.Agent, migrated.Page, migrated.Machine);
+        context.AddRange(
+            migrated.User, migrated.Agent, migrated.Page,
+            migrated.Machine, migrated.Software, migrated.Installation);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         context.ChangeTracker.Clear();
 

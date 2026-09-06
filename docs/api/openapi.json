@@ -1777,6 +1777,361 @@
         }
       }
     },
+    "/api/installations": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every installation as a slim InstallationSummary, by key, without the descriptions. Every parameter filters by one value; `environment=production&backup=none` is the question VISION 7 names. Not paginated.",
+        "operationId": "ListInstallations",
+        "parameters": [
+          {
+            "name": "machine",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "software",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "backup",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitoring",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "logging",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstallationSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. It has no version; that is what its deployments say.",
+        "operationId": "CreateInstallation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInstallationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Installation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The complete installation: every field, the machine and the software it names, and who touched it last.",
+        "operationId": "ReadInstallation",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Installation"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list. `If-Match` with the `updated_at` last read guards the write.",
+        "operationId": "ChangeInstallation",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeInstallationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Installation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/history": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the installation, oldest first: who, when, which field, from what to what. A list reads as its entries; the description records that it changed, not how.",
+        "operationId": "ReadInstallationHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pages": {
       "get": {
         "tags": [
@@ -2430,6 +2785,14 @@
           "string"
         ]
       },
+      "Backup": {
+        "enum": [
+          "none",
+          "planned",
+          "active"
+        ],
+        "type": "string"
+      },
       "BootstrapExchangeRequest": {
         "required": [
           "token",
@@ -2495,6 +2858,145 @@
             ]
           }
         }
+      },
+      "ChangeInstallationRequest": {
+        "required": [
+          "name",
+          "machine",
+          "software",
+          "environment",
+          "role",
+          "status",
+          "urls",
+          "ports",
+          "path",
+          "secrets",
+          "backup",
+          "monitoring",
+          "logging",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "machine": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "software": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "environment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Environment"
+              }
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Status"
+              }
+            ]
+          },
+          "urls": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Backup"
+              }
+            ]
+          },
+          "monitoring": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Monitoring"
+              }
+            ]
+          },
+          "logging": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Logging"
+              }
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "ChangeMachineRequest": {
         "required": [
@@ -2728,6 +3230,152 @@
             ]
           }
         }
+      },
+      "CreateInstallationRequest": {
+        "required": [
+          "key",
+          "name",
+          "machine",
+          "software",
+          "environment",
+          "role",
+          "status",
+          "urls",
+          "ports",
+          "path",
+          "secrets",
+          "backup",
+          "monitoring",
+          "logging",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "machine": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "software": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "environment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Environment"
+              }
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Status"
+              }
+            ]
+          },
+          "urls": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Backup"
+              }
+            ]
+          },
+          "monitoring": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Monitoring"
+              }
+            ]
+          },
+          "logging": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Logging"
+              }
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "CreateMachineRequest": {
         "required": [
@@ -3043,6 +3691,14 @@
           }
         }
       },
+      "Environment": {
+        "enum": [
+          "production",
+          "staging",
+          "development"
+        ],
+        "type": "string"
+      },
       "HistoryEntry": {
         "required": [
           "id",
@@ -3116,6 +3772,155 @@
           }
         }
       },
+      "Installation": {
+        "required": [
+          "key",
+          "name",
+          "machine",
+          "software",
+          "environment",
+          "role",
+          "status",
+          "urls",
+          "ports",
+          "path",
+          "secrets",
+          "backup",
+          "monitoring",
+          "logging",
+          "description",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "machine": {
+            "type": "string"
+          },
+          "software": {
+            "type": "string"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backup": {
+            "$ref": "#/components/schemas/Backup"
+          },
+          "monitoring": {
+            "$ref": "#/components/schemas/Monitoring"
+          },
+          "logging": {
+            "$ref": "#/components/schemas/Logging"
+          },
+          "description": {
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InstallationSummary": {
+        "required": [
+          "key",
+          "name",
+          "machine",
+          "software",
+          "environment",
+          "role",
+          "status",
+          "backup",
+          "monitoring",
+          "logging",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "machine": {
+            "type": "string"
+          },
+          "software": {
+            "type": "string"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "backup": {
+            "$ref": "#/components/schemas/Backup"
+          },
+          "monitoring": {
+            "$ref": "#/components/schemas/Monitoring"
+          },
+          "logging": {
+            "$ref": "#/components/schemas/Logging"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IssuedToken": {
         "required": [
           "id",
@@ -3140,6 +3945,13 @@
             "format": "date-time"
           }
         }
+      },
+      "Logging": {
+        "enum": [
+          "local",
+          "central"
+        ],
+        "type": "string"
       },
       "Machine": {
         "required": [
@@ -3438,6 +4250,13 @@
           }
         }
       },
+      "Monitoring": {
+        "enum": [
+          "none",
+          "external"
+        ],
+        "type": "string"
+      },
       "Page": {
         "required": [
           "slug",
@@ -3525,6 +4344,26 @@
           }
         }
       },
+      "Port": {
+        "required": [
+          "port",
+          "protocol",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/Protocol"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -3560,6 +4399,13 @@
             ]
           }
         }
+      },
+      "Protocol": {
+        "enum": [
+          "tcp",
+          "udp"
+        ],
+        "type": "string"
       },
       "RecoveryRequest": {
         "required": [
@@ -3602,6 +4448,21 @@
             ]
           }
         }
+      },
+      "Role": {
+        "enum": [
+          "application",
+          "platform"
+        ],
+        "type": "string"
+      },
+      "Scope": {
+        "enum": [
+          "public",
+          "private",
+          "internal"
+        ],
+        "type": "string"
       },
       "SecretPasswordRequest": {
         "required": [

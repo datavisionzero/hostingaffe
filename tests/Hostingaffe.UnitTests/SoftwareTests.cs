@@ -101,17 +101,4 @@ public sealed class SoftwareTests
             "the tag belongs to the deployment",
             Assert.Throws<ArgumentException>(() => Software.NormalizeImage("caddy:2")).Message,
             StringComparison.Ordinal);
-
-    [Theory]
-    [InlineData("https://caddyserver.com")]
-    [InlineData("http://example.test/path")]
-    public void A_url_is_an_absolute_http_address(string url) => Assert.Equal(url, Software.Url(url, "homepage"));
-
-    [Theory]
-    [InlineData("caddyserver.com")]
-    [InlineData("ftp://example.test")]
-    [InlineData("/relative")]
-    [InlineData("https://")]
-    public void Anything_else_is_not_a_url(string url) =>
-        Assert.Throws<ArgumentException>(() => Software.Url(url, "homepage"));
 }

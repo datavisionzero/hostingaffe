@@ -28,7 +28,7 @@ public sealed partial class Software
 {
     public const int NameMaxLength = 200;
 
-    /// <summary>What a URL and an image name fit in.</summary>
+    /// <summary>What an image name fits in.</summary>
     public const int ReferenceMaxLength = 500;
 
     /// <summary>
@@ -117,8 +117,8 @@ public sealed partial class Software
         var changes = new List<FieldChange>();
 
         Fields.Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
-        Fields.Text("homepage", edit.Homepage, Homepage, value => Homepage = value, value => Url(value, "homepage"), changes);
-        Fields.Text("repository", edit.Repository, Repository, value => Repository = value, value => Url(value, "repository"), changes);
+        Fields.Text("homepage", edit.Homepage, Homepage, value => Homepage = value, value => Fields.Url(value, "homepage"), changes);
+        Fields.Text("repository", edit.Repository, Repository, value => Repository = value, value => Fields.Url(value, "repository"), changes);
         Fields.Text("image", edit.Image, Image, value => Image = value, NormalizeImage, changes);
 
         // A description records that it changed, never how: the history is read
@@ -212,23 +212,6 @@ public sealed partial class Software
         }
 
         return trimmed;
-    }
-
-    /// <summary>
-    /// An absolute <c>http</c> or <c>https</c> address. Nothing else is a
-    /// homepage or a repository, and a half-typed one is refused where it was
-    /// typed rather than found broken by whoever clicks it.
-    /// </summary>
-    /// <exception cref="ArgumentException">It is not an absolute http(s) URL.</exception>
-    public static string Url(string value, string field)
-    {
-        Fields.Line(value ?? string.Empty, ReferenceMaxLength, $"A {field}");
-
-        return Uri.TryCreate(value, UriKind.Absolute, out var parsed)
-            && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps)
-            && !string.IsNullOrEmpty(parsed.Host)
-            ? value!
-            : throw new ArgumentException($"A {field} is an http or https address.");
     }
 
     [GeneratedRegex(ImageComponentPattern)]

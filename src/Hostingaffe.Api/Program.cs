@@ -120,6 +120,14 @@ builder.Services.AddScoped<ReadSoftwareHistory>();
 builder.Services.AddScoped<CreateSoftware>();
 builder.Services.AddScoped<ChangeSoftware>();
 
+// One software installed once on one machine (VISION 7).
+builder.Services.AddScoped<InstallationAssembler>();
+builder.Services.AddScoped<ListInstallations>();
+builder.Services.AddScoped<ReadInstallation>();
+builder.Services.AddScoped<ReadInstallationHistory>();
+builder.Services.AddScoped<CreateInstallation>();
+builder.Services.AddScoped<ChangeInstallation>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -200,6 +208,7 @@ api.MapIdentities();
 api.MapBrowserIdentity();
 api.MapMachines();
 api.MapSoftware();
+api.MapInstallations();
 api.MapPages();
 api.MapSmtp();
 

@@ -261,6 +261,87 @@ than found broken by whoever clicks them.
 list is read in, and it covers deleted rows, so a key stays spent for the grace
 period.
 
+## Installations
+
+One software installed once on one machine (`CONTEXT.md`, Installation), and the
+second of the two relationships the model builds.
+
+```sql
+create table installation (
+    id          uuid          not null primary key,
+    key         varchar(64)   not null,
+    name        varchar(200)  not null,
+    machine_id  uuid          not null references machine (id),
+    software_id uuid          not null references software (id),
+    environment text          not null check (environment in ('production', 'staging', 'development')),
+    role        text          not null check (role in ('application', 'platform')),
+    status      text          not null check (status in ('planned', 'active', 'retired')),
+    urls        text[]        not null default '{}',
+    ports       -- a table of its own, below
+    path        varchar(500),
+    secrets     text[]        not null default '{}',
+    backup      text          not null check (backup in ('none', 'planned', 'active')),
+    monitoring  text          not null check (monitoring in ('none', 'external')),
+    logging     text          not null check (logging in ('local', 'central')),
+    description text          not null default '',
+    created_by  uuid          not null references identity (id),
+    created_at  timestamptz   not null,
+    updated_by  uuid          not null references identity (id),
+    updated_at  timestamptz   not null,
+    deleted_at  timestamptz,
+    deleted_by  uuid          references identity (id)
+);
+
+create unique index installation_key      on installation (key);
+create        index installation_machine  on installation (machine_id);
+create        index installation_software on installation (software_id);
+```
+
+**There is no `version` column and no `depends_on` column.** The first is
+derived from the deployments and arrives with them; the second is roadmap
+(VISION 15.2), and a nullable column prepared in advance would be a decision
+taken quietly. Both are `unknown-field` in a request body, and the message says
+which of the two reasons applies.
+
+**Six closed sets, six check constraints.** `environment` and `role` answer two
+different questions — whom the installation serves, and what it is for the
+machine — and the three decisions are columns rather than prose because "every
+production installation without a backup" is a question the product answers in
+one query. Every one of the eight filters on the list is an equality on one of
+these columns or on one of the two foreign keys.
+
+`installation_software` is read whenever a software is asked what still hangs on
+it, which is what refuses its deletion.
+
+`urls` and `secrets` are arrays of text: nothing is read by them, and a join per
+URL would buy nothing the row does not already say. `secrets` holds **names**,
+never values — a name is one word, and a value with an `=` or a space in it does
+not fit the shape.
+
+```sql
+create table installation_port (
+    installation_id uuid not null references installation (id) on delete cascade,
+    port            int  not null check (port between 1 and 65535),
+    protocol        text not null check (protocol in ('tcp', 'udp')),
+    scope           text not null check (scope in ('public', 'private', 'internal')),
+
+    primary key (installation_id, port, protocol)
+);
+```
+
+**A port is a row, not a string and not a document.** `protocol` and `scope` are
+closed sets like every other one in the model, and a closed set is a column with
+a check constraint that lists the words. The primary key is what makes a port
+the same port — the number and the transport — so a second row for `443/tcp`
+with another scope is a contradiction the database will not hold. The spelling
+`443/tcp:public` is what a person reads and what a history row carries; it is a
+rendering, and it is nowhere in the schema.
+
+The cascade here is the only one in the file, and it is the hard delete's: these
+rows are part of what an installation *is*, so when the purge finally removes
+the installation row they go with it. A soft delete leaves them alone, because
+it leaves the installation alone.
+
 ## Pages
 
 The instance's flat wiki, addressed by a slug rather than a key
@@ -301,7 +382,8 @@ to what (`CONTEXT.md`, History).
 ```sql
 create table history (
     id         bigint      not null primary key generated always as identity,
-    subject    text        not null check (subject in ('page', 'machine', 'software')),
+    subject    text        not null
+        check (subject in ('page', 'machine', 'software', 'installation')),
     subject_id uuid        not null,
     actor_id   uuid        not null references identity (id),
     at         timestamptz not null,
@@ -326,6 +408,11 @@ points at an id nothing answers to.
 **`generated always as identity`**: a caller cannot bring its own id, so the
 order of the ids is the order the rows were written and nothing else. That is
 what makes `order by id` the history's order.
+
+**A list records what it became.** `urls`, `secrets` and `ports` write their
+entries as one line, separated by commas, and a port reads as `443/tcp:public`
+there — a history row is text a person reads, which is exactly what that
+spelling is for.
 
 **A text records that it changed, not how.** A page's body and a machine's or a
 software's description write a row with both values empty; the text itself is

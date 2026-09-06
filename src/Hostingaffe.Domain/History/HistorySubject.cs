@@ -11,4 +11,5 @@ public enum HistorySubject
     Page,
     Machine,
     Software,
+    Installation,
 }

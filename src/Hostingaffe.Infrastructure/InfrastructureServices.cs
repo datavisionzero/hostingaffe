@@ -37,6 +37,7 @@ public static class InfrastructureServices
         services.AddScoped<ITokens, Tokens>();
         services.AddScoped<IMachines, Machines>();
         services.AddScoped<ISoftware, SoftwareRows>();
+        services.AddScoped<IInstallations, Installations>();
         services.AddScoped<IPages, Pages>();
         services.AddScoped<IHistory, History>();
         services.AddScoped<ITransactions, Transactions>();

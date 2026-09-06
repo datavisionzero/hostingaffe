@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
 
@@ -46,6 +47,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     /// inventing one.
     /// </summary>
     public DbSet<Software> Software => Set<Software>();
+
+    /// <summary>One software installed once on one machine (VISION 7).</summary>
+    public DbSet<Installation> Installations => Set<Installation>();
 
     /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();

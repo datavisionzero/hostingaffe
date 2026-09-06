@@ -91,10 +91,18 @@ software.
 | `backup` | `none` · `planned` · `active` |
 | `monitoring` | `none` · `external` |
 | `logging` | `local` · `central` |
+| `protocol` (of a port) | `tcp` · `udp` |
+| `scope` (of a port) | `public` · `private` · `internal` |
 
 `environment` and `role` answer two different questions: whom an installation
 serves, and what it is for the host. A Caddy fronting production and staging is
 both `platform` and `production`.
+
+`ports` is a list of objects — `{ "port": 443, "protocol": "tcp", "scope":
+"public" }`. The spelling `443/tcp:public` is what a person reads and types, and
+what a history row carries; it is a rendering, not the field. `secrets` is a
+list of secret **names**, never values. `urls` is a list of URLs, and `path` is
+where the installation lives on the machine.
 
 `version` is derived: the version of the installation's latest deployment.
 
