@@ -1,7 +1,7 @@
 /**
  * The object a `stale` refusal carries, or nothing.
  *
- * `docs/api.md` ("Concurrency on text fields") has the refusal hand the
+ * `docs/api.md` ("Guarding a write") has the refusal hand the
  * current object back so the client can merge and try again — and a client
  * that drops it turns the guard into a dead end, because every further write
  * carries the same version and is refused for the same reason. Whoever sends

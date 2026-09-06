@@ -110,14 +110,32 @@ act, and the act wrote three rows. What a cascade writes keeps its own note —
 deleting a machine says `with machine caddy` on everything it takes, and the
 caller's note goes on the machine's own row.
 
-## Concurrency on text fields
+## Guarding a write
 
-A text two writers share — a page's body — is guarded by `If-Match` carrying
-the `updated_at` last read, quoted:
+A record two writers share is guarded by `If-Match`, carrying what the caller
+last read, quoted. **What it carries depends on what the record keeps.**
+
+A file is numbered — every write is a revision and every revision is still
+readable — so its entity tag is that number:
 
 ```
+PUT /api/installations/logaffe-prod/files/compose.override.yml
+If-Match: "7"
+```
+
+Everything else keeps only the moment it last moved, so its entity tag is
+`updated_at`:
+
+```
+PATCH /api/pages/backup-restore
 If-Match: "2026-09-06T09:12:44.518273Z"
 ```
+
+**What has revisions is guarded with the revision; what has none is guarded
+with the stand.** A page is not numbered on purpose: a counter with nothing
+behind it would let `?revision=2` be asked for and not answered, and the same
+spelling with an unequal promise is worse than two spellings with a reason
+(ADR 0004 is the note; this is the guard).
 
 A write over a version somebody else has moved is `stale`, and the refusal
 carries the object as it now stands in `current`, so the caller can merge
@@ -376,7 +394,9 @@ to the revision, so reading an old one gives the file as it was.
 
 `path`, `revision` and `owner` are `unknown-field` in a write body. A file does
 not move — it is put at the new path and the old one deleted — a revision is
-made by writing, and the owner is the address it was written to.
+made by writing, and the owner is the address it was written to. The revision a
+caller *does* send is the guard, and it goes in `If-Match`: see Guarding a
+write.
 
 ### Deployments
 

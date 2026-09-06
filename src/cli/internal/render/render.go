@@ -322,3 +322,42 @@ func revisions(files []api.DeploymentFile) string {
 	}
 	return strings.Join(spelled, ", ")
 }
+
+// File prints the head of a file and not its content: what a write produced,
+// where it sits, and who put it there. `ha files get` is the content, so that
+// it can be redirected into a file without a head on top of it.
+func File(w io.Writer, f api.File) {
+	fmt.Fprintf(w, "%s  revision %d  %s\n", f.Path, f.Revision, Anchor(&f.Owner))
+	line(w, said("executable", executable(f.Executable)), said("bytes", fmt.Sprint(len(f.Content))))
+	fmt.Fprintf(w, "updated: %s by %s  author: %s\n",
+		f.UpdatedAt.Format(time.RFC3339), f.UpdatedBy.Name, f.CreatedBy.Name)
+}
+
+// FileSummaries prints what is under an owner: the path, the revision it is at,
+// whether it is executable, and when it last moved.
+func FileSummaries(w io.Writer, items []api.FileSummary) {
+	for _, f := range items {
+		fmt.Fprintf(w, "%-40s %-10s %-4s %-16s %s\n",
+			f.Path, fmt.Sprintf("revision %d", f.Revision), executable(f.Executable),
+			f.UpdatedBy.Name, f.UpdatedAt.Format("2006-01-02 15:04"))
+	}
+}
+
+// FileRevisions prints every write of one file, newest first, without what each
+// of them wrote: one of them is read by asking for the file with `--revision`.
+func FileRevisions(w io.Writer, items []api.FileRevision) {
+	for _, r := range items {
+		fmt.Fprintf(w, "%-10s %-4s %-16s %s\n",
+			fmt.Sprintf("revision %d", r.Revision), executable(r.Executable),
+			r.By.Name, r.At.Format("2006-01-02 15:04"))
+	}
+}
+
+// executable says the one mode bit there is, and says nothing where it is not
+// set: a file that is not executable is the ordinary case.
+func executable(set bool) string {
+	if set {
+		return "+x"
+	}
+	return ""
+}

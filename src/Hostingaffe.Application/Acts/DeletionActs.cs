@@ -373,9 +373,11 @@ public sealed class MoveFile(
     FileAssembler assembler,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(AnchorKind kind, string key, string path, CancellationToken cancellationToken)
+    public async Task DeleteAsync(
+        AnchorKind kind, string key, string path, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var before = await lookup.LiveAsync(owner, path, cancellationToken);
 
@@ -386,7 +388,7 @@ public sealed class MoveFile(
 
             var now = clock.GetUtcNow();
             row.Delete(caller.Id, now);
-            history.Add(HistoryEntry.OnFile(row.Id, caller.Id, now, HistoryField.Deleted));
+            history.Add(HistoryEntry.OnFile(row.Id, caller.Id, now, HistoryField.Deleted, note: said));
 
             await files.SaveAsync(cancellationToken);
             return true;
@@ -394,9 +396,10 @@ public sealed class MoveFile(
     }
 
     public async Task<FileShape> RestoreAsync(
-        AnchorKind kind, string key, string path, CancellationToken cancellationToken)
+        AnchorKind kind, string key, string path, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var before = await lookup.AnyAsync(owner, path, cancellationToken);
 
@@ -412,7 +415,7 @@ public sealed class MoveFile(
 
             var now = clock.GetUtcNow();
             row.Restore();
-            history.Add(HistoryEntry.OnFile(row.Id, caller.Id, now, HistoryField.Restored));
+            history.Add(HistoryEntry.OnFile(row.Id, caller.Id, now, HistoryField.Restored, note: said));
 
             await files.SaveAsync(cancellationToken);
             return row;

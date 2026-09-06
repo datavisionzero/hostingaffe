@@ -44,9 +44,11 @@ as well, said before any request goes out.
   every path no endpoint took, so an endpoint this `ha` knows and that instance
   does not answers `200` with a page of HTML. That is exit 1 saying so, never a
   crash: a body that is not JSON is not a success, whatever the status says.
-- **A guarded write sends `If-Match`** with the `updated_at` last read, where a
-  command takes `--if-match`; the instance refuses a write over somebody else's
-  with exit 6 rather than letting it win silently.
+- **A guarded write sends `If-Match`** with what was last read, where a command
+  offers the guard; the instance refuses a write over somebody else's with exit
+  6 rather than letting it win silently. **What has revisions is guarded with
+  the revision, and what has none with the stand**: a file takes `--revision`,
+  everything else `--if-match`.
 
 ## Exit codes
 
@@ -95,13 +97,14 @@ says whether this binary and that instance fit.
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
+| `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history` |
 | `ha page` | `list`, `view`, `create`, `edit`, `rename`, `delete`, `restore` |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
 `ha inst` is `ha installation` and `ha deploy` is `ha deployment`; the objects
-keep the glossary's words and the short forms are only short forms. There is no
-`ha softwares`: the word is uncountable (`CONTEXT.md`, Software). The file is
-its own ticket and is not here yet.
+keep the glossary's words and the short forms are only short forms, and
+`--inst` is `--installation` wherever that flag appears. There is no
+`ha softwares`: the word is uncountable (`CONTEXT.md`, Software).
 
 **`add` and `set` take the same flags**, so that what a record can be created
 with is what it can be corrected with. A flag left off leaves the field alone;
@@ -173,6 +176,47 @@ record *is* — a deployment with the wrong version is `ha deploy delete`d and
 recorded again, and its number is not handed out a second time. `--version` is
 on `set` all the same, and it is sent: the instance's refusal says the rule,
 which an unknown flag would not.
+
+## Files
+
+A file has no key. Its address is its **owner and its path**, and the owner is
+named the way a page names what it hangs on — `--machine KEY` or
+`--installation KEY`, the kind included, because the machine `caddy` and the
+software `caddy` are different things. Naming both, or neither, is exit 2 said
+before any request goes out.
+
+```sh
+ha files put compose.override.yml --inst logaffe-prod --file ./compose.override.yml
+ha files get compose.override.yml --inst logaffe-prod > compose.override.yml
+ha files list --machine caddy
+ha files diff sites/logaffe.caddy --machine caddy
+```
+
+**`put` writes, and creates what is not there yet.** It writes first and
+creates on a not-found, so nobody has to know which of the two it is — except
+with `--revision`, where a not-found is a not-found, because nobody read a
+revision of a file that does not exist. Every write prints the revision it
+produced.
+
+**`--revision` is the write guard.** It carries the revision last read, and a
+write against a newer one is exit 6 with the instance saying which revision the
+file is at. Without it the write wins and the history says so. An agent that
+read before it writes passes what it read; one that puts a new file has nothing
+to pass.
+
+**`get` is the content, byte for byte**, so that `ha files get … > file` writes
+what the machine runs and not one line more. The revision that a write hands
+back is in `--json`, which prints the record instead, and in `ha files list`.
+`get --revision N` reads the file as it was at that write; `ha files revisions`
+says which writes there were.
+
+**`diff` puts two revisions side by side** as a unified diff. Without `--from`
+and `--to` it is the last change, which is the question somebody usually has.
+
+**The refused paths are not rebuilt here.** `.env` and every `.env.*` but
+`.env.example`, anything under `secrets/`, and anything outside the owner's
+directory are refused by the instance, and `ha` passes the refusal through as
+exit 4 — the boundary is at the API, not at the client (VISION 10).
 
 A page carries the two fields the record gives it. `--kind` is `runbook`,
 `decision` or `note` on `create` and `edit`; left off at creation it is the

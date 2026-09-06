@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -195,26 +196,86 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
         Assert.Equal("2", history[1].GetProperty("new_value").GetString());
     }
 
+    /// <summary>
+    /// A file is guarded by its revision, not by its `updated_at`: it is the one
+    /// record whose history keeps content, so the number it hands a reader is
+    /// what that reader hands back (`docs/api.md`, Guarding a write).
+    /// </summary>
     [Fact]
-    public async Task A_write_over_a_version_somebody_moved_is_stale()
+    public async Task A_write_over_a_revision_somebody_moved_is_stale()
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         await Ground(admin);
         var created = await Put(admin, "/api/installations/logaffe-prod/files", "compose.override.yml", "one");
-        var read = created.GetProperty("updated_at").GetString();
+        var read = created.GetProperty("revision").GetInt32();
 
         await Write(admin, "two");
 
-        using var request = new HttpRequestMessage(HttpMethod.Put, Address)
-        {
-            Content = JsonContent.Create(new { content = "three" }),
-        };
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{read}\""));
-
-        using var refused = await admin.SendAsync(request, Ct);
+        using var refused = await admin.SendAsync(Guarded(read.ToString(CultureInfo.InvariantCulture), "three"), Ct);
         Assert.Equal(HttpStatusCode.PreconditionFailed, refused.StatusCode);
+
+        // The refusal hands back what is there now, so the caller can merge.
+        var problem = await refused.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal("two", problem.GetProperty("current").GetProperty("content").GetString());
+
+        // The revision it actually read goes through.
+        using var written = await admin.SendAsync(Guarded("2", "three"), Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+        Assert.Equal(3, (await written.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("revision").GetInt32());
     }
+
+    /// <summary>
+    /// A timestamp in `If-Match` was the guard before the file was numbered, and
+    /// it is refused rather than read as a revision nobody has.
+    /// </summary>
+    [Fact]
+    public async Task A_guard_that_is_not_a_revision_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        var created = await Put(admin, "/api/installations/logaffe-prod/files", "compose.override.yml", "one");
+
+        var problem = await Refusals.Problem(
+            await admin.SendAsync(Guarded(created.GetProperty("updated_at").GetString()!, "two"), Ct),
+            HttpStatusCode.BadRequest,
+            "validation");
+
+        Assert.Equal("if-match", problem.GetProperty("errors").EnumerateObject().Single().Name);
+    }
+
+    /// <summary>Every write of a file carries its note into the history (ADR 0004).</summary>
+    [Fact]
+    public async Task Every_write_of_a_file_carries_its_note()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var created = await admin.PostAsJsonAsync(
+            "/api/installations/logaffe-prod/files?note=from%20the%20old%20repository",
+            new { path = "compose.override.yml", content = "one" },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var written = await admin.PutAsJsonAsync(Address + "?note=raised%20the%20memory%20limit", new { content = "two" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>(
+            "/api/installations/logaffe-prod/file-history/compose.override.yml", Ct);
+
+        Assert.Equal(
+            ["from the old repository", "raised the memory limit"],
+            history.EnumerateArray().Select(e => e.GetProperty("note").GetString()));
+    }
+
+    private static HttpRequestMessage Guarded(string tag, string content) =>
+        new(HttpMethod.Put, Address)
+        {
+            Content = JsonContent.Create(new { content }),
+            Headers = { IfMatch = { new EntityTagHeaderValue($"\"{tag}\"") } },
+        };
 
     [Fact]
     public async Task An_owner_that_names_nothing_is_not_found()

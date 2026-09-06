@@ -2612,13 +2612,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Put a file under the machine: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory.",
+        "summary": "Put a file under the machine: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateMachineFile",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2748,7 +2755,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the `updated_at` last read guards the write.",
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "WriteMachineFile",
         "parameters": [
           {
@@ -2763,6 +2770,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2835,7 +2849,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete the file with every revision it ever had; its path stays spent until the purge.",
+        "summary": "Soft-delete the file with every revision it ever had; its path stays spent until the purge. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteMachineFile",
         "parameters": [
           {
@@ -2850,6 +2864,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2887,7 +2908,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address.",
+        "summary": "Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestoreMachineFile",
         "parameters": [
           {
@@ -2902,6 +2923,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -3132,13 +3160,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Put a file under the installation: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory.",
+        "summary": "Put a file under the installation: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateInstallationFile",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -3268,7 +3303,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the `updated_at` last read guards the write.",
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "WriteInstallationFile",
         "parameters": [
           {
@@ -3283,6 +3318,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -3355,7 +3397,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete the file with every revision it ever had; its path stays spent until the purge.",
+        "summary": "Soft-delete the file with every revision it ever had; its path stays spent until the purge. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteInstallationFile",
         "parameters": [
           {
@@ -3370,6 +3412,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -3407,7 +3456,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address.",
+        "summary": "Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestoreInstallationFile",
         "parameters": [
           {
@@ -3422,6 +3471,13 @@
             "name": "path",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }

@@ -31,6 +31,23 @@ func readText(stdin io.Reader, path string) (*string, error) {
 	return &text, nil
 }
 
+// readContent reads a file's content, byte for byte. It is not readText: a
+// Markdown body is trimmed because a trailing blank line means nothing in it,
+// and a file's bytes are what the machine runs, trailing newline included.
+func readContent(stdin io.Reader, path string) (string, error) {
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(stdin)
+	} else {
+		data, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return "", &config.UsageError{Message: fmt.Sprintf("cannot read %s: %v", path, err)}
+	}
+	return string(data), nil
+}
+
 // optional turns the flag package's zero value into "not given".
 func optional(s string) *string {
 	if s == "" {

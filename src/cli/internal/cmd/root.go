@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/client"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/config"
@@ -77,6 +78,16 @@ func newRoot(env Env) *cobra.Command {
 	root.PersistentFlags().BoolVar(&g.json, "json", false, "print the object as the API answered it")
 	root.SetVersionTemplate("ha {{.Version}}\n")
 
+	// `--inst` is `--installation` wherever the flag exists. The object keeps
+	// the glossary's word and the short form is only a short form, which is the
+	// same rule `ha inst` follows for the command (CONTEXT.md).
+	root.SetGlobalNormalizationFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "inst" {
+			return "installation"
+		}
+		return pflag.NormalizedName(name)
+	})
+
 	// A usage mistake is exit 2, in the words of the flag package rather than a
 	// wall of help.
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
@@ -87,6 +98,7 @@ func newRoot(env Env) *cobra.Command {
 	root.AddCommand(newSoftware(g))
 	root.AddCommand(newInstallation(g))
 	root.AddCommand(newDeployment(g))
+	root.AddCommand(newFile(g))
 	root.AddCommand(newPage(g))
 	root.AddCommand(identityCommands(g)...)
 	return root

@@ -13,7 +13,7 @@ namespace Hostingaffe.Domain.Pages;
 /// </para>
 /// <para>
 /// <see cref="UpdatedAt"/> is the version, so that a page inherits the guarded
-/// write of <c>docs/api.md</c> ("Concurrency on text fields") rather than
+/// write of <c>docs/api.md</c> ("Guarding a write") rather than
 /// carrying a mechanism of its own. Every edit moves it and names who made it,
 /// because a wiki's list is read for who touched what last.
 /// </para>

@@ -263,11 +263,12 @@ public sealed class CreateFile(
     TimeProvider clock)
 {
     public async Task<FileShape> ExecuteAsync(
-        AnchorKind kind, string key, CreateFileRequest request, CancellationToken cancellationToken)
+        AnchorKind kind, string key, CreateFileRequest request, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         FileWrites.Closed(request.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var path = Validated.Field("path", () => FilePath.Normalize(request.Path ?? string.Empty));
@@ -282,7 +283,7 @@ public sealed class CreateFile(
                 () => File.Create(owner, path, request.Content, request.Executable ?? false, caller.Id, now));
 
             files.Add(created);
-            history.Add(HistoryEntry.OnFile(created.Id, caller.Id, now, HistoryField.Created, null, path));
+            history.Add(HistoryEntry.OnFile(created.Id, caller.Id, now, HistoryField.Created, null, path, said));
 
             await files.SaveAsync(cancellationToken);
             return created;
@@ -294,8 +295,10 @@ public sealed class CreateFile(
 
 /// <summary>
 /// A new revision, unless the file already says exactly this. Guarded by
-/// <c>If-Match</c> against <c>updated_at</c>, which is the newest revision's
-/// timestamp.
+/// <c>If-Match</c> against the <b>revision</b>: the file is the one record
+/// whose history keeps content, so what it hands a reader to hand back is the
+/// number of the write, not the moment of it (<c>docs/api.md</c>, Guarding a
+/// write).
 /// </summary>
 public sealed class WriteFile(
     ICallerIdentity callerIdentity,
@@ -307,26 +310,33 @@ public sealed class WriteFile(
     TimeProvider clock)
 {
     public async Task<FileShape> ExecuteAsync(
-        AnchorKind kind, string key, string path, WriteFileRequest request, string? ifMatch, CancellationToken cancellationToken)
+        AnchorKind kind,
+        string key,
+        string path,
+        WriteFileRequest request,
+        string? ifMatch,
+        string? note,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         FileWrites.Closed(request.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var owner = await lookup.OwnerAsync(kind, key, cancellationToken);
         var before = await lookup.LiveAsync(owner, path, cancellationToken);
-        var expected = GuardedWrite.Expected(ifMatch);
+        var expected = GuardedWrite.ExpectedRevision(ifMatch);
 
         var file = await transactions.RunAsync(async () =>
         {
             var row = await files.LoadForWriteAsync(before.Id, cancellationToken)
                 ?? throw new Refusal(RefusalCode.NotFound, $"No file {path} of {owner}.");
 
-            if (expected is { } version && row.UpdatedAt != version)
+            if (expected is { } revision && row.Revision != revision)
             {
                 throw new Refusal(
                     RefusalCode.Stale,
-                    $"{row.Path} changed at {row.UpdatedAt:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}; you last read it at {version:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}.",
+                    $"{row.Path} is at revision {row.Revision}; you last read revision {revision}.",
                     new Dictionary<string, object?>
                     {
                         ["current"] = await assembler.CompleteAsync(owner, row, row.Current, cancellationToken),
@@ -339,7 +349,7 @@ public sealed class WriteFile(
                 "content", () => row.Write(request.Content, request.Executable, caller.Id, now)))
             {
                 history.Add(HistoryEntry.OnFile(
-                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue));
+                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));
             }
 
             await files.SaveAsync(cancellationToken);

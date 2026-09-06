@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -106,6 +108,9 @@ func (f *fields) json() []byte {
 	return body
 }
 
+// bytesOf is a body the generated client reads rather than takes.
+func bytesOf(body []byte) io.Reader { return bytes.NewReader(body) }
+
 // wire is the name the contract spells a flag with: `snake_case`, always.
 func wire(flag string) string { return strings.ReplaceAll(flag, "-", "_") }
 
@@ -135,7 +140,7 @@ func asItIs(text string) (any, error) { return text, nil }
 
 // guard puts the `updated_at` last read on a write, quoted, so that the
 // instance refuses a write over one somebody else has moved rather than letting
-// it win silently (docs/api.md, Concurrency on text fields).
+// it win silently (docs/api.md, Guarding a write).
 func guard(ifMatch string) api.RequestEditorFn {
 	return func(_ context.Context, req *http.Request) error {
 		if ifMatch != "" {

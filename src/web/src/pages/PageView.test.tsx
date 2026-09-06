@@ -112,7 +112,7 @@ it("edits the body under If-Match", async () => {
 
 /**
  * The conflict has to be visible and the typed text has to survive it: that is
- * what the header is for (`docs/api.md`, Concurrency on text fields).
+ * what the header is for (`docs/api.md`, Guarding a write).
  */
 it("keeps what was typed when somebody came between, and shows what they wrote", async () => {
   const theirs = { ...page, body: "Their version.", updated_at: "2026-09-05T13:00:00Z" };

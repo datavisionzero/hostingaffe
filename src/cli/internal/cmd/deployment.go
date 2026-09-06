@@ -116,10 +116,10 @@ func recordDeployment(g *globals, cmd *cobra.Command, key string, write *deploym
 func newDeploymentList(g *globals) *cobra.Command {
 	var installation string
 	cmd := &cobra.Command{
-		Use: "list --inst KEY", Short: "Every deployment of the installation, newest by `at` first.", Args: cobra.NoArgs,
+		Use: "list --installation KEY", Short: "Every deployment of the installation, newest by `at` first.", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if installation == "" {
-				return &config.UsageError{Message: "a deployment lives under an installation: --inst KEY."}
+				return &config.UsageError{Message: "a deployment lives under an installation: --installation KEY."}
 			}
 			_, c, err := g.load()
 			if err != nil {
@@ -139,7 +139,7 @@ func newDeploymentList(g *globals) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&installation, "inst", "", "the installation, by `key`")
+	cmd.Flags().StringVar(&installation, "installation", "", "the installation, by `key`; `--inst` is the same flag")
 	return cmd
 }
 

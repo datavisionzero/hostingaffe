@@ -44,15 +44,15 @@ public static class FileEndpoints
             .WithName($"List{kind}Files")
             .WithSummary($"Every file of the {owner}, by path, as a slim FileSummary — without the contents.");
 
-        door.MapPost("/files", async (string key, CreateFileRequest? request, CreateFile create, CancellationToken cancellationToken) =>
+        door.MapPost("/files", async (string key, CreateFileRequest? request, string? note, CreateFile create, CancellationToken cancellationToken) =>
             {
                 var file = await create.ExecuteAsync(
-                    kind, key, request ?? new CreateFileRequest(null, null, null), cancellationToken);
+                    kind, key, request ?? new CreateFileRequest(null, null, null), note, cancellationToken);
 
                 return Results.Created($"{Routes.Api}/{collection}/{key}/files/{file.Path}", file);
             })
             .WithName($"Create{kind}File")
-            .WithSummary($"Put a file under the {owner}: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory.")
+            .WithSummary($"Put a file under the {owner}: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).")
             .Produces<FileShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
@@ -61,33 +61,34 @@ public static class FileEndpoints
             .WithName($"Read{kind}File")
             .WithSummary("The file with its content. `revision` reads it as it was at that write; without it, as it is now.");
 
-        door.MapPut("/files/{**path}", (string key, string path, WriteFileRequest? request, HttpRequest http, WriteFile write, CancellationToken cancellationToken) =>
+        door.MapPut("/files/{**path}", (string key, string path, WriteFileRequest? request, string? note, HttpRequest http, WriteFile write, CancellationToken cancellationToken) =>
                 write.ExecuteAsync(
                     kind,
                     key,
                     path,
                     request ?? new WriteFileRequest(null, null),
                     http.Headers.IfMatch.ToString(),
+                    note,
                     cancellationToken))
             .WithName($"Write{kind}File")
-            .WithSummary("Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the `updated_at` last read guards the write.")
+            .WithSummary("Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).")
             .Produces<FileShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
-        door.MapDelete("/files/{**path}", async (string key, string path, MoveFile move, CancellationToken cancellationToken) =>
+        door.MapDelete("/files/{**path}", async (string key, string path, string? note, MoveFile move, CancellationToken cancellationToken) =>
             {
-                await move.DeleteAsync(kind, key, path, cancellationToken);
+                await move.DeleteAsync(kind, key, path, note, cancellationToken);
                 return Results.NoContent();
             })
             .WithName($"Delete{kind}File")
-            .WithSummary("Soft-delete the file with every revision it ever had; its path stays spent until the purge.")
+            .WithSummary("Soft-delete the file with every revision it ever had; its path stays spent until the purge. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent);
 
-        door.MapPost("/file-restore/{**path}", (string key, string path, MoveFile move, CancellationToken cancellationToken) =>
-                move.RestoreAsync(kind, key, path, cancellationToken))
+        door.MapPost("/file-restore/{**path}", (string key, string path, string? note, MoveFile move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(kind, key, path, note, cancellationToken))
             .WithName($"Restore{kind}File")
-            .WithSummary("Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address.")
+            .WithSummary("Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address. `note` goes into the history beside the change (ADR 0004).")
             .Produces<FileShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
