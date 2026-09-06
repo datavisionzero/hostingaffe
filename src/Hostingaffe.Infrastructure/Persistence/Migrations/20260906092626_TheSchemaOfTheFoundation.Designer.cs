@@ -13,8 +13,8 @@ using NpgsqlTypes;
 namespace Hostingaffe.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(HostingaffeDbContext))]
-    [Migration("20260906083658_DropTheProjectDimension")]
-    partial class DropTheProjectDimension
+    [Migration("20260906092626_TheSchemaOfTheFoundation")]
+    partial class TheSchemaOfTheFoundation
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
