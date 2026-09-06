@@ -10,10 +10,10 @@ yet.
 Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
 conventions, [`CONTEXT.md`](CONTEXT.md), [`docs/codebase.md`](docs/codebase.md),
 [`docs/cli.md`](docs/cli.md), [`docs/install.md`](docs/install.md),
-[`docs/operations.md`](docs/operations.md) and [`deploy/`](deploy/) exist;
-`docs/adr/`, `docs/storage.md` and `docs/api.md` are still to be written. Until
-each exists, this file says what stands in for it. Add the link here when you
-create one.
+[`docs/operations.md`](docs/operations.md), [`docs/adr/`](docs/adr/) and
+[`deploy/`](deploy/) exist; `docs/storage.md` and `docs/api.md` are still to be
+written. Until each exists, this file says what stands in for it. Add the link
+here when you create one.
 
 ## Language
 
@@ -40,9 +40,12 @@ never pushed (see below).
   [Vision.md §7](Vision.md#7-domain-model) first.
 - **Decisions**: the stack is planaffe's, adopted rather than re-decided, and
   the ADRs that chose it live in `datavisionzero/planaffe` — reference them,
-  do not rewrite them. Decisions this product makes for itself go in
-  `docs/adr/`. Say so explicitly when your work contradicts one instead of
-  silently overriding it.
+  do not rewrite them; [`docs/adr/README.md`](docs/adr/README.md) lists the
+  adopted ones. Decisions this product makes for itself go in
+  [`docs/adr/`](docs/adr/), starting with
+  [0001](docs/adr/0001-the-foundation-is-a-copy-of-planaffe.md), which records
+  that the foundation is a copy. Say so explicitly when your work contradicts
+  one instead of silently overriding it.
 - **Research**: [`docs/research/`](docs/research/) holds the reading behind the
   vision — what already exists in this space and why hostingaffe is not it.
   Read the relevant file before re-arguing a boundary the vision has drawn.
