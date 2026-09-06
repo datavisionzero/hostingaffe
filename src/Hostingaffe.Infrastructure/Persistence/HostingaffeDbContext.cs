@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Hostingaffe.Domain;
+using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Installations;
@@ -50,6 +51,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
 
     /// <summary>One software installed once on one machine (VISION 7).</summary>
     public DbSet<Installation> Installations => Set<Installation>();
+
+    /// <summary>What actually ran on an installation, and when it went live (VISION 7).</summary>
+    public DbSet<Deployment> Deployments => Set<Deployment>();
 
     /// <summary>The text files a machine runs with, each with every revision it ever had (VISION 7).</summary>
     public DbSet<Domain.Files.File> Files => Set<Domain.Files.File>();

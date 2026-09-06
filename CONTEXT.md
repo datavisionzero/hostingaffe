@@ -113,7 +113,10 @@ is recorded when it is done, and a rollback is a deployment to the previous
 version with a note that says so.
 
 `previous` and `files` are derived — the version before it, and the file
-revisions that were current when the version went live.
+revisions that were current when the version went live. Everything derived is
+ordered by `at`, never by the order of recording, so backfilling history never
+moves the present. A deployment has no key: the instance numbers it per
+installation.
 
 ## File
 

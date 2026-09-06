@@ -1892,7 +1892,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. It has no version; that is what its deployments say.",
+        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is.",
         "operationId": "CreateInstallation",
         "requestBody": {
           "content": {
@@ -2894,6 +2894,343 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/deployments": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every deployment of the installation, newest by `at` first — the order everything derived uses, so the list and the version agree.",
+        "operationId": "ListDeployments",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeploymentSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Record a deployment: only `version` is required. `at` defaults to now and may be set, so that history can be backfilled — the latest by `at` is what the installation runs.",
+        "operationId": "RecordDeployment",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDeploymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/deployments/{number}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The complete deployment, with `previous` and `files` derived by `at`: the version before it, and the file revisions that were current when it went live.",
+        "operationId": "ReadDeployment",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Correct `ref`, `at`, `ticket` or `note`, and the history says so. `version` and the installation are what the record is: a deployment with the wrong version is deleted and recorded again.",
+        "operationId": "CorrectDeployment",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectDeploymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/deployments/{number}/history": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every correction made to the deployment, oldest first. The deployments themselves are not history entries; this is what was changed about one.",
+        "operationId": "ReadDeploymentHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -4019,6 +4356,43 @@
         },
         "additionalProperties": false
       },
+      "CorrectDeploymentRequest": {
+        "required": [
+          "ref",
+          "at",
+          "ticket",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateAgentRequest": {
         "required": [
           "name"
@@ -4078,6 +4452,7 @@
           "backup",
           "monitoring",
           "logging",
+          "version",
           "description"
         ],
         "type": "object",
@@ -4197,6 +4572,12 @@
               {
                 "$ref": "#/components/schemas/Logging"
               }
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
             ]
           },
           "description": {
@@ -4508,6 +4889,148 @@
           }
         }
       },
+      "Deployment": {
+        "required": [
+          "installation",
+          "number",
+          "version",
+          "previous",
+          "ref",
+          "files",
+          "at",
+          "by",
+          "ticket",
+          "note",
+          "created_at",
+          "updated_by",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "installation": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "string"
+          },
+          "previous": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentFile"
+            }
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeploymentFile": {
+        "required": [
+          "path",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DeploymentSummary": {
+        "required": [
+          "number",
+          "version",
+          "previous",
+          "ref",
+          "at",
+          "by",
+          "ticket",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "string"
+          },
+          "previous": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "EmailChangeRequest": {
         "required": [
           "email"
@@ -4723,6 +5246,7 @@
           "backup",
           "monitoring",
           "logging",
+          "version",
           "description",
           "created_by",
           "updated_by",
@@ -4785,6 +5309,12 @@
           "logging": {
             "$ref": "#/components/schemas/Logging"
           },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "description": {
             "type": "string"
           },
@@ -4816,6 +5346,7 @@
           "backup",
           "monitoring",
           "logging",
+          "version",
           "updated_at"
         ],
         "type": "object",
@@ -4849,6 +5380,12 @@
           },
           "logging": {
             "$ref": "#/components/schemas/Logging"
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "updated_at": {
             "type": "string",
@@ -5363,6 +5900,50 @@
           "udp"
         ],
         "type": "string"
+      },
+      "RecordDeploymentRequest": {
+        "required": [
+          "version",
+          "ref",
+          "at",
+          "ticket",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ref": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "RecoveryRequest": {
         "required": [

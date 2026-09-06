@@ -43,7 +43,10 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/admin/smtp", "/api/admin/smtp/test",
                 "/api/agents", "/api/agents/{id}",
                 "/api/email-changes/confirm",
-                "/api/installations", "/api/installations/{key}", "/api/installations/{key}/file-history/{path}",
+                "/api/installations", "/api/installations/{key}",
+                "/api/installations/{key}/deployments", "/api/installations/{key}/deployments/{number}",
+                "/api/installations/{key}/deployments/{number}/history",
+                "/api/installations/{key}/file-history/{path}",
                 "/api/installations/{key}/file-revisions/{path}", "/api/installations/{key}/files",
                 "/api/installations/{key}/files/{path}", "/api/installations/{key}/history",
                 "/api/invitations/accept",
@@ -67,6 +70,9 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Me", schemas);
         Assert.Contains("Machine", schemas);
         Assert.Contains("MachineSummary", schemas);
+        Assert.Contains("Deployment", schemas);
+        Assert.Contains("DeploymentSummary", schemas);
+        Assert.Contains("DeploymentFile", schemas);
         Assert.Contains("File", schemas);
         Assert.Contains("FileSummary", schemas);
         Assert.Contains("FileRevision", schemas);

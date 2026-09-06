@@ -138,6 +138,16 @@ builder.Services.AddScoped<ReadFileHistory>();
 builder.Services.AddScoped<CreateFile>();
 builder.Services.AddScoped<WriteFile>();
 
+// What ran, and when it went live — the source of an installation's version
+// (VISION 7).
+builder.Services.AddScoped<DeploymentLookup>();
+builder.Services.AddScoped<DeploymentAssembler>();
+builder.Services.AddScoped<ListDeployments>();
+builder.Services.AddScoped<ReadDeployment>();
+builder.Services.AddScoped<ReadDeploymentHistory>();
+builder.Services.AddScoped<RecordDeployment>();
+builder.Services.AddScoped<CorrectDeployment>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -220,6 +230,7 @@ api.MapMachines();
 api.MapSoftware();
 api.MapInstallations();
 api.MapFiles();
+api.MapDeployments();
 api.MapPages();
 api.MapSmtp();
 

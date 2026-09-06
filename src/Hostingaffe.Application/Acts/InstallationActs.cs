@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
+using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Installations;
 
@@ -49,6 +50,7 @@ public sealed record InstallationSummaryShape(
     Backup Backup,
     Monitoring Monitoring,
     Logging Logging,
+    string? Version,
     DateTimeOffset UpdatedAt);
 
 /// <summary>The complete installation: every field of VISION 7, and who touched it.</summary>
@@ -67,6 +69,7 @@ public sealed record InstallationShape(
     Backup Backup,
     Monitoring Monitoring,
     Logging Logging,
+    string? Version,
     string Description,
     IdentityRef CreatedBy,
     IdentityRef UpdatedBy,
@@ -78,12 +81,21 @@ public sealed record InstallationShape(
 /// software, the environment and the role. The rest may arrive later.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The five are required because none of them has a default that would be
 /// true: an installation is a software on a machine, and <c>environment</c> and
 /// <c>role</c> answer the two questions VISION 7 says every installation
 /// answers. The three decisions do have one — <c>none</c>, <c>none</c>,
 /// <c>local</c> — and it is the honest starting state: nothing decided yet is
 /// no backup.
+/// </para>
+/// <para>
+/// <see cref="Version"/> is the one field here that is not the installation's:
+/// given, it records the first deployment in the same transaction, so that an
+/// installation never has a version without a record of when it appeared
+/// (VISION 7). Left out, there is no deployment yet and no version — which is
+/// what a <c>planned</c> installation is.
+/// </para>
 /// </remarks>
 public sealed record CreateInstallationRequest(
     string? Key,
@@ -100,6 +112,7 @@ public sealed record CreateInstallationRequest(
     Backup? Backup,
     Monitoring? Monitoring,
     Logging? Logging,
+    string? Version,
     string? Description)
 {
     /// <inheritdoc cref="ChangeInstallationRequest.UnknownFields"/>
@@ -141,7 +154,14 @@ public sealed record ChangeInstallationRequest(
 /// Turns installation rows into the two shapes, resolving identities, machines
 /// and software once for the whole list rather than once per row.
 /// </summary>
-public sealed class InstallationAssembler(IIdentities identities, IMachines machines, ISoftware software)
+/// <remarks>
+/// The <c>version</c> is derived here and nowhere else, and it is
+/// <see cref="Derived"/> that says what it means: the version of the latest
+/// deployment <em>by <c>at</c></em>. A list that computed it by the order of
+/// recording would move the present every time somebody backfilled the past.
+/// </remarks>
+public sealed class InstallationAssembler(
+    IIdentities identities, IMachines machines, ISoftware software, IDeployments deployments)
 {
     public async Task<IReadOnlyList<InstallationSummaryShape>> SummariesAsync(
         IReadOnlyList<Installation> rows, CancellationToken cancellationToken)
@@ -149,6 +169,7 @@ public sealed class InstallationAssembler(IIdentities identities, IMachines mach
         ArgumentNullException.ThrowIfNull(rows);
 
         var (machineKeys, softwareKeys) = await KeysAsync(rows, cancellationToken);
+        var versions = await VersionsAsync(rows, cancellationToken);
 
         return
         [
@@ -163,6 +184,7 @@ public sealed class InstallationAssembler(IIdentities identities, IMachines mach
                 row.Backup,
                 row.Monitoring,
                 row.Logging,
+                versions.GetValueOrDefault(row.Id),
                 row.UpdatedAt)),
         ];
     }
@@ -175,6 +197,7 @@ public sealed class InstallationAssembler(IIdentities identities, IMachines mach
         var people = await identities.FindManyAsync(
             [installation.CreatedBy, installation.UpdatedBy], cancellationToken);
         var (machineKeys, softwareKeys) = await KeysAsync([installation], cancellationToken);
+        var versions = await VersionsAsync([installation], cancellationToken);
 
         return new InstallationShape(
             installation.Key,
@@ -191,11 +214,28 @@ public sealed class InstallationAssembler(IIdentities identities, IMachines mach
             installation.Backup,
             installation.Monitoring,
             installation.Logging,
+            versions.GetValueOrDefault(installation.Id),
             installation.Description,
             IdentityRef.Of(people[installation.CreatedBy]),
             IdentityRef.Of(people[installation.UpdatedBy]),
             installation.CreatedAt,
             installation.UpdatedAt);
+    }
+
+    /// <summary>
+    /// The version each of these installations runs, by the one rule that says
+    /// what "latest" means.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<Guid, string>> VersionsAsync(
+        IReadOnlyList<Installation> rows, CancellationToken cancellationToken)
+    {
+        var all = await deployments.ListAsync(rows.Select(row => row.Id), cancellationToken);
+
+        return all
+            .GroupBy(one => one.InstallationId)
+            .Select(group => (group.Key, Version: Derived.Version(group)))
+            .Where(found => found.Version is not null)
+            .ToDictionary(found => found.Key, found => found.Version!);
     }
 
     private async Task<(IReadOnlyDictionary<Guid, string> Machines, IReadOnlyDictionary<Guid, string> Software)> KeysAsync(
@@ -313,12 +353,17 @@ public sealed class ReadInstallationHistory(
     }
 }
 
-/// <summary>An installation, in one transaction, with its birth in the history.</summary>
+/// <summary>
+/// An installation, in one transaction, with its birth in the history — and
+/// with its first deployment where the caller gave a version, so that an
+/// installation never has one without a record of when it appeared (VISION 7).
+/// </summary>
 public sealed class CreateInstallation(
     ICallerIdentity callerIdentity,
     IInstallations installations,
     IMachines machines,
     ISoftware software,
+    IDeployments deployments,
     IHistory history,
     ITransactions transactions,
     InstallationAssembler assembler,
@@ -359,6 +404,21 @@ public sealed class CreateInstallation(
 
             installations.Add(row);
             history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Created));
+
+            // The first deployment is part of the same act, not a second call a
+            // caller could forget: a version with no record of when it appeared
+            // is exactly what VISION 7 rules out. No version given means no
+            // deployment yet, which is what a planned installation is.
+            if (!string.IsNullOrWhiteSpace(request.Version))
+            {
+                var first = Validated.Field(
+                    "version",
+                    () => Domain.Deployments.Deployment.Record(row.Id, 1, request.Version, now, caller.Id, now));
+
+                deployments.Add(first);
+                history.Add(HistoryEntry.OnDeployment(
+                    first.Id, caller.Id, now, HistoryField.Created, null, first.Version));
+            }
 
             await installations.SaveAsync(cancellationToken);
             return row;

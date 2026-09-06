@@ -41,13 +41,13 @@ public static class InstallationEndpoints
                 var installation = await create.ExecuteAsync(
                     request ?? new CreateInstallationRequest(
                         null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null),
                     cancellationToken);
 
                 return Results.Created($"{Routes.Api}/installations/{installation.Key}", installation);
             })
             .WithName("CreateInstallation")
-            .WithSummary("Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. It has no version; that is what its deployments say.")
+            .WithSummary("Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is.")
             .Produces<InstallationShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 

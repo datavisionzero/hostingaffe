@@ -6,8 +6,7 @@ carries no version in its path: the contract is
 captured from a running instance and checked in, and both clients are generated
 from it (planaffe ADRs 0005, 0011).
 
-The endpoint tables below cover what the foundation serves. The one object of
-the product still to come — the deployment — arrives with its own section.
+The endpoint tables below cover what an instance serves.
 
 ## Where it is
 
@@ -256,8 +255,9 @@ their values — the values live in vaultaffe or on the host. A name is one word
 anything with a space or an `=` in it is `validation`, which is what keeps a
 line of an `.env` file from arriving here whole.
 
-`version` and `depends_on` are `unknown-field`. The first is derived from the
-deployments; the second is roadmap (VISION 15.2), not an omission.
+`version` is derived from the deployments and is read-only on an installation —
+`PATCH` refuses it as `unknown-field`. `POST` takes it once, for the first
+deployment. `depends_on` is roadmap (VISION 15.2), not an omission.
 
 ### Files
 
@@ -307,6 +307,52 @@ to the revision, so reading an old one gives the file as it was.
 `path`, `revision` and `owner` are `unknown-field` in a write body. A file does
 not move — it is put at the new path and the old one deleted — a revision is
 made by writing, and the owner is the address it was written to.
+
+### Deployments
+
+A deployment has no key: the instance numbers it per installation, and it lives
+under that installation.
+
+| | |
+|---|---|
+| `GET /api/installations/{key}/deployments` | every one, newest by `at` first |
+| `POST /api/installations/{key}/deployments` | record one; only `version` is required |
+| `GET /api/installations/{key}/deployments/{number}` | the complete deployment |
+| `PATCH /api/installations/{key}/deployments/{number}` | `ref`, `at`, `ticket`, `note` |
+| `GET /api/installations/{key}/deployments/{number}/history` | the corrections made to it |
+
+**There is no status.** A deployment is recorded when it is done. A rollback is
+a deployment to the previous version with a note that says so; a failed attempt
+that changed nothing is a note or a ticket, not a row here.
+
+**`at` may be set**, so that history can be backfilled, and everything derived
+is ordered by it:
+
+- an installation's `version` is the one of its latest deployment **by `at`**
+- a deployment's `previous` is the version of the deployment before it, same order
+- its `files` are the revisions of the installation's files that were current at
+  its `at` — empty for one backfilled to before the first file was put
+
+Backfilling a deployment with an older `at` therefore does **not** move the
+current version, and one with a newer `at` does. `at` can repeat, and the number
+breaks the tie.
+
+**The first deployment is created with the installation.** `POST
+/api/installations` takes a `version`, and records both in one transaction, so
+an installation never has a version without a record of when it appeared.
+Without a `version` there is no deployment yet and no version — which is what a
+`planned` installation is.
+
+**The correction rule is fixed**, because an agent will record the wrong thing:
+`ref`, `at`, `ticket` and `note` change and the history says so. `version` and
+`installation` are `unknown-field`, and the refusal says why — they are what the
+record *is*, and a deployment with the wrong version is deleted and recorded
+again. So are `number`, `previous`, `files` and `status`.
+
+`by` is who **recorded** it, written by the instance, which for a backfilled
+deployment is not necessarily who deployed. `ticket` is a planaffe key like
+`LOG-42` and stays a string: a reference to the other product, not a word of
+this model.
 
 ### Pages
 

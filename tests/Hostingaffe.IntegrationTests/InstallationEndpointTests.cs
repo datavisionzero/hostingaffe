@@ -63,8 +63,9 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
         Assert.Equal("tcp", ports[0].GetProperty("protocol").GetString());
         Assert.Equal("public", ports[0].GetProperty("scope").GetString());
 
-        // It has no version: that is what its deployments will say.
-        Assert.False(installation.TryGetProperty("version", out _));
+        // Its version is derived and nothing recorded it yet, so it is empty —
+        // not absent. What fills it is a deployment.
+        Assert.Equal(JsonValueKind.Null, installation.GetProperty("version").ValueKind);
     }
 
     [Fact]

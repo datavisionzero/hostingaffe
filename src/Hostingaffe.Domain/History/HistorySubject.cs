@@ -13,4 +13,5 @@ public enum HistorySubject
     Software,
     Installation,
     File,
+    Deployment,
 }

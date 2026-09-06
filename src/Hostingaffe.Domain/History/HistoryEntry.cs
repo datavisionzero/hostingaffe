@@ -133,6 +133,21 @@ public sealed class HistoryEntry
         string? note = null) =>
         On(HistorySubject.File, fileId, actorId, at, field, oldValue, newValue, note);
 
+    /// <summary>
+    /// A deployment is <em>not</em> a history entry — it is a record of its own
+    /// (VISION 7) — but a correction to one is, because the four fields that may
+    /// be corrected are fields like any other.
+    /// </summary>
+    public static HistoryEntry OnDeployment(
+        Guid deploymentId,
+        Guid actorId,
+        DateTimeOffset at,
+        string field,
+        string? oldValue = null,
+        string? newValue = null,
+        string? note = null) =>
+        On(HistorySubject.Deployment, deploymentId, actorId, at, field, oldValue, newValue, note);
+
     private static string Named(string field) =>
         string.IsNullOrWhiteSpace(field)
             ? throw new ArgumentException("A history entry names the field that changed.", nameof(field))

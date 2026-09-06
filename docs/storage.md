@@ -407,6 +407,50 @@ anything outside the owner's directory — a leading slash, a `..`, a `.`. The
 list is in `FilePath` and nowhere else, because the API is as open as the CLI
 is. `.envrc` is welcome: in the template it is one line and carries no value.
 
+## Deployments
+
+The record that an installation changed version (`CONTEXT.md`, Deployment), and
+the source of the version it runs.
+
+```sql
+create table deployment (
+    id              uuid          not null primary key,
+    installation_id uuid          not null references installation (id),
+    number          int           not null check (number >= 1),
+    version         varchar(200)  not null,
+    ref             varchar(500),
+    at              timestamptz   not null,
+    ticket          varchar(64),
+    note            text          not null default '',
+    created_by      uuid          not null references identity (id),   -- `by`
+    created_at      timestamptz   not null,
+    updated_by      uuid          not null references identity (id),
+    updated_at      timestamptz   not null,
+    deleted_at      timestamptz,
+    deleted_by      uuid          references identity (id)
+);
+
+create unique index deployment_number on deployment (installation_id, number);
+create        index deployment_when   on deployment (installation_id, at desc, number desc);
+```
+
+**There is no status column.** A deployment is recorded when it is done. A
+rollback is a deployment to the previous version with a note that says so; an
+attempt that changed nothing is a note or a ticket, not a row here. Every row is
+a version that really ran.
+
+**A deployment has no key.** The instance numbers it per installation, counted
+from one, and `deployment_number` is what makes that number an address. The next
+number counts past deleted rows too: an address is not handed out twice.
+
+**`at` is when the version went live and may be set**, so that history can be
+backfilled. `created_by` — `by` on the wire — is who *recorded* it, which for a
+backfilled deployment is not necessarily who deployed. `deployment_when` is the
+index everything derived reads by.
+
+`ticket` stays a string: it is a planaffe key like `LOG-42`, a reference to the
+other product and not a word of this model.
+
 ## Pages
 
 The instance's flat wiki, addressed by a slug rather than a key
@@ -448,7 +492,8 @@ to what (`CONTEXT.md`, History).
 create table history (
     id         bigint      not null primary key generated always as identity,
     subject    text        not null
-        check (subject in ('page', 'machine', 'software', 'installation', 'file')),
+        check (subject in ('page', 'machine', 'software',
+                           'installation', 'file', 'deployment')),
     subject_id uuid        not null,
     actor_id   uuid        not null references identity (id),
     at         timestamptz not null,
@@ -521,9 +566,20 @@ revision's. `file` holds who put the file there and where it sits; everything it
 *says* is in `file_revision`.
 
 **An installation's `version`** is the version of its latest deployment *by
-`at`*, not by the order of recording, and it arrives with the deployment. It is
-written down here in advance because it is the rule that would be easy to get
-wrong twice.
+`at`*, and a deployment's **`previous`** is the version of the deployment before
+it in the same order. **`files`** are the revisions of the installation's files
+that were current at that deployment's `at`, and empty for one backfilled to
+before the first file was put.
+
+All three are ordered by `at` and never by the order of recording — counting by
+recording order moves the present every time somebody backfills the past, which
+is the mistake VISION 7 names. `at` can repeat, so the number breaks the tie and
+is the only thing that does.
+
+**The rule lives in one place**, `Derived`, and every read goes through it. That
+is also why the deployment store hands back rows rather than an answer: a query
+that said "the latest one" would be this rule written a second time, in SQL,
+where nothing holds the two together.
 
 ## The purge
 
