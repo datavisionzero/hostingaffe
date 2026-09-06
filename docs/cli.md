@@ -90,6 +90,9 @@ says whether this binary and that instance fit.
 ## Verbs
 
 `ha --help` lists the objects, and `ha <object> --help` the verbs under each.
+This is the complete surface; the handful of commands an agent actually runs is
+the block of [`agents-md.md`](./agents-md.md), written to be copied into a
+user's own repository.
 
 | object | verbs |
 |---|---|

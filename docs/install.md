@@ -113,3 +113,6 @@ the start and the log says which.
 - Invite the rest of the team.
 - Give each agent a token of its own: `ha agent create --name <name>`. Every
   agent its own, so the history says which one acted.
+- Copy the block from [`agents-md.md`](./agents-md.md) into the `AGENTS.md` of
+  the repositories whose hosts this instance records, so that an agent working
+  there knows where the record is and how to reach it.
