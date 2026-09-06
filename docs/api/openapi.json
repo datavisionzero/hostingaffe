@@ -1257,8 +1257,17 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create a machine: the key and the kind are required, everything else may arrive later. `host` is a vm's only.",
+        "summary": "Create a machine: the key and the kind are required, everything else may arrive later. `host` is a vm's only. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateMachine",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1367,13 +1376,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write.",
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "ChangeMachine",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1446,13 +1462,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`.",
+        "summary": "Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteMachine",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1544,13 +1567,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted machine back, with exactly what its deletion took — not with what was deleted on its own before that.",
+        "summary": "Bring a deleted machine back, with exactly what its deletion took — not with what was deleted on its own before that. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestoreMachine",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1647,8 +1677,17 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create a software: the key is required, everything else may arrive later. `image` is a container image name without a tag.",
+        "summary": "Create a software: the key is required, everything else may arrive later. `image` is a container image name without a tag. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateSoftware",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1757,13 +1796,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write.",
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "ChangeSoftware",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1836,13 +1882,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete a software. One with installations still on it is refused, and the problem document says how many; nothing cascades from here.",
+        "summary": "Soft-delete a software. One with installations still on it is refused, and the problem document says how many; nothing cascades from here. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteSoftware",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1944,13 +1997,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted software back, under the key it kept.",
+        "summary": "Bring a deleted software back, under the key it kept. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestoreSoftware",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2122,8 +2182,17 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is.",
+        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateInstallation",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2232,13 +2301,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list. `If-Match` with the `updated_at` last read guards the write.",
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "ChangeInstallation",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2311,13 +2387,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`.",
+        "summary": "Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteInstallation",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2409,13 +2492,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted installation back, with exactly what its deletion took.",
+        "summary": "Bring a deleted installation back, with exactly what its deletion took. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestoreInstallation",
         "parameters": [
           {
             "name": "key",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }

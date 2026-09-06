@@ -33,6 +33,7 @@ material value to understanding the decision.
 - [0001 – The foundation is a copy of planaffe](./0001-the-foundation-is-a-copy-of-planaffe.md)
 - [0002 – The API lives under /api](./0002-the-api-lives-under-api.md)
 - [0003 – A page's slug is one segment, not a path](./0003-a-pages-slug-is-one-segment-not-a-path.md)
+- [0004 – A write's note is a query parameter, not a field](./0004-a-writes-note-is-a-query-parameter-not-a-field.md)
 
 ## Adopted from planaffe
 

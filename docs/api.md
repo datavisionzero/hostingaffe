@@ -86,6 +86,30 @@ second attempt.
 command that wrote several times replays each request rather than repeating
 it.
 
+## The note beside a change
+
+Every write takes `note`, a **query parameter**, and what it says is written
+into the history rows that write produces (ADR 0004):
+
+```
+POST   /api/machines?note=replacing%20the%20old%20ex44
+PATCH  /api/installations/logaffe-prod?note=moved%20to%20the%20new%20proxy
+DELETE /api/software/nginx?note=never%20actually%20installed
+POST   /api/machines/ex44/restore?note=deleted%20by%20mistake
+```
+
+It is a query parameter and not a member of the request body because two of the
+four writes have no body, and because the body objects are the record itself —
+`CreateMachineRequest` is also the shape `ha export` writes and
+`ha machine add --file` reads, and a note about an act does not belong in it.
+
+A note is **one line of at most 500 characters**, trimmed; an empty one is the
+same as none, and a longer one is `validation` naming `note`. A change that
+touches three fields writes the note on all three rows: the note belongs to the
+act, and the act wrote three rows. What a cascade writes keeps its own note —
+deleting a machine says `with machine caddy` on everything it takes, and the
+caller's note goes on the machine's own row.
+
 ## Concurrency on text fields
 
 A text two writers share — a page's body — is guarded by `If-Match` carrying

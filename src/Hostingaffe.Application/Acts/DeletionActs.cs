@@ -154,9 +154,10 @@ public sealed class MoveMachine(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(string key, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await machines.LiveAsync(key, settings, cancellationToken);
 
         await transactions.RunAsync(async () =>
@@ -169,16 +170,17 @@ public sealed class MoveMachine(
             await cascade.DeleteUnderMachineAsync(row, caller.Id, now, cancellationToken);
 
             row.Delete(caller.Id, now);
-            history.Add(HistoryEntry.OnMachine(row.Id, caller.Id, now, HistoryField.Deleted));
+            history.Add(HistoryEntry.OnMachine(row.Id, caller.Id, now, HistoryField.Deleted, note: said));
 
             await machines.SaveAsync(cancellationToken);
             return true;
         }, cancellationToken);
     }
 
-    public async Task<MachineShape> RestoreAsync(string key, CancellationToken cancellationToken)
+    public async Task<MachineShape> RestoreAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await machines.AnyAsync(key, cancellationToken);
 
         if (!before.Deleted)
@@ -197,7 +199,7 @@ public sealed class MoveMachine(
             await cascade.RestoreUnderMachineAsync(row, caller.Id, took, now, cancellationToken);
 
             row.Restore();
-            history.Add(HistoryEntry.OnMachine(row.Id, caller.Id, now, HistoryField.Restored));
+            history.Add(HistoryEntry.OnMachine(row.Id, caller.Id, now, HistoryField.Restored, note: said));
 
             await machines.SaveAsync(cancellationToken);
             return row;
@@ -222,9 +224,10 @@ public sealed class MoveSoftware(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(string key, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await software.LiveAsync(key, settings, cancellationToken);
 
         // Before anything else, and said with a number, because "delete it and
@@ -256,16 +259,17 @@ public sealed class MoveSoftware(
 
             var now = clock.GetUtcNow();
             row.Delete(caller.Id, now);
-            history.Add(HistoryEntry.OnSoftware(row.Id, caller.Id, now, HistoryField.Deleted));
+            history.Add(HistoryEntry.OnSoftware(row.Id, caller.Id, now, HistoryField.Deleted, note: said));
 
             await software.SaveAsync(cancellationToken);
             return true;
         }, cancellationToken);
     }
 
-    public async Task<SoftwareShape> RestoreAsync(string key, CancellationToken cancellationToken)
+    public async Task<SoftwareShape> RestoreAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await software.AnyAsync(key, cancellationToken);
 
         if (!before.Deleted)
@@ -280,7 +284,7 @@ public sealed class MoveSoftware(
 
             var now = clock.GetUtcNow();
             found.Restore();
-            history.Add(HistoryEntry.OnSoftware(found.Id, caller.Id, now, HistoryField.Restored));
+            history.Add(HistoryEntry.OnSoftware(found.Id, caller.Id, now, HistoryField.Restored, note: said));
 
             await software.SaveAsync(cancellationToken);
             return found;
@@ -301,9 +305,10 @@ public sealed class MoveInstallation(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(string key, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await installations.LiveAsync(key, settings, cancellationToken);
 
         await transactions.RunAsync(async () =>
@@ -316,16 +321,17 @@ public sealed class MoveInstallation(
             await cascade.DeleteUnderInstallationAsync(row, caller.Id, now, cancellationToken);
 
             row.Delete(caller.Id, now);
-            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Deleted));
+            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Deleted, note: said));
 
             await installations.SaveAsync(cancellationToken);
             return true;
         }, cancellationToken);
     }
 
-    public async Task<InstallationShape> RestoreAsync(string key, CancellationToken cancellationToken)
+    public async Task<InstallationShape> RestoreAsync(string key, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await installations.AnyAsync(key, cancellationToken);
 
         if (!before.Deleted)
@@ -344,7 +350,7 @@ public sealed class MoveInstallation(
             await cascade.RestoreUnderInstallationAsync(row, caller.Id, took, now, cancellationToken);
 
             row.Restore();
-            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Restored));
+            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Restored, note: said));
 
             await installations.SaveAsync(cancellationToken);
             return row;

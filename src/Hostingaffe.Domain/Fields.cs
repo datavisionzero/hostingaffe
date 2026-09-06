@@ -20,6 +20,19 @@ public static class Fields
     /// <summary>What a URL fits in, wherever one is stored.</summary>
     public const int UrlMaxLength = 500;
 
+    /// <summary>What the note beside a change fits in.</summary>
+    public const int NoteMaxLength = 500;
+
+    /// <summary>
+    /// The note a write carries into the history: why, said beside what
+    /// changed (VISION 6.1). One line, trimmed, and nothing at all where there
+    /// was nothing to say — a note is offered, never demanded, and an empty one
+    /// is the same as none.
+    /// </summary>
+    /// <exception cref="ArgumentException">It spans lines or is too long.</exception>
+    public static string? Note(string? given) =>
+        given?.Trim() is { Length: > 0 } said ? Line(said, NoteMaxLength, "A note") : null;
+
 
     /// <summary>
     /// One free-text value: absent leaves the field alone, the empty string

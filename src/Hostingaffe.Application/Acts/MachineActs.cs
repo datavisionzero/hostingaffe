@@ -271,11 +271,13 @@ public sealed class CreateMachine(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task<MachineShape> ExecuteAsync(CreateMachineRequest request, CancellationToken cancellationToken)
+    public async Task<MachineShape> ExecuteAsync(
+        CreateMachineRequest request, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         MachineWrites.Closed(request.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var key = Validated.Field("key", () => Key.Normalize(request.Key ?? string.Empty));
         var kind = request.Kind ?? throw Refusal.Validation("kind", "A machine is a vps, a dedicated, a vm or a local.");
@@ -320,7 +322,7 @@ public sealed class CreateMachine(
 
             machines.Add(created);
             keys.Assign(Keyed.Machine, key);
-            history.Add(HistoryEntry.OnMachine(created.Id, caller.Id, now, HistoryField.Created));
+            history.Add(HistoryEntry.OnMachine(created.Id, caller.Id, now, HistoryField.Created, note: said));
 
             await machines.SaveAsync(cancellationToken);
             return created;
@@ -345,11 +347,12 @@ public sealed class ChangeMachine(
     TimeProvider clock)
 {
     public async Task<MachineShape> ExecuteAsync(
-        string key, ChangeMachineRequest changes, string? ifMatch, CancellationToken cancellationToken)
+        string key, ChangeMachineRequest changes, string? ifMatch, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         MachineWrites.Closed(changes.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var before = await machines.LiveAsync(key, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
@@ -402,7 +405,7 @@ public sealed class ChangeMachine(
             foreach (var change in MachineWrites.Apply(row, edit, caller.Id, now))
             {
                 history.Add(HistoryEntry.OnMachine(
-                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue));
+                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));
             }
 
             await machines.SaveAsync(cancellationToken);

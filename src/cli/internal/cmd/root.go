@@ -83,6 +83,9 @@ func newRoot(env Env) *cobra.Command {
 		return &config.UsageError{Message: err.Error()}
 	})
 
+	root.AddCommand(newMachine(g))
+	root.AddCommand(newSoftware(g))
+	root.AddCommand(newInstallation(g))
 	root.AddCommand(newPage(g))
 	root.AddCommand(identityCommands(g)...)
 	return root

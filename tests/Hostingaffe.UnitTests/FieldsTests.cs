@@ -28,4 +28,21 @@ public sealed class FieldsTests
         Assert.Throws<ArgumentException>(() => Fields.Line("one\ntwo", 200, "A location"));
         Assert.Throws<ArgumentException>(() => Fields.Line(new string('x', 201), 200, "A location"));
     }
+
+    [Fact]
+    public void A_note_is_trimmed_and_an_empty_one_is_no_note_at_all()
+    {
+        Assert.Equal("dist-upgrade", Fields.Note("  dist-upgrade  "));
+        Assert.Null(Fields.Note(null));
+        Assert.Null(Fields.Note(""));
+        Assert.Null(Fields.Note("   "));
+    }
+
+    [Fact]
+    public void A_note_is_one_line_and_says_why_rather_than_telling_the_story()
+    {
+        Assert.Throws<ArgumentException>(() => Fields.Note("why\nand how"));
+        Assert.Throws<ArgumentException>(() => Fields.Note(new string('x', Fields.NoteMaxLength + 1)));
+        Assert.Equal(new string('x', Fields.NoteMaxLength), Fields.Note(new string('x', Fields.NoteMaxLength)));
+    }
 }

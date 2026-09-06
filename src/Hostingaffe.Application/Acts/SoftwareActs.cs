@@ -194,11 +194,13 @@ public sealed class CreateSoftware(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task<SoftwareShape> ExecuteAsync(CreateSoftwareRequest request, CancellationToken cancellationToken)
+    public async Task<SoftwareShape> ExecuteAsync(
+        CreateSoftwareRequest request, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         SoftwareWrites.Closed(request.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var key = Validated.Field("key", () => Key.Normalize(request.Key ?? string.Empty));
 
@@ -221,7 +223,7 @@ public sealed class CreateSoftware(
 
             software.Add(row);
             keys.Assign(Keyed.Software, key);
-            history.Add(HistoryEntry.OnSoftware(row.Id, caller.Id, now, HistoryField.Created));
+            history.Add(HistoryEntry.OnSoftware(row.Id, caller.Id, now, HistoryField.Created, note: said));
 
             await software.SaveAsync(cancellationToken);
             return row;
@@ -246,11 +248,12 @@ public sealed class ChangeSoftware(
     TimeProvider clock)
 {
     public async Task<SoftwareShape> ExecuteAsync(
-        string key, ChangeSoftwareRequest changes, string? ifMatch, CancellationToken cancellationToken)
+        string key, ChangeSoftwareRequest changes, string? ifMatch, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         SoftwareWrites.Closed(changes.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var before = await software.LiveAsync(key, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
@@ -282,7 +285,7 @@ public sealed class ChangeSoftware(
             foreach (var change in SoftwareWrites.Apply(row, edit, caller.Id, now))
             {
                 history.Add(HistoryEntry.OnSoftware(
-                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue));
+                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));
             }
 
             await software.SaveAsync(cancellationToken);

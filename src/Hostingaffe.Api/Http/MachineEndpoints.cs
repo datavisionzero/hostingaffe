@@ -26,18 +26,19 @@ public static class MachineEndpoints
             .WithName("ListMachines")
             .WithSummary("Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. Retired machines are left out unless `retired=true` or `status=retired`; not paginated.");
 
-        door.MapPost(string.Empty, async (CreateMachineRequest? request, CreateMachine create, CancellationToken cancellationToken) =>
+        door.MapPost(string.Empty, async (CreateMachineRequest? request, string? note, CreateMachine create, CancellationToken cancellationToken) =>
             {
                 var machine = await create.ExecuteAsync(
                     request ?? new CreateMachineRequest(
                         null, null, null, null, null, null, null, null, null, null,
                         null, null, null, null, null, null, null, null, null, null),
+                    note,
                     cancellationToken);
 
                 return Results.Created($"{Routes.Api}/machines/{machine.Key}", machine);
             })
             .WithName("CreateMachine")
-            .WithSummary("Create a machine: the key and the kind are required, everything else may arrive later. `host` is a vm's only.")
+            .WithSummary("Create a machine: the key and the kind are required, everything else may arrive later. `host` is a vm's only. `note` goes into the history beside the change (ADR 0004).")
             .Produces<MachineShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
@@ -51,33 +52,34 @@ public static class MachineEndpoints
             .WithName("ReadMachineHistory")
             .WithSummary("Every change to the machine, oldest first: who, when, which field, from what to what. The description records that it changed, not how.");
 
-        door.MapPatch("/{key}", (string key, ChangeMachineRequest? request, HttpRequest http, ChangeMachine change, CancellationToken cancellationToken) =>
+        door.MapPatch("/{key}", (string key, ChangeMachineRequest? request, string? note, HttpRequest http, ChangeMachine change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
                     key,
                     request ?? new ChangeMachineRequest(
                         null, null, null, null, null, null, null, null, null,
                         null, null, null, null, null, null, null, null, null, null),
                     http.Headers.IfMatch.ToString(),
+                    note,
                     cancellationToken))
             .WithName("ChangeMachine")
-            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write.")
+            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).")
             .Produces<MachineShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
-        door.MapDelete("/{key}", async (string key, MoveMachine move, CancellationToken cancellationToken) =>
+        door.MapDelete("/{key}", async (string key, string? note, MoveMachine move, CancellationToken cancellationToken) =>
             {
-                await move.DeleteAsync(key, cancellationToken);
+                await move.DeleteAsync(key, note, cancellationToken);
                 return Results.NoContent();
             })
             .WithName("DeleteMachine")
-            .WithSummary("Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`.")
+            .WithSummary("Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent);
 
-        door.MapPost("/{key}/restore", (string key, MoveMachine move, CancellationToken cancellationToken) =>
-                move.RestoreAsync(key, cancellationToken))
+        door.MapPost("/{key}/restore", (string key, string? note, MoveMachine move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(key, note, cancellationToken))
             .WithName("RestoreMachine")
-            .WithSummary("Bring a deleted machine back, with exactly what its deletion took — not with what was deleted on its own before that.")
+            .WithSummary("Bring a deleted machine back, with exactly what its deletion took — not with what was deleted on its own before that. `note` goes into the history beside the change (ADR 0004).")
             .Produces<MachineShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 

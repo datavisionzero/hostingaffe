@@ -87,10 +87,57 @@ says whether this binary and that instance fit.
 
 ## Verbs
 
-`ha me`, `ha version`, `ha user`, `ha agent`, `ha token` and `ha page` are what
-the foundation has; `ha --help` lists them, and `ha <object> --help` the verbs
-under each. The table of the product's own objects — machine, software,
-installation, deployment, file — is written when those objects exist.
+`ha --help` lists the objects, and `ha <object> --help` the verbs under each.
+
+| object | verbs |
+|---|---|
+| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha page` | `list`, `view`, `create`, `edit`, `rename`, `delete`, `restore` |
+| `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
+
+`ha inst` is `ha installation`; the object keeps the glossary's word and the
+short form is only a short form. There is no `ha softwares`: the word is
+uncountable (`CONTEXT.md`, Software). Deployment and file are their own tickets
+and are not here yet.
+
+**`add` and `set` take the same flags**, so that what a record can be created
+with is what it can be corrected with. A flag left off leaves the field alone;
+**a flag given empty clears a text field** — `--location ""` empties it. `set`
+refuses to send a request that changes nothing, and says so as exit 2 rather
+than as a write that did not happen.
+
+**The closed sets are flags that name their values in the help**: `--kind`,
+`--arch` and `--status` on a machine, `--environment`, `--role`, `--status`,
+`--backup`, `--monitoring` and `--logging` on an installation. A value outside
+one is the instance's to refuse and arrives as exit 4 — `ha` keeps no second
+copy of the model.
+
+**A list is replaced whole**, never patched entry by entry: `--url`, `--secret`
+and `--port` are repeated, what is given is what the list becomes, and the lone
+value `none` clears it. A port is written and read the way a person writes one,
+`443/tcp:public`; the field itself is the object, and `ha` converts.
+
+**`--measured-at` takes a day** — `2026-09-05`, meaning midnight UTC — or a full
+RFC 3339 timestamp. Anything else is exit 2, said before any request goes out.
+
+**Every write takes `--note`**, and the note lands in the history next to the
+change, so that "why" is recorded where "what" is (ADR 0004). One line; an empty
+one is the same as none, and a change that touches three fields writes the note
+on all three rows. `ha <object> history KEY` is where it is read back.
+
+`--description` is one line on the command line; `--description-file` reads it
+from a file or from `-`, and naming both is exit 2. `view` prints the fields
+that are filled in and then the description as it is stored, so the output can
+be piped straight back into `--description-file -`.
+
+**Retiring is not deleting** (`CONTEXT.md`, Retired and deleted). The normal end
+of a machine or an installation is `set KEY --status retired`, which keeps
+everything and only leaves the default list; `--retired` on `list` puts them
+back and `--status retired` asks for exactly them. `delete` is for mistakes, is
+undone by `restore` for the grace period, and a key it burns is never given out
+again.
 
 A page carries the two fields the record gives it. `--kind` is `runbook`,
 `decision` or `note` on `create` and `edit`; left off at creation it is the

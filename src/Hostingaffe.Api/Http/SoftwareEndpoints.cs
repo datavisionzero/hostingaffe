@@ -34,16 +34,17 @@ public static class SoftwareEndpoints
             .WithName("ListSoftware")
             .WithSummary("Every software as a slim SoftwareSummary, by key, without the descriptions. Not paginated.");
 
-        door.MapPost(string.Empty, async (CreateSoftwareRequest? request, CreateSoftware create, CancellationToken cancellationToken) =>
+        door.MapPost(string.Empty, async (CreateSoftwareRequest? request, string? note, CreateSoftware create, CancellationToken cancellationToken) =>
             {
                 var software = await create.ExecuteAsync(
                     request ?? new CreateSoftwareRequest(null, null, null, null, null, null),
+                    note,
                     cancellationToken);
 
                 return Results.Created($"{Routes.Api}/software/{software.Key}", software);
             })
             .WithName("CreateSoftware")
-            .WithSummary("Create a software: the key is required, everything else may arrive later. `image` is a container image name without a tag.")
+            .WithSummary("Create a software: the key is required, everything else may arrive later. `image` is a container image name without a tag. `note` goes into the history beside the change (ADR 0004).")
             .Produces<SoftwareShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
@@ -57,32 +58,33 @@ public static class SoftwareEndpoints
             .WithName("ReadSoftwareHistory")
             .WithSummary("Every change to the software, oldest first: who, when, which field, from what to what. The description records that it changed, not how.");
 
-        door.MapPatch("/{key}", (string key, ChangeSoftwareRequest? request, HttpRequest http, ChangeSoftware change, CancellationToken cancellationToken) =>
+        door.MapPatch("/{key}", (string key, ChangeSoftwareRequest? request, string? note, HttpRequest http, ChangeSoftware change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
                     key,
                     request ?? new ChangeSoftwareRequest(null, null, null, null, null),
                     http.Headers.IfMatch.ToString(),
+                    note,
                     cancellationToken))
             .WithName("ChangeSoftware")
-            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write.")
+            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).")
             .Produces<SoftwareShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
-        door.MapDelete("/{key}", async (string key, MoveSoftware move, CancellationToken cancellationToken) =>
+        door.MapDelete("/{key}", async (string key, string? note, MoveSoftware move, CancellationToken cancellationToken) =>
             {
-                await move.DeleteAsync(key, cancellationToken);
+                await move.DeleteAsync(key, note, cancellationToken);
                 return Results.NoContent();
             })
             .WithName("DeleteSoftware")
-            .WithSummary("Soft-delete a software. One with installations still on it is refused, and the problem document says how many; nothing cascades from here.")
+            .WithSummary("Soft-delete a software. One with installations still on it is refused, and the problem document says how many; nothing cascades from here. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
-        door.MapPost("/{key}/restore", (string key, MoveSoftware move, CancellationToken cancellationToken) =>
-                move.RestoreAsync(key, cancellationToken))
+        door.MapPost("/{key}/restore", (string key, string? note, MoveSoftware move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(key, note, cancellationToken))
             .WithName("RestoreSoftware")
-            .WithSummary("Bring a deleted software back, under the key it kept.")
+            .WithSummary("Bring a deleted software back, under the key it kept. `note` goes into the history beside the change (ADR 0004).")
             .Produces<SoftwareShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 

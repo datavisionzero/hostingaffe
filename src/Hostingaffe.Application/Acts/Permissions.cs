@@ -30,6 +30,14 @@ public static class Permissions
 /// </summary>
 public static class Validated
 {
+    /// <summary>
+    /// The note a write carried, checked where it arrived. It is the query
+    /// parameter <c>note</c> on every write (ADR 0004), so the refusal names
+    /// <c>note</c> and a caller can find it.
+    /// </summary>
+    /// <exception cref="Refusal"><c>validation</c> on <c>note</c>.</exception>
+    public static string? Note(string? given) => Field("note", () => Fields.Note(given));
+
     /// <exception cref="Refusal"><c>validation</c> on <paramref name="field"/>.</exception>
     public static T Field<T>(string field, Func<T> normalize)
     {

@@ -374,11 +374,12 @@ public sealed class CreateInstallation(
     TimeProvider clock)
 {
     public async Task<InstallationShape> ExecuteAsync(
-        CreateInstallationRequest request, CancellationToken cancellationToken)
+        CreateInstallationRequest request, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         InstallationWrites.Closed(request.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var key = Validated.Field("key", () => Key.Normalize(request.Key ?? string.Empty));
 
@@ -407,7 +408,7 @@ public sealed class CreateInstallation(
 
             installations.Add(row);
             keys.Assign(Keyed.Installation, key);
-            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Created));
+            history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Created, note: said));
 
             // The first deployment is part of the same act, not a second call a
             // caller could forget: a version with no record of when it appeared
@@ -421,7 +422,7 @@ public sealed class CreateInstallation(
 
                 deployments.Add(first);
                 history.Add(HistoryEntry.OnDeployment(
-                    first.Id, caller.Id, now, HistoryField.Created, null, first.Version));
+                    first.Id, caller.Id, now, HistoryField.Created, null, first.Version, said));
             }
 
             await installations.SaveAsync(cancellationToken);
@@ -449,11 +450,16 @@ public sealed class ChangeInstallation(
     TimeProvider clock)
 {
     public async Task<InstallationShape> ExecuteAsync(
-        string key, ChangeInstallationRequest changes, string? ifMatch, CancellationToken cancellationToken)
+        string key,
+        ChangeInstallationRequest changes,
+        string? ifMatch,
+        string? note,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         InstallationWrites.Closed(changes.UnknownFields);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var before = await installations.LiveAsync(key, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
@@ -482,7 +488,7 @@ public sealed class ChangeInstallation(
             foreach (var change in InstallationWrites.Apply(row, edit, caller.Id, now))
             {
                 history.Add(HistoryEntry.OnInstallation(
-                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue));
+                    row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));
             }
 
             await installations.SaveAsync(cancellationToken);

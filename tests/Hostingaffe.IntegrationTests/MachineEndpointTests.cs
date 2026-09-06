@@ -286,6 +286,81 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
         Assert.Equal("maintainer", history[0].GetProperty("actor").GetProperty("name").GetString());
     }
 
+    /// <summary>
+    /// The note beside the change (ADR 0004), tested on the machine because the
+    /// mechanism is one and the same for software and installations.
+    /// </summary>
+    [Fact]
+    public async Task Every_write_carries_its_note_into_the_history()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var created = await admin.PostAsJsonAsync(
+            "/api/machines?note=replacing%20the%20old%20one",
+            new { key = "ex44", kind = "dedicated" },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var changed = await admin.PatchAsJsonAsync(
+            "/api/machines/ex44?note=dist-upgrade",
+            new { os = "Ubuntu 26.04 LTS", provider = "hetzner" },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+
+        using var deleted = await admin.DeleteAsync("/api/machines/ex44?note=wrong%20key", Ct);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        using var restored = await admin.PostAsync("/api/machines/ex44/restore?note=no%20it%20was%20not", null, Ct);
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/history", Ct);
+        var notes = history.EnumerateArray().ToDictionary(
+            e => e.GetProperty("field").GetString()!,
+            e => e.GetProperty("note").GetString(),
+            StringComparer.Ordinal);
+
+        Assert.Equal("replacing the old one", notes["created"]);
+        Assert.Equal("wrong key", notes["deleted"]);
+        Assert.Equal("no it was not", notes["restored"]);
+
+        // One act, two fields, one note: it belongs to the act and the act
+        // wrote both rows.
+        Assert.Equal("dist-upgrade", notes["os"]);
+        Assert.Equal("dist-upgrade", notes["provider"]);
+    }
+
+    [Fact]
+    public async Task A_write_without_a_note_writes_no_note()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await Machine(admin, "ex44", "dedicated");
+
+        // Given and empty is the same as not given at all.
+        using var changed = await admin.PatchAsJsonAsync("/api/machines/ex44?note=", new { provider = "hetzner" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/history", Ct);
+        Assert.All(history.EnumerateArray(), e => Assert.Equal(JsonValueKind.Null, e.GetProperty("note").ValueKind));
+    }
+
+    [Fact]
+    public async Task A_note_is_one_line_and_the_refusal_names_it()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var refused = await admin.PostAsJsonAsync(
+            "/api/machines?note=" + Uri.EscapeDataString("why\nand how"),
+            new { key = "ex44", kind = "dedicated" },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("note", (await Problem(refused)).GetProperty("errors").EnumerateObject().Single().Name);
+    }
+
     [Fact]
     public async Task A_change_over_somebody_elses_is_stale()
     {
