@@ -66,6 +66,16 @@ func New(cfg config.Config, httpClient *http.Client) (*Client, error) {
 		cfg.URL,
 		api.WithHTTPClient(httpClient),
 		api.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+			// A file's path is the last thing in its address and has slashes
+			// in it — `sites/logaffe.caddy` — and the endpoint is a catch-all
+			// that takes them as separators. The generated builder escapes
+			// every path parameter, slash included, so `RawPath` says
+			// `sites%2Flogaffe.caddy` and the instance looks for a file by
+			// that name. Clearing it makes Go encode the path afresh, where a
+			// slash is a slash. Nothing else in this API has a slash inside a
+			// segment, so it is done once here rather than at each of the file
+			// calls (docs/api.md, Files).
+			req.URL.RawPath = ""
 			req.Header.Set("Authorization", "Bearer "+cfg.Token)
 			req.Header.Set("User-Agent", UserAgent())
 			if req.Method != http.MethodGet && req.Method != http.MethodHead {

@@ -99,6 +99,7 @@ says whether this binary and that instance fit.
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history` |
 | `ha search` | one call over every field, every Markdown body and every file |
+| `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
@@ -177,6 +178,50 @@ record *is* — a deployment with the wrong version is `ha deploy delete`d and
 recorded again, and its number is not handed out a second time. `--version` is
 on `set` all the same, and it is sent: the instance's refusal says the rule,
 which an unknown flag would not.
+
+## Exporting
+
+```sh
+ha export --dir ./hosting-export
+```
+
+The escape hatch that makes the product safe to adopt: the whole record as a
+Markdown tree with the files at their own paths, plus one JSON document that
+carries all of it machine-readably, the history included.
+
+```
+hosting-export/
+  README.md                                      what this is, and a table of the machines
+  export.json                                    all of it, the history included
+  machines/<key>/README.md                       the machine, its fields, what is on it
+  machines/<key>/history.md                      who changed what, oldest first
+  machines/<key>/files/<path>                    its own files, byte for byte
+  machines/<key>/installations/<key>/README.md   the installation and its fields
+  machines/<key>/installations/<key>/history.md
+  machines/<key>/installations/<key>/deployments.md   what ran here, newest by `at` first
+  machines/<key>/installations/<key>/files/<path>
+  software/<key>.md
+  pages/<slug>.md
+```
+
+**Two exports of the same record are the same bytes.** Nothing in the tree says
+when it was written, and everything is ordered by its address, so an export can
+be kept in a repository and diffed — which is how a record that has drifted
+shows itself.
+
+**`export.json` is the shape the bulk write reads back**: export and import go
+in a circle, which is what gives migrating an old repository a defined target.
+
+**It is composed from the ordinary endpoints**, not from an endpoint of its own:
+whoever may read an export may make the single reads it is built from, and one
+endpoint for it would be a second place that has to learn every entity the model
+grows. That makes it many requests — an export is complete and rare, and that is
+what pays for it.
+
+**`--dir` must be absent, empty, or an export.** A directory holding an export is
+replaced, because re-exporting is the ordinary thing to do; anything else is
+left alone and said so before a single request goes out, because `ha` does not
+remove what it did not write.
 
 ## Searching
 
