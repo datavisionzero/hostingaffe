@@ -592,7 +592,20 @@ The identity model is planaffe's, minus the project dimension:
   read-only token would not change that — it still reads everything. A token
   scoped to one machine is the roadmap answer (17.).
 - Sign-in, browser sessions, invitation and password recovery are what planaffe
-  has, built the same way.
+  has, built the same way. A user is invited by e-mail rather than created with
+  a password somebody has to hand over, so no password ever travels through a
+  third person.
+- **Transactional e-mail is an optional instance capability** (planaffe
+  ADR 0018). It is configured with the SMTP variables of the environment, and
+  an instance without them is a working instance: the first administrator
+  arrives through the bootstrap path, which sends nothing, and the acts that
+  cannot happen without a mail — inviting a user, resending an invitation,
+  password recovery, changing an e-mail address — refuse with
+  `smtp-not-configured` and say why. An operator can ask the instance whether
+  it is configured and have it send one test mail. Optional because an instance
+  can be one person and their agents, and a mail server nobody needs is a
+  dependency nobody should have to install; a team of humans configures it once
+  and then never thinks about it.
 
 ## 10. Reachable From the Internet, and What That Means Here
 
@@ -670,7 +683,7 @@ are planaffe's and are referenced, not rewritten.
 - **API:** one HTTP API with an OpenAPI document captured from a running
   instance and checked in; the web application's client is generated from it.
 - **Identity:** planaffe's users, agents, tokens, sessions, invitations and
-  recovery.
+  recovery, with the same SMTP sender behind the three mails they need.
 - **Deployment:** one image, one Compose file, Postgres beside it, port
   `8080`; upgrade is `docker compose pull && up`; backup is `pg_dump`.
 - **Logs of the instance itself:** Serilog to console and file, to logaffe when
