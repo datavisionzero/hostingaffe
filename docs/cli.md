@@ -93,7 +93,7 @@ says whether this binary and that instance fit.
 
 | object | verbs |
 |---|---|
-| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
@@ -176,6 +176,21 @@ record *is* — a deployment with the wrong version is `ha deploy delete`d and
 recorded again, and its number is not handed out a second time. `--version` is
 on `set` all the same, and it is sent: the instance's refusal says the rule,
 which an unknown flag would not.
+
+## Context
+
+`ha machine context KEY` is the one call an agent makes before it touches a
+host: everything recorded about the machine, as Markdown on stdout, in the
+order that brings first what is needed first — the machine, its installations
+with their version, ports and file list, the last deployments, the software,
+the pages that hang on any of it, and the instance's `decision` pages.
+
+**File contents are not in it**, and that is the point: they are a
+`ha files get` away, and they are what would fill a context window. What comes
+back is what the instance assembled — one request, because the command is
+measured by what an operation costs in round trips and context, not by server
+latency (VISION 4.1, 16). `--json` gives the object the API answered with, the
+document inside it.
 
 ## Files
 

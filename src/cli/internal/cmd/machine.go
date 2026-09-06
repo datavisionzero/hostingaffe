@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -19,7 +20,7 @@ func newMachine(g *globals) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newMachineList(g), newMachineView(g), newMachineAdd(g), newMachineSet(g),
-		newMachineDelete(g), newMachineRestore(g), newMachineHistory(g))
+		newMachineDelete(g), newMachineRestore(g), newMachineHistory(g), newMachineContext(g))
 	return cmd
 }
 
@@ -81,6 +82,35 @@ func newMachineView(g *globals) *cobra.Command {
 				return err
 			}
 			return printMachine(g, cmd, *resp.JSON200)
+		},
+	}
+}
+
+// newMachineContext is the one call an agent makes before it touches a host:
+// everything recorded about the machine, as Markdown, in the order that brings
+// first what is needed first (VISION 16). The instance assembles it — the
+// command is measured by what it costs in round trips, and ha prints what it
+// gets.
+func newMachineContext(g *globals) *cobra.Command {
+	return &cobra.Command{
+		Use: "context KEY", Short: "Everything recorded about the machine, as Markdown. File contents are not in it.", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, c, err := g.load()
+			if err != nil {
+				return err
+			}
+			resp, err := c.ReadMachineContextWithResponse(cmd.Context(), args[0])
+			if err != nil {
+				return client.Transport(err)
+			}
+			if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+				return err
+			}
+			if g.json {
+				return render.JSON(cmd.OutOrStdout(), resp.JSON200)
+			}
+			fmt.Fprint(cmd.OutOrStdout(), resp.JSON200.Document)
+			return nil
 		},
 	}
 }

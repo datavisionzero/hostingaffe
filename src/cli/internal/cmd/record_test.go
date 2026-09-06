@@ -35,6 +35,8 @@ const (
 "at":"2026-09-05T10:00:00Z","field":"created","old_value":null,"new_value":null,"note":"replacing the old one"},
 {"id":2,"actor":{"id":"0198e0c0-0000-7000-8000-000000000002","kind":"user","name":"maintainer"},
 "at":"2026-09-05T12:00:00Z","field":"os","old_value":"Ubuntu 24.04","new_value":"Ubuntu 26.04 LTS","note":"dist-upgrade"}]`
+
+	contextJSON = `{"key":"ex44","document":"# ex44 \u2014 The big one\n\nA dedicated machine, active.\n"}`
 )
 
 // records answers whatever a record verb asks for, so that one server serves
@@ -50,6 +52,8 @@ func records() *fake {
 		}
 
 		switch {
+		case strings.HasSuffix(r.URL.Path, "/context"):
+			return 200, contextJSON
 		case r.Method == http.MethodDelete:
 			return 204, ""
 		case strings.HasSuffix(r.URL.Path, "/history"):
@@ -83,6 +87,7 @@ func TestRecordVerbsReachTheRightAddresses(t *testing.T) {
 		{[]string{"machine", "delete", "ex44"}, "DELETE", "/api/machines/ex44", "ha machine restore ex44"},
 		{[]string{"machine", "restore", "ex44"}, "POST", "/api/machines/ex44/restore", "ex44"},
 		{[]string{"machine", "history", "ex44"}, "GET", "/api/machines/ex44/history", "dist-upgrade"},
+		{[]string{"machine", "context", "ex44"}, "GET", "/api/machines/ex44/context", "# ex44"},
 
 		{[]string{"software", "list"}, "GET", "/api/software", "logaffe"},
 		{[]string{"software", "view", "logaffe"}, "GET", "/api/software/logaffe", "logaffe"},
@@ -395,6 +400,27 @@ func TestHistoryPrintsTheNoteBesideTheChange(t *testing.T) {
 	}
 	if !strings.HasSuffix(lines[1], "os             Ubuntu 24.04 → Ubuntu 26.04 LTS  (dist-upgrade)") {
 		t.Errorf("os: %q", lines[1])
+	}
+}
+
+// `context` is what the instance assembled, printed as it came: Markdown on
+// stdout, so it can be piped into whatever reads it.
+func TestContextPrintsTheDocumentAsItCame(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, out, stderr := run(t, server, "machine", "context", "ex44")
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	if out != "# ex44 \u2014 The big one\n\nA dedicated machine, active.\n" {
+		t.Fatalf("the document, and nothing around it:\n%q", out)
+	}
+
+	// One call, because that is what the command is measured by.
+	if len(f.requests) != 1 {
+		t.Errorf("%d requests", len(f.requests))
 	}
 }
 

@@ -47,6 +47,12 @@ public static class MachineEndpoints
             .WithName("ReadMachine")
             .WithSummary("The complete machine: every field, the host it runs on, and who touched it last.");
 
+        door.MapGet("/{key}/context", (string key, ReadMachineContext read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, cancellationToken))
+            .WithName("ReadMachineContext")
+            .WithSummary("Everything recorded about the machine as one Markdown document, in the order that brings first what is needed first: the machine, its installations with their version, ports and file list, the last deployments, the software, the pages that hang on any of it, and the instance's `decision` pages. File contents are not in it — they are one read of a file away, and they are what would fill a context window.")
+            .Produces<MachineContextShape>();
+
         door.MapGet("/{key}/history", (string key, ReadMachineHistory read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(key, cancellationToken))
             .WithName("ReadMachineHistory")

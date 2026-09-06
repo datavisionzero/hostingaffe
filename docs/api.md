@@ -240,6 +240,7 @@ and the message says why.
 | `POST /api/machines` | `key` and `kind` are required, everything else may arrive later |
 | `GET /api/machines/{key}` | the complete machine |
 | `PATCH /api/machines/{key}` | any field but the key; `If-Match` guards it |
+| `GET /api/machines/{key}/context` | everything recorded about it, as one Markdown document |
 | `GET /api/machines/{key}/history` | who changed what, oldest first |
 | `DELETE /api/machines/{key}`, `POST /api/machines/{key}/restore` | soft, with the cascade above |
 
@@ -266,6 +267,25 @@ Retiring, and deleting.
 
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
+
+**`context` is the one call an agent makes before it touches a host.** It
+answers `{ "key", "document" }`, and the document is Markdown, in this order:
+the machine and its fields; its installations, each with the version it runs,
+its ports, its file list and the last five deployments; the software those are
+installations of; the machine's own files; the pages that hang on the machine or
+on any of its installations; and the instance's `decision` pages — the rules
+that hold on every host.
+
+**File contents are not in it.** They are one read of a file away, and they are
+what would fill a context window. The measure is VISION 16: well under ten
+thousand tokens for a machine with five installations, which the integration
+tests hold to by counting characters rather than by estimating.
+
+The document is assembled here rather than by the caller, and that is a
+deliberate exception to what this document otherwise avoids — describing
+presentation. A client that built it would ask about thirty times for a host of
+that size, and the web application's machine screen is the same assembly; one of
+them is what keeps the two saying the same thing.
 
 ### Software
 

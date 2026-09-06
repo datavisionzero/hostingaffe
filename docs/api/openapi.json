@@ -1508,6 +1508,57 @@
         }
       }
     },
+    "/api/machines/{key}/context": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Everything recorded about the machine as one Markdown document, in the order that brings first what is needed first: the machine, its installations with their version, ports and file list, the last deployments, the software, the pages that hang on any of it, and the instance's `decision` pages. File contents are not in it — they are one read of a file away, and they are what would fill a context window.",
+        "operationId": "ReadMachineContext",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineContext"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/machines/{key}/history": {
       "get": {
         "tags": [
@@ -6383,6 +6434,21 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "MachineContext": {
+        "required": [
+          "key",
+          "document"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "document": {
+            "type": "string"
           }
         }
       },

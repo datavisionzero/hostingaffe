@@ -109,6 +109,7 @@ builder.Services.AddScoped<MachineAssembler>();
 builder.Services.AddScoped<ListMachines>();
 builder.Services.AddScoped<ReadMachine>();
 builder.Services.AddScoped<ReadMachineHistory>();
+builder.Services.AddScoped<ReadMachineContext>();
 builder.Services.AddScoped<CreateMachine>();
 builder.Services.AddScoped<ChangeMachine>();
 
