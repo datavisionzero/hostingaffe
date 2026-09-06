@@ -10,7 +10,7 @@ const (
 	OK = 0
 	// Unexpected is a 500, a response ha cannot parse, or a bug in ha.
 	Unexpected = 1
-	// Usage is bad arguments, HOSTINGAFFE_URL or HOSTINGAFFE_TOKEN unset, or a .hostingaffe file ha cannot read.
+	// Usage is bad arguments, or HOSTINGAFFE_URL or HOSTINGAFFE_TOKEN unset or malformed.
 	Usage = 2
 	// NotFound is 404 not-found and 404 deleted.
 	NotFound = 3
@@ -22,10 +22,10 @@ const (
 	Stale = 6
 	// Denied is 401 and 403.
 	Denied = 7
-	// 8 is not given away: it was `next` finding nothing, and it stays free for
-	// whatever answers "there is nothing" next, so that no script has to relearn
-	// a number.
-	//
+	// 8 is not given away. It was `next` finding nothing, which is planaffe's
+	// and not this product's, and it stays free for whatever answers "there is
+	// nothing" here — so that no script has to relearn a number.
+
 	// Skew is a CLI too old or too new for the instance (ADR 0011).
 	Skew = 9
 	// Unreachable is DNS, connection refused, timeout, TLS: the instance could not be reached.

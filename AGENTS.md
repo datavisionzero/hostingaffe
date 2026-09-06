@@ -3,11 +3,15 @@
 Instructions for coding agents working in this repository. See
 [Vision.md](Vision.md) for what hostingaffe is and what it deliberately is not.
 
-The repository is **pre-MVP**: there is no implementation yet, and the files
-[Vision.md §12](Vision.md#12-technical-guard-rails) names as conventions —
-`CONTEXT.md`, `docs/adr/`, `docs/codebase.md`, `docs/storage.md`, `docs/api.md`,
-`docs/cli.md`, `deploy/` — are still to be written. Until each exists, this file
-says what stands in for it. Add the link here when you create one.
+The repository is **pre-MVP**: the foundation stands — a copy of planaffe
+with planaffe's domain cut out — and this product's own domain is not built
+yet.
+
+Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
+conventions, [`docs/cli.md`](docs/cli.md) and [`deploy/`](deploy/) exist;
+`CONTEXT.md`, `docs/adr/`, `docs/codebase.md`, `docs/storage.md` and
+`docs/api.md` are still to be written. Until each exists, this file says what
+stands in for it. Add the link here when you create one.
 
 ## Language
 
