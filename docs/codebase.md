@@ -31,9 +31,13 @@ Api ──────► Application ──────► Domain
 ```
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
-browser session, one-time secret), `Machines`, `Pages`, `History`, and at the
-root what belongs to more than one of them — `Key`, the handle an operator
-chooses; `Status`, the lifecycle a machine and an installation share;
+browser session, one-time secret), `Machines`, `Installations` (with the port
+and its two closed sets), `Files` (with the one list of refused paths),
+`Deployments` (with `Derived`, which says what "latest" means), `Pages`,
+`History`, and at the root what belongs to more than one of them — `Key`, the
+handle an operator chooses; `AssignedKey`, the register that makes a key never
+reusable; `Status`, the lifecycle a machine and an installation share; `Anchor`,
+the machine-or-installation a file is owned by and a page attached to;
 `Spelling`, which turns a closed set's value into the word the contract, the
 column and the history all use; `Fields`, the shapes every editable field
 shares; and `Refusal` with `RefusalCode`, the one list of every way the product
@@ -44,19 +48,26 @@ uncountable, so there is no plural to name a folder with, and a namespace
 `Software` beside a type `Software` is an ambiguity every reference then has to
 spell around.
 
+Two type names collide with types the runtime imports everywhere —
+`Installations.Environment` with `System.Environment`, `Files.File` with
+`System.IO.File`. The files that need the model's say so with an alias: the
+words are the glossary's, and a type named around a collision would be a word
+`CONTEXT.md` does not have.
+
 **Application** is the use cases. `Acts/` holds one class per act, named for
 what it does — `CreatePage`, `CreateUser`, `AuthenticateToken` — plus the
 shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
-`IMachines`, `IPages`, `IIdentities`, `ITokens`, `IHistory`, `ITransactions`,
+`IMachines`, `ISoftware`, `IInstallations`, `IFiles`, `IDeployments`, `IKeys`,
+`IPages`, `IIdentities`, `ITokens`, `IHistory`, `ITransactions`,
 `IIdempotency`, `IEmailSender`, and the settings records read from the
 environment.
 
 **Infrastructure** implements them. `Persistence/` is EF Core: the
 `HostingaffeDbContext`, one `IEntityTypeConfiguration` per table under
 `Configurations/`, one store per port beside it, `Transactions` with the
-opportunistic purge, and `Migrations/` — one migration, and every schema
-change from here arrives as another on top (planaffe ADR 0011). `Email/` is
+opportunistic purge, and `Migrations/` — every schema change arrives
+as another one on top, only ever forward (planaffe ADR 0011). `Email/` is
 the SMTP sender, `Identity/` the Argon2id password hasher.
 
 **Api** is HTTP and nothing else. `Http/` maps the endpoints, one file per

@@ -58,7 +58,10 @@ services:
     healthcheck:
       # The one endpoint outside the door. It answers once the migrations and
       # the bootstrap have run, because the host serves nothing before them.
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/version"]
+      # Under `/api` like everything else the instance answers as an API
+      # (ADR 0002) — outside it, this address is the web application's, and the
+      # container would never report healthy.
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/api/version"]
       interval: 10s
       timeout: 3s
       retries: 6

@@ -4746,22 +4746,6 @@
         }
       },
       "ChangeInstallationRequest": {
-        "required": [
-          "name",
-          "machine",
-          "software",
-          "environment",
-          "role",
-          "status",
-          "urls",
-          "ports",
-          "path",
-          "secrets",
-          "backup",
-          "monitoring",
-          "logging",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "name": {
@@ -4885,27 +4869,6 @@
         "additionalProperties": false
       },
       "ChangeMachineRequest": {
-        "required": [
-          "name",
-          "hostname",
-          "kind",
-          "host",
-          "provider",
-          "plan",
-          "location",
-          "os",
-          "arch",
-          "cpu",
-          "memory",
-          "disk",
-          "ipv4",
-          "ipv6",
-          "private_ip",
-          "ssh",
-          "status",
-          "measured_at",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "name": {
@@ -5061,13 +5024,6 @@
         }
       },
       "ChangeSoftwareRequest": {
-        "required": [
-          "name",
-          "homepage",
-          "repository",
-          "image",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "name": {
@@ -5104,12 +5060,6 @@
         "additionalProperties": false
       },
       "CorrectDeploymentRequest": {
-        "required": [
-          "ref",
-          "at",
-          "ticket",
-          "note"
-        ],
         "type": "object",
         "properties": {
           "ref": {
@@ -5155,11 +5105,6 @@
         }
       },
       "CreateFileRequest": {
-        "required": [
-          "path",
-          "content",
-          "executable"
-        ],
         "type": "object",
         "properties": {
           "path": {
@@ -5184,24 +5129,6 @@
         "additionalProperties": false
       },
       "CreateInstallationRequest": {
-        "required": [
-          "key",
-          "name",
-          "machine",
-          "software",
-          "environment",
-          "role",
-          "status",
-          "urls",
-          "ports",
-          "path",
-          "secrets",
-          "backup",
-          "monitoring",
-          "logging",
-          "version",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "key": {
@@ -5337,28 +5264,6 @@
         "additionalProperties": false
       },
       "CreateMachineRequest": {
-        "required": [
-          "key",
-          "name",
-          "hostname",
-          "kind",
-          "host",
-          "provider",
-          "plan",
-          "location",
-          "os",
-          "arch",
-          "cpu",
-          "memory",
-          "disk",
-          "ipv4",
-          "ipv6",
-          "private_ip",
-          "ssh",
-          "status",
-          "measured_at",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "key": {
@@ -5498,13 +5403,6 @@
         "additionalProperties": false
       },
       "CreatePageRequest": {
-        "required": [
-          "slug",
-          "title",
-          "body",
-          "kind",
-          "attached_to"
-        ],
         "type": "object",
         "properties": {
           "slug": {
@@ -5549,14 +5447,6 @@
         "additionalProperties": false
       },
       "CreateSoftwareRequest": {
-        "required": [
-          "key",
-          "name",
-          "homepage",
-          "repository",
-          "image",
-          "description"
-        ],
         "type": "object",
         "properties": {
           "key": {
@@ -6688,13 +6578,6 @@
         "type": "string"
       },
       "RecordDeploymentRequest": {
-        "required": [
-          "version",
-          "ref",
-          "at",
-          "ticket",
-          "note"
-        ],
         "type": "object",
         "properties": {
           "version": {
@@ -7079,10 +6962,6 @@
         }
       },
       "WriteFileRequest": {
-        "required": [
-          "content",
-          "executable"
-        ],
         "type": "object",
         "properties": {
           "content": {

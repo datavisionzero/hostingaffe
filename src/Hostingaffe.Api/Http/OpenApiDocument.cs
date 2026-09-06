@@ -61,7 +61,12 @@ public static class OpenApiDocument
 
                 // The closed request objects of docs/api.md: what they do not
                 // define, they refuse, and the document has to say so or a
-                // generated client will happily send it.
+                // generated client will happily send it. Nothing in them is
+                // required either — a field left out stays as it is, and one
+                // that an act insists on is refused as `validation` naming it.
+                // The generator marks every parameter of a positional record
+                // required, which is an artifact of how the type is written
+                // rather than a statement about the API.
                 if (type == typeof(AgentMetadataRequest)
                     || type == typeof(CreateMachineRequest)
                     || type == typeof(ChangeMachineRequest)
@@ -76,6 +81,11 @@ public static class OpenApiDocument
                     || type == typeof(CreatePageRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;
+
+                    if (schema is OpenApiSchema closed)
+                    {
+                        closed.Required = null;
+                    }
                 }
 
                 if (type == typeof(AgentMetadataRequest) || type == typeof(AgentMetadata))
