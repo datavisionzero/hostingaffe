@@ -8,11 +8,12 @@ with planaffe's domain cut out — and this product's own domain is not built
 yet.
 
 Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
-conventions, [`docs/cli.md`](docs/cli.md), [`docs/install.md`](docs/install.md),
+conventions, [`CONTEXT.md`](CONTEXT.md), [`docs/codebase.md`](docs/codebase.md),
+[`docs/cli.md`](docs/cli.md), [`docs/install.md`](docs/install.md),
 [`docs/operations.md`](docs/operations.md) and [`deploy/`](deploy/) exist;
-`CONTEXT.md`, `docs/adr/`, `docs/codebase.md`, `docs/storage.md` and
-`docs/api.md` are still to be written. Until each exists, this file says what
-stands in for it. Add the link here when you create one.
+`docs/adr/`, `docs/storage.md` and `docs/api.md` are still to be written. Until
+each exists, this file says what stands in for it. Add the link here when you
+create one.
 
 ## Language
 
@@ -27,17 +28,16 @@ never pushed (see below).
 
 - **Host**: GitHub — `datavisionzero/hostingaffe`. Public, MIT — all of it,
   with no directory and no feature behind a second license.
-- **Layout**: not written yet. Until `docs/codebase.md` exists,
-  [Vision.md §12](Vision.md#12-technical-guard-rails) is the layout: a .NET 10
-  backend in four layers with dependencies pointing inward, a React frontend on
-  Vite, a Go CLI (`ha`), one HTTP API with a checked-in OpenAPI document.
-- **Language of the domain**:
-  [Vision.md §7](Vision.md#7-domain-model) is the glossary, and the model is
-  closed — machine, software, installation, deployment, file, page, history,
-  identity, each named by an immutable **key**. Code, identifiers, the HTTP
-  contract and the CLI use those names without exception, and a concept that
-  needs a name the vision does not have gets settled there first, or in
-  `CONTEXT.md` once that file exists.
+- **Layout**: [`docs/codebase.md`](docs/codebase.md) — what is where, and why.
+  It is kept current: a file that lands somewhere other than it describes means
+  one of the two is wrong.
+- **Language of the domain**: [`CONTEXT.md`](CONTEXT.md) is the glossary the
+  code is named after, and the model is closed — machine, software,
+  installation, deployment, file, page, history, identity, each named by an
+  immutable **key**. Code, identifiers, the HTTP contract and the CLI use those
+  words without exception, and so does the list of words that are *not* used.
+  A concept that needs a word the glossary does not have gets settled in
+  [Vision.md §7](Vision.md#7-domain-model) first.
 - **Decisions**: the stack is planaffe's, adopted rather than re-decided, and
   the ADRs that chose it live in `datavisionzero/planaffe` — reference them,
   do not rewrite them. Decisions this product makes for itself go in
