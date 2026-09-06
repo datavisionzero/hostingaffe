@@ -12,4 +12,5 @@ public enum HistorySubject
     Machine,
     Software,
     Installation,
+    File,
 }

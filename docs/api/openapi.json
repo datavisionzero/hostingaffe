@@ -2132,6 +2132,808 @@
         }
       }
     },
+    "/api/machines/{key}/files": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every file of the machine, by path, as a slim FileSummary — without the contents.",
+        "operationId": "ListMachineFiles",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Put a file under the machine: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory.",
+        "operationId": "CreateMachineFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/files/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The file with its content. `revision` reads it as it was at that write; without it, as it is now.",
+        "operationId": "ReadMachineFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the `updated_at` last read guards the write.",
+        "operationId": "WriteMachineFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/file-revisions/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every write of the file, newest first, without what each of them wrote. One of them is read by asking for the file with `revision`.",
+        "operationId": "ReadMachineFileRevisions",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileRevision"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/file-history/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the file, oldest first: who, when, and which revision it became. What each revision said is the revision's, not the history's.",
+        "operationId": "ReadMachineFileHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/files": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every file of the installation, by path, as a slim FileSummary — without the contents.",
+        "operationId": "ListInstallationFiles",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Put a file under the installation: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory.",
+        "operationId": "CreateInstallationFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/files/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The file with its content. `revision` reads it as it was at that write; without it, as it is now.",
+        "operationId": "ReadInstallationFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the `updated_at` last read guards the write.",
+        "operationId": "WriteInstallationFile",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/file-revisions/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every write of the file, newest first, without what each of them wrote. One of them is read by asking for the file with `revision`.",
+        "operationId": "ReadInstallationFileRevisions",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileRevision"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/installations/{key}/file-history/{path}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the file, oldest first: who, when, and which revision it became. What each revision said is the revision's, not the history's.",
+        "operationId": "ReadInstallationFileHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pages": {
       "get": {
         "tags": [
@@ -3231,6 +4033,35 @@
           }
         }
       },
+      "CreateFileRequest": {
+        "required": [
+          "path",
+          "content",
+          "executable"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executable": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateInstallationRequest": {
         "required": [
           "key",
@@ -3698,6 +4529,110 @@
           "development"
         ],
         "type": "string"
+      },
+      "File": {
+        "required": [
+          "owner",
+          "path",
+          "executable",
+          "content",
+          "revision",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner"
+          },
+          "path": {
+            "type": "string"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FileRevision": {
+        "required": [
+          "revision",
+          "executable",
+          "by",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FileSummary": {
+        "required": [
+          "owner",
+          "path",
+          "executable",
+          "revision",
+          "updated_by",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner"
+          },
+          "path": {
+            "type": "string"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "HistoryEntry": {
         "required": [
@@ -4257,6 +5192,28 @@
         ],
         "type": "string"
       },
+      "Owner": {
+        "required": [
+          "kind",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/OwnerKind"
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "OwnerKind": {
+        "enum": [
+          "machine",
+          "installation"
+        ],
+        "type": "string"
+      },
       "Page": {
         "required": [
           "slug",
@@ -4753,6 +5710,28 @@
             "type": "string"
           }
         }
+      },
+      "WriteFileRequest": {
+        "required": [
+          "content",
+          "executable"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executable": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "additionalProperties": false
       }
     }
   },

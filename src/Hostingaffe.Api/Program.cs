@@ -128,6 +128,16 @@ builder.Services.AddScoped<ReadInstallationHistory>();
 builder.Services.AddScoped<CreateInstallation>();
 builder.Services.AddScoped<ChangeInstallation>();
 
+// The text a machine runs with, and every revision it ever had (VISION 7).
+builder.Services.AddScoped<FileLookup>();
+builder.Services.AddScoped<FileAssembler>();
+builder.Services.AddScoped<ListFiles>();
+builder.Services.AddScoped<ReadFile>();
+builder.Services.AddScoped<ReadFileRevisions>();
+builder.Services.AddScoped<ReadFileHistory>();
+builder.Services.AddScoped<CreateFile>();
+builder.Services.AddScoped<WriteFile>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -209,6 +219,7 @@ api.MapBrowserIdentity();
 api.MapMachines();
 api.MapSoftware();
 api.MapInstallations();
+api.MapFiles();
 api.MapPages();
 api.MapSmtp();
 

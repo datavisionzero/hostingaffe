@@ -43,9 +43,13 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/admin/smtp", "/api/admin/smtp/test",
                 "/api/agents", "/api/agents/{id}",
                 "/api/email-changes/confirm",
-                "/api/installations", "/api/installations/{key}", "/api/installations/{key}/history",
+                "/api/installations", "/api/installations/{key}", "/api/installations/{key}/file-history/{path}",
+                "/api/installations/{key}/file-revisions/{path}", "/api/installations/{key}/files",
+                "/api/installations/{key}/files/{path}", "/api/installations/{key}/history",
                 "/api/invitations/accept",
-                "/api/machines", "/api/machines/{key}", "/api/machines/{key}/history",
+                "/api/machines", "/api/machines/{key}", "/api/machines/{key}/file-history/{path}",
+                "/api/machines/{key}/file-revisions/{path}", "/api/machines/{key}/files",
+                "/api/machines/{key}/files/{path}", "/api/machines/{key}/history",
                 "/api/me", "/api/me/email", "/api/me/metadata", "/api/me/password",
                 "/api/pages", "/api/pages/{slug}", "/api/pages/{slug}/history", "/api/pages/{slug}/restore",
                 "/api/password-recovery", "/api/password-recovery/complete",
@@ -63,6 +67,10 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Me", schemas);
         Assert.Contains("Machine", schemas);
         Assert.Contains("MachineSummary", schemas);
+        Assert.Contains("File", schemas);
+        Assert.Contains("FileSummary", schemas);
+        Assert.Contains("FileRevision", schemas);
+        Assert.Contains("Owner", schemas);
         Assert.Contains("Installation", schemas);
         Assert.Contains("InstallationSummary", schemas);
         Assert.Contains("Port", schemas);

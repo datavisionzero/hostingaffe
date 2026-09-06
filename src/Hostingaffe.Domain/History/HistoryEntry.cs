@@ -123,6 +123,16 @@ public sealed class HistoryEntry
         string? note = null) =>
         On(HistorySubject.Installation, installationId, actorId, at, field, oldValue, newValue, note);
 
+    public static HistoryEntry OnFile(
+        Guid fileId,
+        Guid actorId,
+        DateTimeOffset at,
+        string field,
+        string? oldValue = null,
+        string? newValue = null,
+        string? note = null) =>
+        On(HistorySubject.File, fileId, actorId, at, field, oldValue, newValue, note);
+
     private static string Named(string field) =>
         string.IsNullOrWhiteSpace(field)
             ? throw new ArgumentException("A history entry names the field that changed.", nameof(field))

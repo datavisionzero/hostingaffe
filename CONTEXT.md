@@ -125,6 +125,10 @@ Files are the one place the history keeps **content** rather than the fact of a
 change, because rolling back a Compose file needs the previous Compose file.
 Each write makes a `revision`, and two revisions can be diffed.
 
+An owner is named by its kind and its key together — `{"kind": "machine", "key":
+"ex44"}` — because a key is unique per entity type and not across them, and a
+machine `caddy` and an installation `caddy` both exist.
+
 Paths that carry secrets are refused: `.env` and any `.env.*` but
 `.env.example`, and anything under `secrets/`. So is any path outside the
 owner's directory.

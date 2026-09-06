@@ -342,6 +342,71 @@ rows are part of what an installation *is*, so when the purge finally removes
 the installation row they go with it. A soft delete leaves them alone, because
 it leaves the installation alone.
 
+## Files
+
+The text a machine runs with, kept next to the thing it belongs to
+(`CONTEXT.md`, File), and the one place the history keeps **content**.
+
+```sql
+create table file (
+    id              uuid         not null primary key,
+    machine_id      uuid         references machine (id),
+    installation_id uuid         references installation (id),
+    path            varchar(500) not null,
+    created_by      uuid         not null references identity (id),
+    created_at      timestamptz  not null,
+    deleted_at      timestamptz,
+    deleted_by      uuid         references identity (id),
+
+    check (num_nonnulls(machine_id, installation_id) = 1)
+);
+
+create unique index file_on_machine      on file (machine_id, path)      where machine_id is not null;
+create unique index file_on_installation on file (installation_id, path) where installation_id is not null;
+
+create table file_revision (
+    file_id    uuid        not null references file (id) on delete cascade,
+    revision   int         not null,
+    content    text        not null,
+    executable boolean     not null,
+    by         uuid        not null references identity (id),
+    at         timestamptz not null,
+
+    primary key (file_id, revision)
+);
+```
+
+**Exactly one owner**, and the check constraint is what says "exactly": a
+systemd unit belongs to the machine, a Compose file to the installation, and
+nothing belongs to both or to neither. The two partial unique indexes are what
+makes `path` unique *per owner* and are the order an owner's files are read in;
+they cover deleted rows, so a path stays spent for the grace period.
+
+**Nothing on `file` says what the file contains.** The content, the mode bit,
+the revision number and who last wrote it are the newest revision's, computed on
+read. A column repeating any of them would be the second truth a write has to
+remember to refresh — the same rule the derived version follows.
+
+**Every write is a revision, and every earlier content stays.** That is what
+makes rolling back a Compose file possible, which is the whole reason files are
+the exception to "a text records that it changed, not how". A write that changes
+neither the content nor the mode bit makes no revision: a revision repeating its
+predecessor byte for byte is not a version of the file, and `files sync` writing
+the whole set would otherwise number the history up without saying anything.
+
+The mode bit is on the revision rather than on the file, so that reading a
+revision gives the file as it was — a script that was runnable stays runnable.
+
+Content is UTF-8, capped at one megabyte, and refused rather than replaced when
+it is not text: VISION 7 rules binary out, and a byte turned into a question
+mark is a file that no longer runs.
+
+**The refused paths are a rule of the Domain, not of a client.** `.env` and
+every `.env.*` but `.env.example`; anything under `secrets/` at any depth; and
+anything outside the owner's directory — a leading slash, a `..`, a `.`. The
+list is in `FilePath` and nowhere else, because the API is as open as the CLI
+is. `.envrc` is welcome: in the template it is one line and carries no value.
+
 ## Pages
 
 The instance's flat wiki, addressed by a slug rather than a key
@@ -383,7 +448,7 @@ to what (`CONTEXT.md`, History).
 create table history (
     id         bigint      not null primary key generated always as identity,
     subject    text        not null
-        check (subject in ('page', 'machine', 'software', 'installation')),
+        check (subject in ('page', 'machine', 'software', 'installation', 'file')),
     subject_id uuid        not null,
     actor_id   uuid        not null references identity (id),
     at         timestamptz not null,
@@ -448,12 +513,17 @@ the same word. `request_hash` is what makes a repeat with a different body an
 
 ## What is derived rather than stored
 
-**Nothing yet, and one thing soon.** A machine's fields are all written. The
-first derived value is an installation's `version` — the version of its latest
-deployment *by `at`*, not by the order of recording — and it arrives with the
-deployment. It is written down here in advance because the rule it follows is
-the one that would be easy to get wrong twice: derived means computed on read,
-at one place, never a column that a write has to remember to refresh.
+Derived means **computed on read, at one place, never a column that a write has
+to remember to refresh**. There is one such place so far and one more coming.
+
+**A file's content, mode bit, revision number and last author** are the newest
+revision's. `file` holds who put the file there and where it sits; everything it
+*says* is in `file_revision`.
+
+**An installation's `version`** is the version of its latest deployment *by
+`at`*, not by the order of recording, and it arrives with the deployment. It is
+written down here in advance because it is the rule that would be easy to get
+wrong twice.
 
 ## The purge
 

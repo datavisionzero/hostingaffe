@@ -6,8 +6,8 @@ carries no version in its path: the contract is
 captured from a running instance and checked in, and both clients are generated
 from it (planaffe ADRs 0005, 0011).
 
-The endpoint tables below cover what the foundation serves. The objects of
-the product — deployment, file — arrive with their own sections.
+The endpoint tables below cover what the foundation serves. The one object of
+the product still to come — the deployment — arrives with its own section.
 
 ## Where it is
 
@@ -258,6 +258,55 @@ line of an `.env` file from arriving here whole.
 
 `version` and `depends_on` are `unknown-field`. The first is derived from the
 deployments; the second is roadmap (VISION 15.2), not an omission.
+
+### Files
+
+A file has no key: its address is its owner and its path. Both owners get the
+same six endpoints, once under `/api/machines/{key}` and once under
+`/api/installations/{key}`:
+
+| | |
+|---|---|
+| `GET …/files` | every file of the owner, by path, as a slim `FileSummary` |
+| `POST …/files` | put one there; the content is its first revision |
+| `GET …/files/{path}` | the file with its content; `revision` reads it as it was |
+| `PUT …/files/{path}` | write it: a new revision |
+| `GET …/file-revisions/{path}` | every write, newest first, without the contents |
+| `GET …/file-history/{path}` | who changed what, oldest first |
+
+A path has slashes in it, so it is the last thing in an address — which is why
+the revisions and the history sit under a word of their own beside `files`
+rather than after the path, where nothing could tell a sub-resource from a
+directory.
+
+**Every write is a revision, and every earlier content stays.** Reading revision
+2 is `GET …/files/compose.override.yml?revision=2`, and the answer is the same
+`File` shape: "the file as it was" is the file. Comparing two of them is the
+CLI's and the interface's; nothing is diffed on the server.
+
+**A write that changes nothing makes no revision.** Sending the content the file
+already has, with the mode bit it already has, answers the file unchanged. That
+is what keeps `files sync` — which writes the whole set — from numbering the
+history up without saying anything.
+
+**The refused paths** (VISION 7, 10), one list, in the Domain, because the API
+is as open as the CLI is:
+
+- `.env`, and every `.env.*` but `.env.example`
+- anything under `secrets/`, at any depth
+- anything outside the owner's directory: a leading slash, a `..`, a `.`
+
+`.envrc` is welcome — in the template it is one line and carries no value. The
+warning about content that *looks* like a private key is the CLI's, and VISION 7
+says itself that it is a guard against accidents rather than a boundary.
+
+Content is UTF-8 and capped at one megabyte; what is not text is `validation`,
+not a replaced byte. `executable` is the only mode bit there is, and it belongs
+to the revision, so reading an old one gives the file as it was.
+
+`path`, `revision` and `owner` are `unknown-field` in a write body. A file does
+not move — it is put at the new path and the old one deleted — a revision is
+made by writing, and the owner is the address it was written to.
 
 ### Pages
 

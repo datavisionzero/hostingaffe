@@ -51,6 +51,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     /// <summary>One software installed once on one machine (VISION 7).</summary>
     public DbSet<Installation> Installations => Set<Installation>();
 
+    /// <summary>The text files a machine runs with, each with every revision it ever had (VISION 7).</summary>
+    public DbSet<Domain.Files.File> Files => Set<Domain.Files.File>();
+
     /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();
 
