@@ -8,5 +8,45 @@ CLAUDE.local.md
 # Research notes, drafts, throwaway scripts.
 /scratchpad/
 
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+
+# The SPA is built into the image, never committed
+src/Hostingaffe.Api/wwwroot/
+
+# The web client's API layer is generated from docs/api/openapi.json before
+# every build. The contract is the artifact; its output is not.
+src/web/src/api/schema.d.ts
+
+# Go
+/dist/
+/hostingaffe
+/ha
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# Local secrets and the host volume of a development installation
+.env
+deploy/.env
+volume/
+
 # macOS
 .DS_Store
+
+# The rolling file of a development run (ADR 0008)
+logs/
+
+# The Go client of the contract, generated before every build (ADR 0005)
+src/cli/internal/api/client.gen.go
+
+# The local instance on this machine: Mailpit, and what only this host needs.
+deploy/docker-compose.local.yml

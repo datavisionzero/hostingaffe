@@ -1,0 +1,71 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Only what something already uses. A version pinned before there is a
+       reference to it is a decision with no reason attached, and the schema,
+       the contract and the log sinks each bring their own when they arrive. -->
+
+  <ItemGroup Label="Persistence">
+    <!-- The one place that declares schema (docs/codebase.md): EF Core owns the
+         tables and the migrations that apply themselves on startup. The
+         design-time package is what `dotnet ef migrations add` needs, and it
+         stays out of the runtime through PrivateAssets on the reference. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
+    <!-- The Npgsql provider asks for an older EF Core patch than the design-time
+         package does. Pinned to one version so the two do not meet as a runtime
+         binding conflict in the test project, where both arrive. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+    <!-- SMTP transport behind the application's narrow email port. -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+    <!-- Argon2id password hashing. The encoded value carries these parameters,
+         so they can be raised without changing the schema. -->
+    <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Api">
+    <!-- Serves the document at /openapi/v1.json that CI captures into
+         docs/api/openapi.json and compares against the checked-in one
+         (ADR 0005). Generating it at build time was tried in the sibling and
+         dropped: the tooling starts the host, and the host migrates on start. -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <!-- The two log sinks of ADR 0008: logaffe as the intended target when an
+         endpoint and a token are configured, Serilog's console and rolling file
+         otherwise. Serilog is what makes the two paths one structured log. -->
+    <PackageVersion Include="Logaffe.Serilog" Version="0.6.0" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <!-- Starts the composition root in the test process, which is the only way
+         to say that an endpoint is behind the door rather than that a line of
+         Program.cs says so. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+
+    <!-- Nothing here calls SSH.NET. It arrives under Testcontainers, whose
+         newest release still asks for the version GHSA-q939-rpr3-3284 was filed
+         against — and `TreatWarningsAsErrors` turns that audit warning into a
+         failed restore. Naming it here lifts the transitive reference to the
+         patched one.
+
+         The exposure was never real: the advisory is about recursive `ScpClient`
+         downloads from a server that picks the filenames, in a test dependency
+         that never reaches the image. What is real is that a red trunk stops
+         everything else (ADR 0001), which is why this is pinned rather than
+         suppressed. Drop both lines once Testcontainers asks for the patched
+         version itself. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+</Project>

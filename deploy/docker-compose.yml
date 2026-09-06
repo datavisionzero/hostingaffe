@@ -1,0 +1,87 @@
+# The way an instance is run. From `git clone` to the first issue in under five
+# minutes, with one command (VISION 16):
+#
+#   cp deploy/.env.example deploy/.env   # and set the three values in it
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# Upgrading is `docker compose pull` followed by `docker compose up -d`:
+# migrations apply themselves on startup, only ever forward, so take a
+# `pg_dump` before it — that is the way back (ADR 0011).
+#
+# Every variable is documented in docs/operations.md.
+
+name: hostingaffe
+
+services:
+  hostingaffe:
+    # `:latest` moves on a stable release and never on a prerelease. An
+    # installation that would rather follow the trunk names `:main`, and one
+    # that wants to stand still names a `sha-<commit>` or a version.
+    image: ${HOSTINGAFFE_IMAGE:-ghcr.io/datavisionzero/hostingaffe:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: >-
+        Host=db;Port=5432;Database=hostingaffe;Username=hostingaffe;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      # The first administrator and their user token, created on the first
+      # start when the instance has no identity yet, and ignored on every start
+      # after that (VISION 12). The token is what `HOSTINGAFFE_TOKEN` in the CLI
+      # holds; at least 32 characters.
+      HOSTINGAFFE_BOOTSTRAP_ADMIN: "${HOSTINGAFFE_BOOTSTRAP_ADMIN:?set HOSTINGAFFE_BOOTSTRAP_ADMIN in deploy/.env}"
+      HOSTINGAFFE_BOOTSTRAP_EMAIL: "${HOSTINGAFFE_BOOTSTRAP_EMAIL:?set HOSTINGAFFE_BOOTSTRAP_EMAIL in deploy/.env}"
+      HOSTINGAFFE_BOOTSTRAP_TOKEN: "${HOSTINGAFFE_BOOTSTRAP_TOKEN:?set HOSTINGAFFE_BOOTSTRAP_TOKEN in deploy/.env}"
+      HOSTINGAFFE_PUBLIC_URL: "${HOSTINGAFFE_PUBLIC_URL:-}"
+      # The reverse proxy in front of this, so that the caller's address and
+      # scheme are the caller's: an address, a CIDR network, or `all`. Unset,
+      # every request looks as if it came from the proxy.
+      HOSTINGAFFE_TRUSTED_PROXY: "${HOSTINGAFFE_TRUSTED_PROXY:-}"
+      HOSTINGAFFE_SMTP_HOST: "${HOSTINGAFFE_SMTP_HOST:-}"
+      HOSTINGAFFE_SMTP_PORT: "${HOSTINGAFFE_SMTP_PORT:-}"
+      HOSTINGAFFE_SMTP_USERNAME: "${HOSTINGAFFE_SMTP_USERNAME:-}"
+      HOSTINGAFFE_SMTP_PASSWORD: "${HOSTINGAFFE_SMTP_PASSWORD:-}"
+      HOSTINGAFFE_SMTP_SECURITY: "${HOSTINGAFFE_SMTP_SECURITY:-}"
+      HOSTINGAFFE_SMTP_FROM_ADDRESS: "${HOSTINGAFFE_SMTP_FROM_ADDRESS:-}"
+      HOSTINGAFFE_SMTP_FROM_NAME: "${HOSTINGAFFE_SMTP_FROM_NAME:-}"
+      # How long an agent's claim lives without a write of the holder's (VISION
+      # 11), and how long a deleted row can be restored before the purge may
+      # take it (ADR 0013). Per instance, never per project.
+      HOSTINGAFFE_CLAIM_EXPIRY_HOURS: "${HOSTINGAFFE_CLAIM_EXPIRY_HOURS:-4}"
+      HOSTINGAFFE_DELETION_GRACE_DAYS: "${HOSTINGAFFE_DELETION_GRACE_DAYS:-7}"
+      # Where the log goes (ADR 0008): into a logaffe instance when both are set,
+      # into the console and a rolling file under /app/logs otherwise.
+      HOSTINGAFFE_LOG_ENDPOINT: "${HOSTINGAFFE_LOG_ENDPOINT:-}"
+      HOSTINGAFFE_LOG_TOKEN: "${HOSTINGAFFE_LOG_TOKEN:-}"
+      HOSTINGAFFE_LOG_LEVEL: "${HOSTINGAFFE_LOG_LEVEL:-Information}"
+    ports:
+      - "${HOSTINGAFFE_PORT:-8080}:8080"
+    healthcheck:
+      # The one endpoint outside the door. It answers once the migrations and
+      # the bootstrap have run, because the host serves nothing before them.
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/version"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hostingaffe
+      POSTGRES_USER: hostingaffe
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      # Everything the product stores. Operations consist of backing this up
+      # (VISION 16): `docker compose exec db pg_dump -U hostingaffe hostingaffe`.
+      - hostingaffe-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hostingaffe -d hostingaffe"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  hostingaffe-db:

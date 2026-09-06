@@ -1,0 +1,30 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- The tag is the version and the only source of one: a release passes
+       `-p:Version=` from the tag it was started by. A build nobody tagged says
+       so rather than claiming a number that was never released. -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+  </PropertyGroup>
+
+  <!-- Nothing here is published as a package. The two clients of this API are
+       generated from docs/api/openapi.json (ADR 0005), and the CLI is a Go
+       binary (ADR 0003), so the .NET side ships as one container image and
+       nothing else. Saying it once here is cheaper than discovering an
+       accidental `dotnet pack` later. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

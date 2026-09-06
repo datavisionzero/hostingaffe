@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Hostingaffe.Api/Hostingaffe.Api.csproj" />
+    <Project Path="src/Hostingaffe.Application/Hostingaffe.Application.csproj" />
+    <Project Path="src/Hostingaffe.Domain/Hostingaffe.Domain.csproj" />
+    <Project Path="src/Hostingaffe.Infrastructure/Hostingaffe.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hostingaffe.IntegrationTests/Hostingaffe.IntegrationTests.csproj" />
+    <Project Path="tests/Hostingaffe.UnitTests/Hostingaffe.UnitTests.csproj" />
+  </Folder>
+</Solution>

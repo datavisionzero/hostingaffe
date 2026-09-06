@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../Hostingaffe.Application/Hostingaffe.Application.csproj" />
+  </ItemGroup>
+
+  <!-- Postgres, the wake-up channel and the two log sinks live here, and each
+       brings its packages with the code that uses them. -->
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+    <!-- Design-time only: this project is its own startup project for
+         `dotnet ef`, through the factory in Persistence. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+# The build context is the repository root; this keeps out of it what the image
+# never needs. `.git/` is excluded on purpose — the commit reaches the build as
+# the REVISION argument, not by reading the repository.
+.git/
+**/bin/
+**/obj/
+scratchpad/
+tests/
+docs/
+!docs/api/openapi.json
+**/node_modules/
+src/web/dist/
+src/cli/
+.github/
+*.md

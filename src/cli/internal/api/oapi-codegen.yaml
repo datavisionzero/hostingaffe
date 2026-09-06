@@ -1,0 +1,8 @@
+# The Go client of the contract. Types and client only: `ha` serves nothing.
+package: api
+output: client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true

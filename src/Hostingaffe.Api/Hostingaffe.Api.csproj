@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>hostingaffe-api</UserSecretsId>
+    <!-- The operational verbs the CLI deliberately does not have — migrations,
+         backups, the first account — run as `docker compose exec hostingaffe
+         hostingaffe …`, so the binary is named for the line it appears in
+         (docs/codebase.md). -->
+    <AssemblyName>hostingaffe</AssemblyName>
+    <RootNamespace>Hostingaffe.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Hostingaffe.Application/Hostingaffe.Application.csproj" />
+    <ProjectReference Include="../Hostingaffe.Infrastructure/Hostingaffe.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Logaffe.Serilog" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+</Project>

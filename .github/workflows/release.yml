@@ -1,0 +1,374 @@
+name: Release
+
+# A tag is the only thing that makes a version. `Directory.Build.props` keeps
+# `0.0.0-dev` for anything nobody tagged, `internal/version.Version` says the
+# same for `ha`, and this workflow is the one place either of them is told
+# otherwise (ADR 0011).
+#
+# `workflow_dispatch` takes the tag by name so that a release can be run again
+# — because the gate had not finished, or because a step here failed — without
+# deleting and re-pushing a tag people may already have.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to release, `v1.2.3`
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Never two of these at once, and never cancelled halfway: a release moves
+# `:latest`, and a half-written one is worse than a late one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/datavisionzero/hostingaffe
+
+jobs:
+  # What is being released, and whether it is allowed to be. Everything below
+  # reads this job and computes nothing of its own.
+  what:
+    name: Which version, and may it go out
+    runs-on: ubuntu-latest
+    # `actions: read` is for the one question this job asks that is not about
+    # the tag: whether CI has a green run on the commit it names.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.read.outputs.tag }}
+      version: ${{ steps.read.outputs.version }}
+      minor: ${{ steps.read.outputs.minor }}
+      prerelease: ${{ steps.read.outputs.prerelease }}
+      sha: ${{ steps.read.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The tag is the subject, so the tag is what is checked out — on a
+          # dispatch `github.ref` is a branch and would build the wrong commit.
+          ref: ${{ inputs.tag || github.ref }}
+
+      - id: read
+        name: Read the tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Semver with a leading `v`, and a prerelease only in the shape the
+          # comparison in `internal/version` can parse. A tag that is not one
+          # of these is a typo, and a typo must not become `:latest`.
+          if ! [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::$TAG is not a release tag. It has to read v1.2.3, or v1.2.3-rc.1 for a prerelease."
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          {
+            echo "tag=$TAG"
+            echo "version=$version"
+            echo "minor=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            # A prerelease is what the tag says it is, and it moves neither
+            # `:latest` nor the two-part tag. Only a stable release is what a
+            # stranger's installation upgrades into.
+            echo "prerelease=${BASH_REMATCH[4]:+true}"
+            echo "sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      # Nothing is re-tested here — the trunk is gated on every push and a tag
+      # names a commit that already went through it. What is checked is that it
+      # actually did: releasing a commit the gate never passed, or passed red,
+      # is the one thing ADR 0001's trunk discipline exists to prevent, and a
+      # tag can be put on any commit at all.
+      - name: The gate passed on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.read.outputs.sha }}
+        run: |
+          set -euo pipefail
+          passed=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&status=success" \
+            --jq '.total_count')
+          if [ "$passed" -eq 0 ]; then
+            echo "::error::CI has no successful run for $SHA. Wait for it, or fix it, then start this workflow again with the tag."
+            exit 1
+          fi
+          echo "CI passed on $SHA."
+
+  # The same image CI builds, on the same two native runners, with the one
+  # difference that makes it a release: `VERSION` comes from the tag instead of
+  # staying at the `0.0.0-dev` the props file gives a build nobody published.
+  image:
+    name: Image (${{ matrix.arch }})
+    needs: what
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.what.outputs.tag }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        name: Build, and push the digest
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.what.outputs.version }}
+            REVISION=${{ needs.what.outputs.sha }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # The same scopes the trunk build fills, so a release does not start
+          # from an empty cache on either architecture.
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+
+      - name: Hand the digest on
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # The names a release gets, all of them at once. `:latest` is what a
+  # stranger's installation upgrades into, so it moves here and on nothing
+  # else — and never on a prerelease, which is what the Compose file has said
+  # it would do since before there was a release to say it about.
+  image-index:
+    name: Image index
+    needs: [what, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Name the release
+        working-directory: /tmp/digests
+        env:
+          VERSION: ${{ needs.what.outputs.version }}
+          MINOR: ${{ needs.what.outputs.minor }}
+          PRERELEASE: ${{ needs.what.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          tags=(--tag "$IMAGE:$VERSION")
+          if [ -z "$PRERELEASE" ]; then
+            tags+=(--tag "$IMAGE:$MINOR" --tag "$IMAGE:latest")
+          else
+            echo "A prerelease. It gets its own tag and moves neither :$MINOR nor :latest."
+          fi
+
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+
+      - name: Both architectures are in what now stands there
+        env:
+          VERSION: ${{ needs.what.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' > /tmp/index.json
+          python3 - <<'PY'
+          import json, pathlib, sys
+
+          index = json.loads(pathlib.Path("/tmp/index.json").read_text())
+          have = {
+              f"{p['os']}/{p['architecture']}"
+              for m in index.get("manifests", [])
+              if (p := m.get("platform")) and p.get("architecture") != "unknown"
+          }
+          print("the index carries", ", ".join(sorted(have)))
+          missing = {"linux/amd64", "linux/arm64"} - have
+          if missing:
+              sys.exit(f"missing from the index: {', '.join(sorted(missing))}")
+          PY
+
+  # `ha` is a client of the public API and references nothing in `src/`
+  # (ADR 0003), which is what lets it be cut per platform from one runner: Go
+  # cross-compiles, and nothing here links against C.
+  #
+  # Until now `docs/install.md` had to send a person to `go install` from the
+  # clone. These are what step 6 points at instead.
+  cli:
+    name: ha
+    needs: what
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.what.outputs.tag }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: src/cli/go.mod
+          cache-dependency-path: src/cli/go.sum
+
+      - name: Cut a binary per platform
+        working-directory: src/cli
+        env:
+          VERSION: ${{ needs.what.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # The generated client of the contract, which is not committed
+          # (ADR 0005). Nothing below compiles without it.
+          go generate ./...
+
+          out=../../dist
+          mkdir -p "$out"
+
+          # The version is stamped in rather than read at runtime: a binary
+          # somebody downloaded has no repository to ask.
+          ldflags="-s -w -X github.com/datavisionzero/hostingaffe/src/cli/internal/version.Version=$VERSION"
+
+          for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            goos="${platform%/*}"
+            goarch="${platform#*/}"
+            # No version in the name, so that
+            # `releases/latest/download/ha_linux_amd64` is a URL somebody can
+            # type. Which version it is, the binary says itself.
+            name="ha_${goos}_${goarch}"
+            [ "$goos" = "windows" ] && name="$name.exe"
+
+            echo "→ $name"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -trimpath -ldflags "$ldflags" -o "$out/$name" ./cmd/ha
+          done
+
+          # One file to check them all against, because a download nobody can
+          # verify is a download nobody should run.
+          (cd "$out" && sha256sum ha_* > checksums.txt && cat checksums.txt)
+
+      # The binary for this runner is the one that can be run here, and a
+      # release whose CLI does not start is worth catching before it is a
+      # release.
+      - name: It runs, and says the version of the tag
+        env:
+          VERSION: ${{ needs.what.outputs.version }}
+        run: |
+          set -euo pipefail
+          said=$(./dist/ha_linux_amd64 --version)
+          echo "$said"
+          grep -qF "$VERSION" <<<"$said"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Last, because a release pointing at an image or a binary that does not
+  # exist is the one failure a person finds out about by being told.
+  #
+  # The notes are what this repository can say for itself: how to get the two
+  # artifacts, and GitHub's own list of the commits since the previous tag.
+  # Anything the tracker knows and the commits do not is a maintainer's to add
+  # afterwards — the release is editable, and what belongs on a public page is
+  # a judgement rather than a pipeline step.
+  release:
+    name: The release
+    needs: [what, image-index, cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.what.outputs.tag }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: cli
+          path: dist
+
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.what.outputs.tag }}
+          VERSION: ${{ needs.what.outputs.version }}
+          PRERELEASE: ${{ needs.what.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          # A quoted heredoc, so that the backticks around the platform names
+          # are backticks and not a shell running `linux/amd64`.
+          notes=$(mktemp)
+          cat > "$notes" <<NOTES
+          ## The image
+
+          \`\`\`sh
+          docker pull $IMAGE:$VERSION
+          \`\`\`
+
+          It carries \`linux/amd64\` and \`linux/arm64\`, so a pull resolves the
+          right one without anybody naming a platform.
+
+          ## ha
+
+          Take the binary for your platform from the assets below, check it
+          against \`checksums.txt\`, and put it on the \`PATH\`.
+          NOTES
+          # The heredoc is indented to sit in this file; the Markdown is not.
+          sed -i 's/^          //' "$notes"
+
+          # `--latest` explicitly, both ways: `docs/install.md` sends people
+          # to `releases/latest/download/ha_<os>_<arch>`, and that URL must
+          # never resolve to a prerelease.
+          flags=(--title "$TAG" --notes-file "$notes" --generate-notes)
+          if [ -n "$PRERELEASE" ]; then
+            flags+=(--prerelease --latest=false)
+          else
+            flags+=(--latest)
+          fi
+
+          gh release create "$TAG" "${flags[@]}" dist/*

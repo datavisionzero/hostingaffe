@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "hostingaffe": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5142",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

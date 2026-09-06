@@ -1,0 +1,34 @@
+# Postgres for working on hostingaffe, and nothing else: `dotnet run --project
+# src/Hostingaffe.Api` runs the server against it, with the connection string in
+# appsettings.Development.json.
+#
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+
+name: hostingaffe-dev
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: hostingaffe
+      POSTGRES_USER: hostingaffe
+      POSTGRES_PASSWORD: hostingaffe
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "55432:5432"
+    volumes:
+      - hostingaffe-dev-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hostingaffe -d hostingaffe"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.31.0
+    ports:
+      - "51025:1025"
+      - "58025:8025"
+
+volumes:
+  hostingaffe-dev-db:

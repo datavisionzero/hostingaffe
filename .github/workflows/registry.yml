@@ -1,0 +1,78 @@
+name: Registry
+
+# Not part of the gate, and therefore not in `ci.yml`: this blocks no commit,
+# runs on no push and would only make the thing standing between a mistake and
+# the trunk slower. It is housekeeping, and housekeeping runs on a clock.
+#
+# On demand as well, because the first run of anything that deletes is a run
+# somebody wants to watch — and that one defaults to deleting nothing.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Work out what would go, and take nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry
+  cancel-in-progress: false
+
+env:
+  OWNER: datavisionzero
+  PACKAGE: hostingaffe
+  # The window a `sha-` tag is useful for. It exists so an installation can pin
+  # itself away from a bad trunk without waiting for the next commit, and after
+  # two months nobody is doing that with this one.
+  MAX_AGE_DAYS: "60"
+  # And a floor under it, for the week where nothing was pushed. Age alone
+  # would empty the list on a quiet stretch.
+  KEEP_NEWEST: "20"
+
+jobs:
+  prune:
+    name: The sha- tags nobody pins to any more
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The rule is in a script rather than in this file because it can be run
+      # by hand against the live registry without starting a workflow, which is
+      # how it was checked before it ever deleted anything. It prints and
+      # decides; it does not delete.
+      - id: pick
+        name: Which versions have stopped being useful
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/prune-registry.py
+
+      # `inputs` is null on a schedule, so a scheduled run deletes and only an
+      # explicitly ticked box on a manual one holds back.
+      - name: Take them
+        if: steps.pick.outputs.ids != '' && !inputs.dry_run
+        uses: actions/delete-package-versions@v5
+        with:
+          owner: ${{ env.OWNER }}
+          package-name: ${{ env.PACKAGE }}
+          package-type: container
+          package-version-ids: ${{ steps.pick.outputs.ids }}
+
+      - name: Say which it was
+        env:
+          COUNT: ${{ steps.pick.outputs.count }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "$COUNT versions would have gone; nothing was taken." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$COUNT versions taken." >> "$GITHUB_STEP_SUMMARY"
+          fi

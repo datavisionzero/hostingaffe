@@ -1,0 +1,407 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So that a run can be started without inventing a commit to carry it.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This workflow is the whole gate. `main` is the only long-lived branch and
+# maintainers commit straight to it (ADR 0001), so there is no review step and
+# no environment between a commit and a release — what is here is what stands
+# between a mistake and the trunk. Two things follow from that. It runs on every
+# push to `main`, every pull request from a fork, and on demand; and it has to
+# stay fast enough that nobody is tempted to push past it, which is why the four
+# toolchains run beside each other rather than in one job.
+
+# One run at a time, across every branch, and nothing is cancelled. The reason
+# is the registry: the `image` job moves `ghcr.io/datavisionzero/hostingaffe:main`,
+# and two runs overlapping would leave that tag wherever the slower one
+# finished, which can be the older commit. Serialising keeps it moving in the
+# order the commits were pushed. With a single maintainer pushing there is
+# nothing to gain from two racing, and a pull request waiting a few minutes
+# behind the trunk costs less than a tag that points backwards.
+concurrency:
+  group: ci
+  cancel-in-progress: false
+
+# The one registry. GHCR is public, pullable anonymously and has no pull limit;
+# a second one would be a second place a tag can stand wrong.
+env:
+  IMAGE: ghcr.io/datavisionzero/hostingaffe
+
+jobs:
+  # The repository is being built in cuts (ADR 0009), and the four toolchains
+  # arrive at four different moments: the .NET solution is here, the contract,
+  # the CLI, the frontend and the image are not yet. The workflow is written
+  # whole anyway, for the same reason the empty layers were raised before there
+  # was anything to put in them — a gate assembled after the fact is a gate that
+  # was missing while the code was written.
+  #
+  # So each job that has no subject yet skips instead of failing, and this job
+  # is what decides. It asks for the one file its subject cannot exist without,
+  # which means no ticket has to remember to come back here: `src/web`'s
+  # `package.json` lands with the web shell and the job starts running.
+  #
+  # What this deliberately does not protect against is a subject that vanishes —
+  # delete `src/web/package.json` and the web job goes quiet rather than red.
+  # That hole closes on its own: the image carries the built SPA (VISION 16), so
+  # a frontend that stopped being built stops the `image` job below.
+  subjects:
+    name: What there is to build, and whether it is published
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.look.outputs.web }}
+      cli: ${{ steps.look.outputs.cli }}
+      contract: ${{ steps.look.outputs.contract }}
+      image: ${{ steps.look.outputs.image }}
+      publish: ${{ steps.look.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: look
+        env:
+          # A pull request's ref is `refs/pull/<n>/merge` and never this, so the
+          # one comparison covers it: a pull request builds and publishes
+          # nothing, which is what keeps `on: pull_request` safe to leave open
+          # to strangers. It is answered here rather than down in the image job
+          # because three jobs now read it, and three copies of a rule like this
+          # is two too many.
+          PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          {
+            test -f src/web/package.json  && echo "web=true"      || echo "web=false"
+            test -f src/cli/go.mod        && echo "cli=true"      || echo "cli=false"
+            test -f docs/api/openapi.json && echo "contract=true" || echo "contract=false"
+            test -f deploy/Dockerfile     && echo "image=true"    || echo "image=false"
+            echo "publish=$PUBLISH"
+          } >> "$GITHUB_OUTPUT"
+
+  # Seconds, and nothing installed: the rules of Domain and the use cases of
+  # Application against substituted ports, plus the layering test that reads the
+  # four project files and fails a reference pointing outward (ADR 0002).
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Hostingaffe.slnx
+      - run: dotnet build Hostingaffe.slnx -c Release --no-restore
+      - run: dotnet test tests/Hostingaffe.UnitTests -c Release --no-build
+
+  # The parts no substitute can vouch for, and they are the ones this product is
+  # about: that two concurrent claims produce exactly one winner, that an expired
+  # claim makes an issue selectable again, that the migrations apply (VISION 11).
+  # Testcontainers brings up the Postgres, so this job needs the Docker the
+  # runner already has and nothing else declared here.
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Hostingaffe.slnx
+      - run: dotnet build Hostingaffe.slnx -c Release --no-restore
+      - run: dotnet test tests/Hostingaffe.IntegrationTests -c Release --no-build
+
+  # No generation step here on purpose. The API layer is generated from
+  # docs/api/openapi.json before typecheck, test and build (ADR 0005), and that
+  # belongs in the package's own scripts rather than in this file — otherwise CI
+  # runs against a freshly generated client and a contributor runs against
+  # whatever is in their working tree.
+  web:
+    name: Web
+    needs: subjects
+    if: needs.subjects.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build -- --outDir dist --emptyOutDir
+
+  # `ha` is a client of the public API and references nothing in `src/`
+  # (ADR 0003), so it is a plain Go module built by a plain Go job. The version
+  # comes from its own `go.mod` rather than from a number pinned here, which is
+  # the only way the two cannot disagree.
+  cli:
+    name: CLI
+    needs: subjects
+    if: needs.subjects.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/cli
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: src/cli/go.mod
+          cache-dependency-path: src/cli/go.sum
+
+      # Go has no equivalent of npm's lifecycle scripts, so the generated client
+      # of the contract is produced by an explicit step here — and by
+      # `go generate ./...` locally, which is the same command. Nothing below
+      # would compile without it: the output is not committed (ADR 0005).
+      - run: go generate ./...
+
+      - run: go vet ./...
+      - run: go test ./...
+      # Compilation of every package, not the release binaries. Those are cut
+      # per platform from a tag, and a trunk build has no tag to be named after.
+      - run: go build ./...
+
+  # ADR 0005 asks for a contract kept honest by a test rather than by a
+  # compiler, because the server shares no types with either of its two clients.
+  # This is that test: the document the running installation serves has to be the
+  # one that is checked in, and a renamed field is a red trunk instead of a
+  # support question.
+  contract:
+    name: OpenAPI contract
+    needs: subjects
+    if: needs.subjects.outputs.contract == 'true'
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:18
+        env:
+          POSTGRES_DB: hostingaffe
+          POSTGRES_USER: hostingaffe
+          POSTGRES_PASSWORD: hostingaffe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hostingaffe -d hostingaffe"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # An empty database and no migration step: the installation applies its
+      # own migrations on start (ADR 0011), so a schema this job had to prepare
+      # would be a second place that creates one.
+      - name: Start the installation
+        run: dotnet run --project src/Hostingaffe.Api -c Release --no-launch-profile &
+        env:
+          ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=hostingaffe;Username=hostingaffe;Password=hostingaffe
+          ASPNETCORE_HTTP_PORTS: "5142"
+
+      - name: Capture the contract
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 45); do
+            curl --fail --silent http://localhost:5142/openapi/v1.json -o /tmp/openapi.json && break
+            sleep 2
+          done
+          test -s /tmp/openapi.json || { echo "the installation never served a document"; exit 1; }
+          # Formatted by the json module rather than by json.tool, whose --indent
+          # flag is not in every Python the runner might carry. ensure_ascii off,
+          # so that a dash in a summary stays a dash, as ContractTests writes it.
+          python3 -c 'import json,pathlib; d=json.loads(pathlib.Path("/tmp/openapi.json").read_text(encoding="utf-8")); pathlib.Path("docs/api/openapi.json").write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")'
+
+      - name: The checked-in contract is the one being served
+        run: git diff --exit-code -- docs/api/openapi.json
+
+  # One image, carrying the API and the built SPA — the only place the two
+  # toolchains meet. This is also the whole of the deployment gate: a red trunk
+  # does not move `:main`, so anything following that tag stays on the last
+  # commit that passed. Expressing it here costs an image nobody pulls on a
+  # pull request, which is cheaper than a second workflow or a `workflow_run`
+  # trigger.
+  #
+  # Two architectures, and a native runner for each. `ubuntu-24.04-arm` is free
+  # for public repositories, and that is what makes this affordable: QEMU would
+  # have been three lines instead of a second job, but a `dotnet publish` and an
+  # `npm ci` under emulation take a multiple of the time, and this job is under
+  # orders to stay fast enough that nobody is tempted to push past it.
+  #
+  # Neither leg sets a tag. Each pushes its manifest under its own digest and
+  # nothing else; `image-index` below is what gives the two of them a name. A
+  # tag set here would point at one architecture for as long as the other took.
+  image:
+    name: Image (${{ matrix.arch }})
+    needs: [subjects, unit, integration, web, cli, contract]
+    # `needs` alone would skip this job for every job above that skipped itself,
+    # which for a while is most of them. What has to hold is that nothing
+    # failed — a skipped job did not fail.
+    if: >-
+      !cancelled()
+      && !contains(needs.*.result, 'failure')
+      && needs.subjects.outputs.image == 'true'
+    strategy:
+      # Both legs run to the end. Which architecture broke is the useful half of
+      # the answer, and cancelling the other one takes it away.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        if: needs.subjects.outputs.publish == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No `VERSION` build argument, deliberately. `Directory.Build.props` keeps
+      # `0.0.0-dev` for a build nobody released, and a trunk build is not a
+      # release: the tag is the only source of a version number. `REVISION` is
+      # passed for the same reason `VERSION` is not — every build between two
+      # releases calls itself `0.0.0-dev`, so the commit is what tells them
+      # apart, and the container cannot work it out on its own.
+      - id: build
+        name: Build, and push the digest from the trunk
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            REVISION=${{ github.sha }}
+          # A name and no tag. `push-by-digest` puts the manifest in the
+          # registry under its own digest alone, which is what lets one job
+          # further down name both of them at the same moment.
+          #
+          # A pull request exports nothing at all rather than pushing nothing:
+          # `cacheonly` builds every layer and writes none of them anywhere,
+          # which is the check without the publication.
+          outputs: >-
+            ${{ needs.subjects.outputs.publish == 'true'
+              && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE)
+              || 'type=cacheonly' }}
+          # A scope per architecture. Sharing one, the two legs would evict each
+          # other's layers on every run and neither would ever hit the cache.
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }}
+
+      # The digest is the whole of what the index job needs, and an empty file
+      # named after it carries it across without a shell quoting anything.
+      - name: Hand the digest on
+        if: needs.subjects.outputs.publish == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        if: needs.subjects.outputs.publish == 'true'
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # The only job that sets a tag. It merges the digests the two legs pushed into
+  # one manifest index, so that a `docker pull` on an ARM machine gets the ARM
+  # image without anybody having to name an architecture — and so that both
+  # names appear at once or not at all.
+  #
+  # Nothing is built here and nothing is checked out: `imagetools create` works
+  # on what is already in the registry.
+  image-index:
+    name: Image index
+    needs: [subjects, image]
+    if: >-
+      !cancelled()
+      && !contains(needs.*.result, 'failure')
+      && needs.subjects.outputs.image == 'true'
+      && needs.subjects.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Name the architectures at once
+        working-directory: /tmp/digests
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # What an installation tracking the trunk pulls, and a name for this
+          # one build, so such an installation can be pinned away from a bad
+          # trunk without waiting for the next commit.
+          #
+          # `:latest` is not among them. That is what a stranger's installation
+          # upgrades into, and the trunk has no claim on it.
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+
+          docker buildx imagetools create \
+            --tag "$IMAGE:main" \
+            --tag "$IMAGE:sha-${SHA:0:7}" \
+            "${sources[@]}"
+
+      # Not "it pushed without an error" but "what is up there carries both".
+      # The index is the whole point of the two legs, and it is one command to
+      # read it back.
+      - name: Both architectures are in what now stands there
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "$IMAGE:main" --format '{{json .Manifest}}' > /tmp/index.json
+          python3 - <<'PY'
+          import json, pathlib, sys
+
+          index = json.loads(pathlib.Path("/tmp/index.json").read_text())
+          # The attestation manifests buildx attaches carry `unknown/unknown`.
+          have = {
+              f"{p['os']}/{p['architecture']}"
+              for m in index.get("manifests", [])
+              if (p := m.get("platform")) and p.get("architecture") != "unknown"
+          }
+          print("the index carries", ", ".join(sorted(have)))
+          missing = {"linux/amd64", "linux/arm64"} - have
+          if missing:
+              sys.exit(f"missing from the index: {', '.join(sorted(missing))}")
+          PY
