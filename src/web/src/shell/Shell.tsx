@@ -1,6 +1,6 @@
 import { CommandIcon } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router";
+import { Link, Navigate, Route, Routes, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -101,6 +101,10 @@ export function Shell() {
           <Route path="/pages" element={<PagesView />} />
           <Route path="/pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
           <Route path="/pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />
+          {/* A typed or stale address is answered inside the frame rather than
+              redirected away: silently landing somewhere else hides the typo,
+              and a blank page is what `docs/human-interface.md` refuses. */}
+          <Route path="*" element={<Empty title="Nothing at this address."><Link className="text-brand underline-offset-4 hover:underline" to="/pages">Go to the wiki</Link></Empty>} />
         </Routes>
       </SidebarInset>
 

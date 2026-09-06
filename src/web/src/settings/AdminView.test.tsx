@@ -101,6 +101,14 @@ it("lands on the users area when no area is named", async () => {
   expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
 });
 
+// An area that is not one used to draw the nav and nothing under it.
+it("lands there too when the area named is not one", async () => {
+  admin({ "GET /users": [maintainer] }, "/admin/nowhere");
+
+  expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+  expect(screen.getByTestId("at")).toHaveTextContent("/admin/users");
+});
+
 // An area is an address, and picking another one leaves the current one
 // rather than growing the address a segment at a time.
 it("leaves the current area behind when another is picked", async () => {

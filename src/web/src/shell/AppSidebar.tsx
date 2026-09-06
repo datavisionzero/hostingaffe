@@ -16,19 +16,27 @@ import { useSession } from "@/session/useSession";
 import { viewPath, views } from "./views";
 
 /**
- * The left navigation of ADR 0006: the views of the instance, in two groups. On
- * a phone the same component is the drawer the header button opens — one
+ * The left navigation of ADR 0006: the views of the instance, in groups. On a
+ * phone the same component is the drawer the header button opens — one
  * application, not a reduced one.
+ *
+ * A group with nothing in it draws nothing. The foundation has one view, and a
+ * heading over an empty list is a promise the application does not keep; the
+ * groups are here because the entities of the product fill them, and they
+ * appear as they do.
  */
 export function AppSidebar() {
   const { me } = useSession();
   const { setOpenMobile } = useSidebar();
   const { pathname } = useLocation();
 
-  const groups = [
-    { id: "views", label: "Views" },
-    { id: "structure", label: "Structure" },
-  ] as const;
+  const groups = (
+    [
+      { id: "views", label: "Views" },
+      { id: "structure", label: "Structure" },
+    ] as const
+  ).map((group) => ({ ...group, views: views.filter((view) => view.group === group.id) }))
+    .filter((group) => group.views.length > 0);
 
   return (
     <Sidebar collapsible="offcanvas">
@@ -46,8 +54,7 @@ export function AppSidebar() {
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {views
-                  .filter((view) => view.group === group.id)
+                {group.views
                   .map((view) => {
                     const path = viewPath(view);
                     return (

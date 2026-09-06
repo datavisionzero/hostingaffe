@@ -81,6 +81,10 @@ export function SettingsShell({ title, areas }: { title: string; areas: Area[] }
             {areas.map((area) => (
               <Route key={area.to} path={area.path ?? area.to} element={area.element} />
             ))}
+            {/* An area that is not one — a typo, or a link from a version that
+                had it — drew the nav and nothing under it. It lands where the
+                bare address lands, because that is the same mistake. */}
+            <Route path="*" element={<Navigate to={`${screen}/${areas[0].to}`} replace />} />
           </Routes>
         </div>
       </div>

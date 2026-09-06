@@ -66,7 +66,7 @@ export function Palette({ open, onOpenChange, onShortcuts }: PaletteProps) {
 function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
-  const { signOut } = useSession();
+  const { me, signOut } = useSession();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const [found, setFound] = useState<{ of: string; pages: PageSummary[] }>({ of: "", pages: [] });
@@ -158,8 +158,21 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
       { id: "sign-out", label: "Sign out", group: "Account", run: () => { onOpenChange(false); signOut(); } },
     );
 
+    // The palette is the other way to everything the application offers, and
+    // the administration is behind the account menu rather than the sidebar —
+    // which makes it exactly the screen somebody looks for here first.
+    if (me.administrator) {
+      list.push({
+        id: "admin",
+        label: "Instance administration",
+        hint: "Users, and transactional email.",
+        group: "Account",
+        run: go("/admin"),
+      });
+    }
+
     return list;
-  }, [found, navigate, needle, onOpenChange, onShortcuts, searching, setTheme, signOut]);
+  }, [found, me.administrator, navigate, needle, onOpenChange, onShortcuts, searching, setTheme, signOut]);
 
   const matching = useMemo(() => {
     const lowered = needle.toLowerCase();

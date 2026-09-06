@@ -49,6 +49,43 @@ describe("the shell (ADR 0006)", () => {
     }
   });
 
+  // A heading over an empty list is a promise the application does not keep.
+  // The foundation fills one of the two groups, so only one is drawn.
+  it("draws no group the instance has no view for", async () => {
+    shell("/pages");
+
+    const navigation = await screen.findByRole("navigation");
+    const drawn = new Set<string>(views.map((view) => view.group));
+
+    for (const group of ["Views", "Structure"]) {
+      const shown = within(navigation).queryByText(group) !== null;
+      expect(shown).toBe(drawn.has(group.toLowerCase()));
+    }
+  });
+
+  // A typed address used to render the frame around nothing at all.
+  it("answers an address it does not have, inside the frame", async () => {
+    shell("/nowhere");
+
+    expect(await screen.findByText("Nothing at this address.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to the wiki" })).toHaveAttribute("href", "/pages");
+    // The frame is still the frame: the navigation did not go with the screen.
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+  });
+
+  it("offers the instance administration from the palette, to an administrator", async () => {
+    shell("/pages");
+    const user = userEvent.setup();
+    await screen.findByText("The web shell");
+
+    await user.keyboard("{Meta>}k{/Meta}");
+    await user.type(await screen.findByRole("combobox", { name: /command/i }), "administration");
+
+    await user.click(await screen.findByRole("option", { name: /Instance administration/ }));
+
+    expect(await screen.findByRole("heading", { name: "Instance administration" })).toBeInTheDocument();
+  });
+
   // One instance holds one team's infrastructure (VISION 9), so `/` is the
   // wiki and not a choice of where to stand.
   it("lands on the wiki from /", async () => {
