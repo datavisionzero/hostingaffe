@@ -2,11 +2,7 @@ package cmd
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,9 +12,20 @@ import (
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/render"
 )
 
+// The page carries the same verbs as the machine, the software and the
+// installation. It is not `put`: a file has a path and a content and nothing
+// else, so putting it is the whole of what can be done with it, while a page
+// has a title, Markdown, a kind and what it hangs on, and a write touches one
+// of them. There is no alias on the old names.
 func newPage(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "page", Short: "Pages: the instance's flat wiki — Markdown addressed by a slug, for what is knowledge rather than an assignment."}
-	cmd.AddCommand(newPageList(g), newPageView(g), newPageCreate(g), newPageEdit(g), newPageRename(g), newPageDelete(g), newPageRestore(g))
+	cmd := &cobra.Command{
+		Use:     "page",
+		Short:   "Pages: the instance's flat wiki — Markdown addressed by a slug, for what is knowledge rather than an assignment.",
+		Aliases: []string{"pages"},
+	}
+	cmd.AddCommand(
+		newPageList(g), newPageView(g), newPageAdd(g), newPageSet(g),
+		newPageRename(g), newPageDelete(g), newPageRestore(g), newPageHistory(g))
 	return cmd
 }
 
@@ -90,15 +97,49 @@ func newPageView(g *globals) *cobra.Command {
 	}
 }
 
-func newPageCreate(g *globals) *cobra.Command {
-	var title, bodyFile, kind, machine, installation string
+// pageFields are the flags a page is written with, on `add` and on `set` alike,
+// so that what a page can be created with is what it can be corrected with.
+type pageFields struct {
+	title, bodyFile, kind, machine, installation string
+	detach                                       bool
+}
+
+func (p *pageFields) flags(cmd *cobra.Command) {
+	f := cmd.Flags()
+	f.StringVar(&p.title, "title", "", "the one line that says what the page is")
+	f.StringVar(&p.bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
+	f.StringVar(&p.kind, "kind", "", "how the page is to be read: runbook, decision or note")
+	f.StringVar(&p.machine, "machine", "", "hang the page on this machine, by `key`")
+	f.StringVar(&p.installation, "installation", "", "hang the page on this installation, by `key`")
+}
+
+// anchorOf turns the two flags into the one anchor the contract carries. It is
+// a usage error rather than a refusal from the instance, because `attached_to`
+// holds one anchor and there is no request that says two: the mistake is in the
+// arguments and never reaches the wire.
+func (p *pageFields) anchorOf() (*api.Anchor, error) {
+	switch {
+	case p.machine != "" && p.installation != "":
+		return nil, &config.UsageError{Message: "a page hangs on one thing: --machine or --installation, not both."}
+	case p.machine != "":
+		return &api.Anchor{Kind: api.AnchorKindMachine, Key: p.machine}, nil
+	case p.installation != "":
+		return &api.Anchor{Kind: api.AnchorKindInstallation, Key: p.installation}, nil
+	default:
+		return nil, nil
+	}
+}
+
+func newPageAdd(g *globals) *cobra.Command {
+	var write pageFields
+	var note string
 	cmd := &cobra.Command{
-		Use: "create SLUG --title TITLE", Short: "Create a page; the slug is the address you give it, never derived from the title.", Args: cobra.ExactArgs(1),
+		Use: "add SLUG --title TITLE", Short: "Add a page; the slug is the address you give it, never derived from the title.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if title == "" {
+			if write.title == "" {
 				return &config.UsageError{Message: "a page has a title: --title."}
 			}
-			anchor, err := anchorOf(machine, installation)
+			anchor, err := write.anchorOf()
 			if err != nil {
 				return err
 			}
@@ -106,16 +147,17 @@ func newPageCreate(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err := readText(cmd.InOrStdin(), bodyFile)
+			body, err := readText(cmd.InOrStdin(), write.bodyFile)
 			if err != nil {
 				return err
 			}
-			request := api.CreatePageRequest{Slug: &args[0], Title: &title, Body: body, AttachedTo: anchor}
-			if kind != "" {
-				of := api.PageKind(kind)
+			request := api.CreatePageRequest{Slug: &args[0], Title: &write.title, Body: body, AttachedTo: anchor}
+			if write.kind != "" {
+				of := api.PageKind(write.kind)
 				request.Kind = &of
 			}
-			resp, err := c.CreatePageWithResponse(cmd.Context(), request)
+			resp, err := c.CreatePageWithResponse(
+				cmd.Context(), &api.CreatePageParams{Note: optional(note)}, request)
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -125,63 +167,43 @@ func newPageCreate(g *globals) *cobra.Command {
 			return printPage(g, cmd, *resp.JSON201)
 		},
 	}
-	cmd.Flags().StringVar(&title, "title", "", "the one line that says what the page is")
-	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
-	cmd.Flags().StringVar(&kind, "kind", "", "how the page is to be read: runbook, decision or note (default note)")
-	cmd.Flags().StringVar(&machine, "machine", "", "hang the page on this machine, by `key`")
-	cmd.Flags().StringVar(&installation, "installation", "", "hang the page on this installation, by `key`")
+	write.flags(cmd)
+	noteFlag(cmd, &note)
 	return cmd
 }
 
-// anchorOf turns the two flags into the one anchor the contract carries. It is
-// a usage error rather than a refusal from the instance, because `attached_to`
-// holds one anchor and there is no request that says two: the mistake is in the
-// arguments and never reaches the wire.
-func anchorOf(machine, installation string) (*api.Anchor, error) {
-	switch {
-	case machine != "" && installation != "":
-		return nil, &config.UsageError{Message: "a page hangs on one thing: --machine or --installation, not both."}
-	case machine != "":
-		return &api.Anchor{Kind: api.AnchorKindMachine, Key: machine}, nil
-	case installation != "":
-		return &api.Anchor{Kind: api.AnchorKindInstallation, Key: installation}, nil
-	default:
-		return nil, nil
-	}
-}
-
-func newPageEdit(g *globals) *cobra.Command {
-	var title, bodyFile, ifMatch, kind, machine, installation string
-	var detach bool
+func newPageSet(g *globals) *cobra.Command {
+	var write pageFields
+	var note, ifMatch string
 	cmd := &cobra.Command{
-		Use: "edit SLUG", Short: "Change the title, the Markdown, the kind or what the page hangs on; --if-match guards the document.", Args: cobra.ExactArgs(1),
+		Use: "set SLUG", Short: "Change the title, the Markdown, the kind or what the page hangs on; --if-match guards the document.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			anchor, err := anchorOf(machine, installation)
+			anchor, err := write.anchorOf()
 			if err != nil {
 				return err
 			}
-			if detach && anchor != nil {
+			if write.detach && anchor != nil {
 				return &config.UsageError{Message: "--detach gives the page to the instance; it does not go with --machine or --installation."}
 			}
 			changes := map[string]any{}
-			if title != "" {
-				changes["title"] = title
+			if write.title != "" {
+				changes["title"] = write.title
 			}
-			body, err := readText(cmd.InOrStdin(), bodyFile)
+			body, err := readText(cmd.InOrStdin(), write.bodyFile)
 			if err != nil {
 				return err
 			}
 			if body != nil {
 				changes["body"] = *body
 			}
-			if kind != "" {
-				changes["kind"] = kind
+			if write.kind != "" {
+				changes["kind"] = write.kind
 			}
 			// Leaving the flags off lets the page hang where it hangs; only
 			// --detach says out loud that it should hang on nothing, and that
 			// is the null the contract wants.
 			switch {
-			case detach:
+			case write.detach:
 				changes["attached_to"] = nil
 			case anchor != nil:
 				changes["attached_to"] = anchor
@@ -189,46 +211,44 @@ func newPageEdit(g *globals) *cobra.Command {
 			if len(changes) == 0 {
 				return &config.UsageError{Message: "nothing to change: --title, --body-file, --kind, --machine, --installation or --detach. The slug is `ha page rename`."}
 			}
-			return changePage(g, cmd, args[0], changes, ifMatch)
+			return changePage(g, cmd, args[0], changes, ifMatch, note)
 		},
 	}
-	cmd.Flags().StringVar(&title, "title", "", "the new title")
-	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
-	cmd.Flags().StringVar(&kind, "kind", "", "how the page is to be read: runbook, decision or note")
-	cmd.Flags().StringVar(&machine, "machine", "", "hang the page on this machine, by `key`")
-	cmd.Flags().StringVar(&installation, "installation", "", "hang the page on this installation, by `key`")
-	cmd.Flags().BoolVar(&detach, "detach", false, "hang the page on nothing: it belongs to the instance as a whole")
-	cmd.Flags().StringVar(&ifMatch, "if-match", "", "the updated_at as last read; refused as stale when it moved")
+	write.flags(cmd)
+	cmd.Flags().BoolVar(&write.detach, "detach", false, "hang the page on nothing: it belongs to the instance as a whole")
+	noteFlag(cmd, &note)
+	ifMatchFlag(cmd, &ifMatch)
 	return cmd
 }
 
-// newPageRename is its own verb rather than a flag on `edit`, because moving a
+// newPageRename is its own verb rather than a flag on `set`, because moving a
 // page's address is not the same kind of act as editing its text: nothing
 // forwards, and every link written to the old slug stops working (ADR 0021).
 func newPageRename(g *globals) *cobra.Command {
-	var ifMatch string
+	var note, ifMatch string
 	cmd := &cobra.Command{
 		Use: "rename SLUG NEW-SLUG", Short: "Move the page to a new address. Nothing forwards; the old slug leads nowhere.", Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return changePage(g, cmd, args[0], map[string]any{"slug": args[1]}, ifMatch)
+			return changePage(g, cmd, args[0], map[string]any{"slug": args[1]}, ifMatch, note)
 		},
 	}
-	cmd.Flags().StringVar(&ifMatch, "if-match", "", "the updated_at as last read; refused as stale when it moved")
+	noteFlag(cmd, &note)
+	ifMatchFlag(cmd, &ifMatch)
 	return cmd
 }
 
-func changePage(g *globals, cmd *cobra.Command, slug string, changes map[string]any, ifMatch string) error {
+func changePage(g *globals, cmd *cobra.Command, slug string, changes map[string]any, ifMatch, note string) error {
 	_, c, err := g.load()
 	if err != nil {
 		return err
 	}
-	body, _ := json.Marshal(changes)
-	resp, err := c.ChangePageWithBodyWithResponse(cmd.Context(), slug, "application/json", bytes.NewReader(body), func(_ context.Context, req *http.Request) error {
-		if ifMatch != "" {
-			req.Header.Set("If-Match", `"`+strings.Trim(ifMatch, `"`)+`"`)
-		}
-		return nil
-	})
+	body := given(cmd)
+	for field, value := range changes {
+		body.set(field, value)
+	}
+	resp, err := c.ChangePageWithBodyWithResponse(
+		cmd.Context(), slug, &api.ChangePageParams{Note: optional(note)},
+		"application/json", bytes.NewReader(body.json()), guard(ifMatch))
 	if err != nil {
 		return client.Transport(err)
 	}
@@ -239,14 +259,15 @@ func changePage(g *globals, cmd *cobra.Command, slug string, changes map[string]
 }
 
 func newPageDelete(g *globals) *cobra.Command {
-	return &cobra.Command{
+	var note string
+	cmd := &cobra.Command{
 		Use: "delete SLUG", Short: "Soft-delete a page; its slug stays taken until the grace period is over.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			resp, err := c.DeletePageWithResponse(cmd.Context(), args[0])
+			resp, err := c.DeletePageWithResponse(cmd.Context(), args[0], &api.DeletePageParams{Note: optional(note)})
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -260,17 +281,20 @@ func newPageDelete(g *globals) *cobra.Command {
 			return nil
 		},
 	}
+	noteFlag(cmd, &note)
+	return cmd
 }
 
 func newPageRestore(g *globals) *cobra.Command {
-	return &cobra.Command{
+	var note string
+	cmd := &cobra.Command{
 		Use: "restore SLUG", Short: "Bring a deleted page back, under the slug it kept.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			resp, err := c.RestorePageWithResponse(cmd.Context(), args[0])
+			resp, err := c.RestorePageWithResponse(cmd.Context(), args[0], &api.RestorePageParams{Note: optional(note)})
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -278,6 +302,32 @@ func newPageRestore(g *globals) *cobra.Command {
 				return err
 			}
 			return printPage(g, cmd, *resp.JSON200)
+		},
+	}
+	noteFlag(cmd, &note)
+	return cmd
+}
+
+func newPageHistory(g *globals) *cobra.Command {
+	return &cobra.Command{
+		Use: "history SLUG", Short: "Who changed what, oldest first, with the note that came with the change.", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, c, err := g.load()
+			if err != nil {
+				return err
+			}
+			resp, err := c.ReadPageHistoryWithResponse(cmd.Context(), args[0])
+			if err != nil {
+				return client.Transport(err)
+			}
+			if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+				return err
+			}
+			if g.json {
+				return render.JSON(cmd.OutOrStdout(), resp.JSON200)
+			}
+			render.History(cmd.OutOrStdout(), *resp.JSON200)
+			return nil
 		},
 	}
 }

@@ -406,6 +406,49 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
     }
 
+    /// <summary>
+    /// Every write of a page carries its note into the history (ADR 0004), and
+    /// an act that changes two fields writes it on both rows.
+    /// </summary>
+    [Fact]
+    public async Task Every_write_of_a_page_carries_its_note()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var created = await admin.PostAsJsonAsync(
+            "/api/pages?note=written%20after%20the%20review",
+            new { slug = "architecture", title = "Architecture" },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var changed = await admin.PatchAsJsonAsync(
+            "/api/pages/architecture?note=corrected%20in%20review",
+            new { title = "The four layers", kind = "decision" },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+
+        using var deleted = await admin.DeleteAsync("/api/pages/architecture?note=superseded", Ct);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        using var restored = await admin.PostAsync("/api/pages/architecture/restore?note=not%20superseded", null, Ct);
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/pages/architecture/history", Ct);
+        var notes = history.EnumerateArray().ToDictionary(
+            e => e.GetProperty("field").GetString()!,
+            e => e.GetProperty("note").GetString(),
+            StringComparer.Ordinal);
+
+        Assert.Equal("written after the review", notes["created"]);
+        Assert.Equal("superseded", notes["deleted"]);
+        Assert.Equal("not superseded", notes["restored"]);
+
+        // One act, two fields, one note.
+        Assert.Equal("corrected in review", notes["title"]);
+        Assert.Equal("corrected in review", notes["kind"]);
+    }
+
     /// <summary>A machine and an installation for the pages below to hang on.</summary>
     private static async Task Ground(HttpClient client)
     {

@@ -122,14 +122,14 @@ public static class PageEndpoints
             .WithSummary("Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; `kind`, `machine` and `installation` narrow it. Not paginated.")
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
-        door.MapPost(string.Empty, async (CreatePageRequest? request, CreatePage create, CancellationToken cancellationToken) =>
+        door.MapPost(string.Empty, async (CreatePageRequest? request, string? note, CreatePage create, CancellationToken cancellationToken) =>
             {
                 var page = await create.ExecuteAsync(
-                    request ?? new CreatePageRequest(null, null, null, null, null), cancellationToken);
+                    request ?? new CreatePageRequest(null, null, null, null, null), note, cancellationToken);
                 return Results.Created($"{Routes.Api}/pages/{page.Slug}", page);
             })
             .WithName("CreatePage")
-            .WithSummary("Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance.")
+            .WithSummary("Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance. `note` goes into the history beside the change (ADR 0004).")
             .Produces<PageShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -144,7 +144,7 @@ public static class PageEndpoints
             .WithName("ReadPageHistory")
             .WithSummary("Every change to the page, oldest first: who, when, which field, from what to what. A text records that it changed, not how.");
 
-        door.MapPatch("/{slug}", (string slug, ChangePageRequest? request, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
+        door.MapPatch("/{slug}", (string slug, ChangePageRequest? request, string? note, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
                     slug,
                     new PageChanges(
@@ -156,26 +156,27 @@ public static class PageEndpoints
                         request?.AttachedToGiven ?? false,
                         request?.AttachedTo),
                     http.Headers.IfMatch.ToString(),
+                    note,
                     cancellationToken))
             .WithName("ChangePage")
-            .WithSummary("Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole.")
+            .WithSummary("Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole. `note` goes into the history beside the change (ADR 0004).")
             .Produces<PageShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
-        door.MapDelete("/{slug}", async (string slug, MovePage move, CancellationToken cancellationToken) =>
+        door.MapDelete("/{slug}", async (string slug, string? note, MovePage move, CancellationToken cancellationToken) =>
             {
-                await move.DeleteAsync(slug, cancellationToken);
+                await move.DeleteAsync(slug, note, cancellationToken);
                 return Results.NoContent();
             })
             .WithName("DeletePage")
-            .WithSummary("Soft-delete a page; its slug stays spent until the purge, so a restore can never land on a taken name.")
+            .WithSummary("Soft-delete a page; its slug stays spent until the purge, so a restore can never land on a taken name. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent);
 
-        door.MapPost("/{slug}/restore", (string slug, MovePage move, CancellationToken cancellationToken) =>
-                move.RestoreAsync(slug, cancellationToken))
+        door.MapPost("/{slug}/restore", (string slug, string? note, MovePage move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(slug, note, cancellationToken))
             .WithName("RestorePage")
-            .WithSummary("Bring a deleted page back, under the slug it kept.")
+            .WithSummary("Bring a deleted page back, under the slug it kept. `note` goes into the history beside the change (ADR 0004).")
             .Produces<PageShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 

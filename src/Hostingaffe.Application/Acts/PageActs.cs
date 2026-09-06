@@ -239,10 +239,12 @@ public sealed class CreatePage(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task<PageShape> ExecuteAsync(CreatePageRequest request, CancellationToken cancellationToken)
+    public async Task<PageShape> ExecuteAsync(
+        CreatePageRequest request, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var slug = Validated.Field("slug", () => Slug.Normalize(request.Slug ?? string.Empty));
         var title = Validated.Field("title", () => Page.NormalizeTitle(request.Title!));
@@ -257,7 +259,7 @@ public sealed class CreatePage(
             created.AttachTo(anchor, caller.Id, now);
 
             pages.Add(created);
-            history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Created));
+            history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Created, note: said));
 
             await pages.SaveAsync(cancellationToken);
             return created;
@@ -284,10 +286,11 @@ public sealed class ChangePage(
     TimeProvider clock)
 {
     public async Task<PageShape> ExecuteAsync(
-        string slug, PageChanges changes, string? ifMatch, CancellationToken cancellationToken)
+        string slug, PageChanges changes, string? ifMatch, string? note, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
 
         var before = await pages.LiveAsync(slug, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
@@ -321,33 +324,33 @@ public sealed class ChangePage(
             {
                 var old = row.Slug;
                 row.Rename(renamed, caller.Id, now);
-                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Slug, old, row.Slug));
+                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Slug, old, row.Slug, said));
             }
 
             if (changes.Title is not null && changes.Title != row.Title)
             {
                 var old = row.Title;
                 Validated.Field("title", () => { row.Retitle(changes.Title, caller.Id, now); return true; });
-                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Title, old, row.Title));
+                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Title, old, row.Title, said));
             }
 
             if (changes.BodyGiven && (changes.Body ?? string.Empty) != row.Body)
             {
                 row.Rewrite(changes.Body, caller.Id, now);
-                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Body));
+                history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Body, note: said));
             }
 
             if (changes.Kind is { } kind
                 && Validated.Field("kind", () => row.Reclassify(kind, caller.Id, now)) is { } reclassified)
             {
                 history.Add(HistoryEntry.OnPage(
-                    row.Id, caller.Id, now, reclassified.Field, reclassified.OldValue, reclassified.NewValue));
+                    row.Id, caller.Id, now, reclassified.Field, reclassified.OldValue, reclassified.NewValue, said));
             }
 
             if (changes.AttachedToGiven && row.AttachTo(anchor, caller.Id, now) is { } attached)
             {
                 history.Add(HistoryEntry.OnPage(
-                    row.Id, caller.Id, now, attached.Field, attached.OldValue, attached.NewValue));
+                    row.Id, caller.Id, now, attached.Field, attached.OldValue, attached.NewValue, said));
             }
 
             await pages.SaveAsync(cancellationToken);
@@ -368,9 +371,10 @@ public sealed class MovePage(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(string slug, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string slug, string? note, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
+        var said = Validated.Note(note);
         var before = await pages.LiveAsync(slug, settings, cancellationToken);
 
         await transactions.RunAsync(async () =>
@@ -380,15 +384,16 @@ public sealed class MovePage(
 
             var now = clock.GetUtcNow();
             row.Delete(caller.Id, now);
-            history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Deleted));
+            history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Deleted, note: said));
             await pages.SaveAsync(cancellationToken);
             return true;
         }, cancellationToken);
     }
 
     /// <summary>The slug was never given away while the page was deleted, so this cannot land on a taken name.</summary>
-    public async Task<PageShape> RestoreAsync(string slug, CancellationToken cancellationToken)
+    public async Task<PageShape> RestoreAsync(string slug, string? note, CancellationToken cancellationToken)
     {
+        var said = Validated.Note(note);
         var before = await pages.AnyAsync(slug, cancellationToken);
         if (!before.Deleted)
         {
@@ -401,7 +406,8 @@ public sealed class MovePage(
                 ?? throw new Refusal(RefusalCode.NotFound, $"No page {slug}.");
 
             row.Restore();
-            history.Add(HistoryEntry.OnPage(row.Id, callerIdentity.Caller.Id, clock.GetUtcNow(), HistoryField.Restored));
+            history.Add(HistoryEntry.OnPage(
+                row.Id, callerIdentity.Caller.Id, clock.GetUtcNow(), HistoryField.Restored, note: said));
 
             await pages.SaveAsync(cancellationToken);
             return row;

@@ -98,7 +98,7 @@ says whether this binary and that instance fit.
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history` |
-| `ha page` | `list`, `view`, `create`, `edit`, `rename`, `delete`, `restore` |
+| `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
 `ha inst` is `ha installation` and `ha deploy` is `ha deployment`; the objects
@@ -233,8 +233,18 @@ and `--to` it is the last change, which is the question somebody usually has.
 directory are refused by the instance, and `ha` passes the refusal through as
 exit 4 — the boundary is at the API, not at the client (VISION 10).
 
+**A page carries the same verbs as everything else**, and `create`, `edit` and
+`put` are gone rather than left as a second spelling — nothing is published and
+an alias from day one is a promise nobody gets rid of later. `put` was
+considered and turned down: a file has a path and a content and nothing else,
+so putting it is the whole of what can be done with it, while a page has a
+title, Markdown, a kind and what it hangs on, and a write touches one of them.
+`rename` stays a verb of its own whatever the others are called, because moving
+a page's address is not editing its text: nothing forwards, and every link to
+the old slug stops working (planaffe ADR 0021).
+
 A page carries the two fields the record gives it. `--kind` is `runbook`,
-`decision` or `note` on `create` and `edit`; left off at creation it is the
+`decision` or `note` on `add` and `set`; left off at creation it is the
 instance that applies `note`, not `ha`. What the page hangs on is named by
 `--machine KEY` or `--installation KEY` — the kind belongs to the anchor,
 because the machine `caddy` and the software `caddy` are different things —
@@ -242,7 +252,8 @@ and naming both at once is exit 2, said before any request goes out, since
 `attached_to` holds one anchor and no request says two. Leaving the flags off
 lets the page hang where it hangs; `--detach` is what gives it to the instance
 as a whole. `ha page list` narrows by the same three: `--kind`, `--machine`,
-`--installation`.
+`--installation`. A page has no revisions, so its guard is `--if-match` with
+the `updated_at` last read, not `--revision`.
 
 ## Working on it
 

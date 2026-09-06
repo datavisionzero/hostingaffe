@@ -4249,8 +4249,17 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance.",
+        "summary": "Create a page: the slug is given, never derived from the title. `kind` defaults to `note`, and `attached_to` names a machine or an installation, or is left out for a page of the instance. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreatePage",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4369,13 +4378,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole.",
+        "summary": "Change the title, the Markdown, the slug, the kind or what the page hangs on; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug, and `\"attached_to\": null` gives the page to the instance as a whole. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "ChangePage",
         "parameters": [
           {
             "name": "slug",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -4448,13 +4464,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete a page; its slug stays spent until the purge, so a restore can never land on a taken name.",
+        "summary": "Soft-delete a page; its slug stays spent until the purge, so a restore can never land on a taken name. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeletePage",
         "parameters": [
           {
             "name": "slug",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -4546,13 +4569,20 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Bring a deleted page back, under the slug it kept.",
+        "summary": "Bring a deleted page back, under the slug it kept. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "RestorePage",
         "parameters": [
           {
             "name": "slug",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
             "schema": {
               "type": "string"
             }

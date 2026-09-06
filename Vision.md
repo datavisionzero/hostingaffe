@@ -192,8 +192,8 @@ ha files sync logaffe-prod /srv/logaffe # on the machine: write the current file
 ha deploy logaffe-prod --version 1.4.0 --ref ghcr.io/datavisionzero/logaffe@sha256:… \
    --ticket LOG-42 --note-file -
 ha deploy list --inst logaffe-prod     # the history, newest first
-ha page put backup-restore --kind runbook --machine caddy \
-   --title "Backup and restore" --file -
+ha page add backup-restore --kind runbook --machine caddy \
+   --title "Backup and restore" --body-file -
 ha search "18502"                      # ports, addresses, names, Markdown, files — everything
 ha export --dir ./hosting-export       # the whole record as a Markdown tree, the files, plus JSON
 ```
@@ -230,12 +230,15 @@ exception:
   the old one.
 - **Every write can carry a `--note`.** The note lands in the history next to
   the change, so "why" is recorded where "what" is.
-- **A write carries the revision it saw, when it saw one.** `ha files put`
-  and `ha page put` accept `--revision`; with it, a write against a newer
-  revision is refused with the stale-revision exit code, and without it the
-  write wins and the history says so. An agent that read before it writes
-  passes what it read; one that puts a new file has nothing to pass. Every
-  write prints the revision it produced.
+- **A write carries what it last read, and what that is depends on the
+  record.** `ha files put` accepts `--revision`; with it, a write against a
+  newer revision is refused with the stale-revision exit code, and without it
+  the write wins and the history says so. Every write of a file prints the
+  revision it produced. What has no revisions — a page, a machine, an
+  installation — is guarded the same way with `--if-match` and the stand it
+  was last read at: what has revisions is guarded with the revision, what has
+  none with the stand. An agent that read before it writes passes what it
+  read; one that puts a new file has nothing to pass.
 - **`files sync` is the one command that touches the machine, and it pulls.**
   It runs on the host under the token of the agent whose SSH session it runs
   in — `HOSTINGAFFE_TOKEN` in that session's environment, and nowhere on the
@@ -577,7 +580,7 @@ The cycle the product is built around, in the order it happens:
    agent runs the command and remembers to record the result.
 4. **After the work**, the agent records what it did: `ha deploy` for a version
    change, `ha inst set` or `ha machine set` with a `--note` for anything else,
-   `ha page put` for a runbook it wrote or corrected. The human reviews in the
+   `ha page add` or `ha page set` for a runbook it wrote or corrected. The human reviews in the
    web interface, and corrects where the agent was wrong.
 5. **Setting up a new host** is one bulk call from a file the agent writes
    while it measures the machine, followed by the files and pages it writes
@@ -741,7 +744,7 @@ is what the host runs, verbatim, so that what is stored is what is true.
   installations.
 - The complete CLI: add, set, view, list, delete (soft, 7.) for every entity,
   `deploy`, `files put`, `files get`, `files list`, `files diff`, `files sync`,
-  `page put`, `search`, `context`, bulk create from a file, `export`.
+  `search`, `context`, bulk create from a file, `export`.
 - The web interface of 6.2, built on the planaffe shell.
 - Users, agents, tokens, sessions; invitation and recovery as in planaffe.
 - Container image, Compose file, self-applying migrations, `docs/install.md`.

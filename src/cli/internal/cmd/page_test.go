@@ -26,6 +26,9 @@ func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 		if r.Method == http.MethodPost && r.URL.Path == "/api/pages" {
 			return 201, page
 		}
+		if strings.HasSuffix(r.URL.Path, "/history") {
+			return 200, historyJSON
+		}
 		if r.Method == http.MethodDelete {
 			return 204, ""
 		}
@@ -40,11 +43,12 @@ func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 	}{
 		{[]string{"page", "list"}, "GET", "/api/pages", "architecture"},
 		{[]string{"page", "view", "architecture"}, "GET", "/api/pages/architecture", "# The four layers"},
-		{[]string{"page", "create", "architecture", "--title", "Architecture"}, "POST", "/api/pages", "architecture"},
-		{[]string{"page", "edit", "architecture", "--title", "The four layers"}, "PATCH", "/api/pages/architecture", "architecture"},
+		{[]string{"page", "add", "architecture", "--title", "Architecture"}, "POST", "/api/pages", "architecture"},
+		{[]string{"page", "set", "architecture", "--title", "The four layers"}, "PATCH", "/api/pages/architecture", "architecture"},
 		{[]string{"page", "rename", "architecture", "betriebshandbuch"}, "PATCH", "/api/pages/architecture", "architecture"},
 		{[]string{"page", "delete", "architecture"}, "DELETE", "/api/pages/architecture", "ha page restore architecture"},
 		{[]string{"page", "restore", "architecture"}, "POST", "/api/pages/architecture/restore", "architecture"},
+		{[]string{"page", "history", "architecture"}, "GET", "/api/pages/architecture/history", "dist-upgrade"},
 	} {
 		code, out, stderr := run(t, server, tc.args...)
 		if code != exit.OK || stderr != "" {
@@ -101,7 +105,7 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 	defer server.Close()
 
 	// The Markdown arrives over stdin, because an agent has it as Markdown already.
-	code, _, stderr := run(t, server, "page", "create", "architecture", "--title", "Architecture", "--body-file", "-")
+	code, _, stderr := run(t, server, "page", "add", "architecture", "--title", "Architecture", "--body-file", "-")
 	if code != exit.OK || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
@@ -111,7 +115,7 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 		t.Errorf("create body = %v", created)
 	}
 	// The guard is sent only when it is given, and quoted as the header wants it.
-	code, _, stderr = run(t, server, "page", "edit", "architecture", "--title", "New", "--if-match", "2026-09-05T12:00:00.000000Z")
+	code, _, stderr = run(t, server, "page", "set", "architecture", "--title", "New", "--if-match", "2026-09-05T12:00:00.000000Z")
 	if code != exit.OK || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
@@ -157,11 +161,11 @@ func TestPageUsageMistakesAreExitTwo(t *testing.T) {
 	defer server.Close()
 
 	for _, args := range [][]string{
-		{"page", "create", "architecture"},
-		{"page", "edit", "architecture"},
-		{"page", "create", "architecture", "--title", "T", "--machine", "caddy", "--installation", "logaffe-prod"},
-		{"page", "edit", "architecture", "--machine", "caddy", "--installation", "logaffe-prod"},
-		{"page", "edit", "architecture", "--machine", "caddy", "--detach"},
+		{"page", "add", "architecture"},
+		{"page", "set", "architecture"},
+		{"page", "add", "architecture", "--title", "T", "--machine", "caddy", "--installation", "logaffe-prod"},
+		{"page", "set", "architecture", "--machine", "caddy", "--installation", "logaffe-prod"},
+		{"page", "set", "architecture", "--machine", "caddy", "--detach"},
 		{"page", "list", "--machine", "caddy", "--installation", "logaffe-prod"},
 	} {
 		if code, _, stderr := run(t, server, args...); code != exit.Usage || stderr == "" {
@@ -171,7 +175,7 @@ func TestPageUsageMistakesAreExitTwo(t *testing.T) {
 }
 
 // The stale refusal is exit 6, as docs/cli.md lays it down.
-func TestPageEditIsExitSixWhenSomebodyCameBetween(t *testing.T) {
+func TestPageSetIsExitSixWhenSomebodyCameBetween(t *testing.T) {
 	f := &fake{t: t, version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
 		return 412, `{"type":"/problems/stale","title":"stale","status":412,"detail":"PLAN/architecture changed."}`
 	}}
@@ -179,7 +183,7 @@ func TestPageEditIsExitSixWhenSomebodyCameBetween(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := run(t, server,
-		"page", "edit", "architecture", "--title", "New", "--if-match", "2026-09-05T12:00:00.000000Z")
+		"page", "set", "architecture", "--title", "New", "--if-match", "2026-09-05T12:00:00.000000Z")
 
 	if code != exit.Stale {
 		t.Fatalf("code %d", code)
@@ -273,7 +277,7 @@ func TestPageWritesCarryTheKindAndTheAnchor(t *testing.T) {
 		return body
 	}
 
-	created := sent(t, "page", "create", "backup-restore", "--title", "Backup and restore",
+	created := sent(t, "page", "add", "backup-restore", "--title", "Backup and restore",
 		"--kind", "runbook", "--machine", "caddy")
 	if created["kind"] != "runbook" {
 		t.Errorf("kind = %v", created["kind"])
@@ -283,12 +287,12 @@ func TestPageWritesCarryTheKindAndTheAnchor(t *testing.T) {
 	}
 
 	// No --kind is no `kind`: the default is the instance's to apply, not ha's
-	// to guess, and a page created by an older ha still lands as `note`.
-	if plain := sent(t, "page", "create", "notes", "--title", "Notes"); plain["kind"] != nil {
+	// to guess, and a page addd by an older ha still lands as `note`.
+	if plain := sent(t, "page", "add", "notes", "--title", "Notes"); plain["kind"] != nil {
 		t.Errorf("kind = %v, want absent", plain["kind"])
 	}
 
-	changed := sent(t, "page", "edit", "backup-restore", "--kind", "decision", "--installation", "logaffe-prod")
+	changed := sent(t, "page", "set", "backup-restore", "--kind", "decision", "--installation", "logaffe-prod")
 	if changed["kind"] != "decision" {
 		t.Errorf("kind = %v", changed["kind"])
 	}
@@ -298,11 +302,11 @@ func TestPageWritesCarryTheKindAndTheAnchor(t *testing.T) {
 
 	// Leaving the flags off lets the page hang where it hangs; only --detach
 	// says out loud that it should hang on nothing, and that is the null.
-	title := sent(t, "page", "edit", "backup-restore", "--title", "Restore")
+	title := sent(t, "page", "set", "backup-restore", "--title", "Restore")
 	if _, said := title["attached_to"]; said {
 		t.Errorf("an untouched anchor is not sent: %v", title)
 	}
-	detached := sent(t, "page", "edit", "backup-restore", "--detach")
+	detached := sent(t, "page", "set", "backup-restore", "--detach")
 	value, said := detached["attached_to"]
 	if !said || value != nil {
 		t.Errorf("--detach sends null: %v", detached)
@@ -377,6 +381,54 @@ func TestPageListShowsTheKindAndTheAnchor(t *testing.T) {
 	for _, want := range []string{"decision", "-", "Tailscale"} {
 		if !strings.Contains(lines[1], want) {
 			t.Errorf("%q lacks %q", lines[1], want)
+		}
+	}
+}
+
+// The page is written with the same verbs as the machine, the software and the
+// installation, and there is no alias on the names it came from (HOST-24).
+func TestThePageCarriesTheVerbsOfEveryOtherObject(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) { return 200, page }}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	for _, args := range [][]string{
+		{"page", "create", "architecture", "--title", "Architecture"},
+		{"page", "edit", "architecture", "--title", "Architecture"},
+		{"page", "put", "architecture", "--title", "Architecture"},
+	} {
+		if code, _, stderr := run(t, server, args...); code != exit.Usage || stderr == "" {
+			t.Errorf("%v is gone, not an alias: code %d, stderr %q", args, code, stderr)
+		}
+	}
+}
+
+// Every write of a page takes `--note`, as every other object's does (ADR 0004).
+func TestEveryPageWriteCarriesItsNote(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.Method == http.MethodDelete {
+			return 204, ""
+		}
+		if r.Method == http.MethodPost && !strings.HasSuffix(r.URL.Path, "/restore") {
+			return 201, page
+		}
+		return 200, page
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	for _, args := range [][]string{
+		{"page", "add", "architecture", "--title", "Architecture", "--note", "written after the review"},
+		{"page", "set", "architecture", "--title", "New", "--note", "written after the review"},
+		{"page", "rename", "architecture", "betriebshandbuch", "--note", "written after the review"},
+		{"page", "delete", "architecture", "--note", "written after the review"},
+		{"page", "restore", "architecture", "--note", "written after the review"},
+	} {
+		if code, _, stderr := run(t, server, args...); code != exit.OK {
+			t.Fatalf("%v: code %d, stderr %q", args, code, stderr)
+		}
+		if got := f.requests[len(f.requests)-1].URL.Query().Get("note"); got != "written after the review" {
+			t.Errorf("%v: note = %q", args, got)
 		}
 	}
 }
