@@ -75,6 +75,22 @@ public static class FileEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
+        door.MapDelete("/files/{**path}", async (string key, string path, MoveFile move, CancellationToken cancellationToken) =>
+            {
+                await move.DeleteAsync(kind, key, path, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName($"Delete{kind}File")
+            .WithSummary("Soft-delete the file with every revision it ever had; its path stays spent until the purge.")
+            .Produces(StatusCodes.Status204NoContent);
+
+        door.MapPost("/file-restore/{**path}", (string key, string path, MoveFile move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(kind, key, path, cancellationToken))
+            .WithName($"Restore{kind}File")
+            .WithSummary("Bring a deleted file back, with its revisions, at the path it kept. It sits beside `files` rather than after the path, because a path is the last thing in an address.")
+            .Produces<FileShape>()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         door.MapGet("/file-revisions/{**path}", (string key, string path, ReadFileRevisions read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(kind, key, path, cancellationToken))
             .WithName($"Read{kind}FileRevisions")

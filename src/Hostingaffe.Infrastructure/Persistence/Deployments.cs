@@ -23,6 +23,19 @@ public sealed class Deployments(HostingaffeDbContext context) : IDeployments
                 .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Deployment>> UnderAsync(
+        IEnumerable<Guid> installationIds, DateTimeOffset? deletedAt, CancellationToken cancellationToken)
+    {
+        var wanted = installationIds?.Distinct().ToArray() ?? [];
+
+        return wanted.Length == 0
+            ? []
+            : await context.Deployments
+                .Where(d => wanted.Contains(d.InstallationId)
+                    && (deletedAt == null ? d.DeletedAt == null : d.DeletedAt == deletedAt))
+                .ToListAsync(cancellationToken);
+    }
+
     public Task<Deployment?> FindAnyAsync(Guid installationId, int number, CancellationToken cancellationToken) =>
         context.Deployments.SingleOrDefaultAsync(
             d => d.InstallationId == installationId && d.Number == number, cancellationToken);

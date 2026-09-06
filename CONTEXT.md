@@ -184,10 +184,32 @@ leaves the default lists and stays reachable by key and in search.
 
 **Deleted** is for mistakes — a machine created twice, a deployment recorded
 with the wrong version. A soft delete, invisible everywhere at once, restorable
-for a grace period, gone afterwards. Deleting a machine takes its
-installations, files and deployments; deleting a software that still has
-installations is refused. Identities are deactivated and revoked, never
+for a grace period, gone afterwards. Identities are deactivated and revoked,
+never deleted.
+
+What a deletion takes:
+
+| deleting a | takes | and |
+|---|---|---|
+| machine | its files, its installations (with theirs), the vms it hosts | its pages stay |
+| installation | its files, its deployments | its pages stay |
+| software | nothing | it is **refused** while installations still hang on it, with a count |
+| file | its revisions | |
+| deployment | nothing | |
+
+**A restore brings back what that deletion took, and nothing else.** Every row a
+cascade touches carries the moment of the deletion, and a restore brings back
+exactly the rows carrying it; a file deleted on its own the week before stays
 deleted.
+
+**A page does not follow its anchor.** It survives the deletion still naming
+what it hung on, so that restoring the machine restores the whole picture. Only
+the purge unhooks it, and it becomes a page of the instance.
+
+**The history survives everything, the purge included** — the history of a
+deleted machine still says that it existed and when it went. So does the key:
+it is written into a register when it is given out, and a key is never given out
+a second time, not even after the purge has taken the row that held it.
 
 ## Words we do not use
 

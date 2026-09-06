@@ -9,7 +9,8 @@ namespace Hostingaffe.Api.Http;
 /// <remarks>
 /// The list takes a filter per closed set and one per key, because the question
 /// VISION 7 names — "every production installation without a backup" — has to be
-/// one call. There is no delete here yet; it arrives for every entity at once.
+/// one call. Retiring is the normal end and keeps everything; deleting is for
+/// mistakes and takes the files and the deployments with it (ADR 0013).
 /// </remarks>
 public static class InstallationEndpoints
 {
@@ -29,11 +30,12 @@ public static class InstallationEndpoints
                 string? backup,
                 string? monitoring,
                 string? logging,
+                bool? retired,
                 ListInstallations list,
                 CancellationToken cancellationToken) =>
-                list.ExecuteAsync(machine, software, environment, role, status, backup, monitoring, logging, cancellationToken))
+                list.ExecuteAsync(machine, software, environment, role, status, backup, monitoring, logging, retired ?? false, cancellationToken))
             .WithName("ListInstallations")
-            .WithSummary("Every installation as a slim InstallationSummary, by key, without the descriptions. Every parameter filters by one value; `environment=production&backup=none` is the question VISION 7 names. Not paginated.")
+            .WithSummary("Every installation as a slim InstallationSummary, by key, without the descriptions. Every parameter filters by one value; `environment=production&backup=none` is the question VISION 7 names. Retired installations are left out unless `retired=true` or `status=retired`. Not paginated.")
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         door.MapPost(string.Empty, async (CreateInstallationRequest? request, CreateInstallation create, CancellationToken cancellationToken) =>
@@ -74,6 +76,22 @@ public static class InstallationEndpoints
             .Produces<InstallationShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        door.MapDelete("/{key}", async (string key, MoveInstallation move, CancellationToken cancellationToken) =>
+            {
+                await move.DeleteAsync(key, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("DeleteInstallation")
+            .WithSummary("Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`.")
+            .Produces(StatusCodes.Status204NoContent);
+
+        door.MapPost("/{key}/restore", (string key, MoveInstallation move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(key, cancellationToken))
+            .WithName("RestoreInstallation")
+            .WithSummary("Bring a deleted installation back, with exactly what its deletion took.")
+            .Produces<InstallationShape>()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         return endpoints;
     }

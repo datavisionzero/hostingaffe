@@ -24,4 +24,7 @@ public static class HistoryField
     public const string Slug = "slug";
 
     public const string Deleted = "deleted";
+
+    /// <summary>Brought back inside the grace period (ADR 0013).</summary>
+    public const string Restored = "restored";
 }

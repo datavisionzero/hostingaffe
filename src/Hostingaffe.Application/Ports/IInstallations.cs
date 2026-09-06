@@ -29,6 +29,18 @@ public interface IInstallations
     Task<IReadOnlyList<Installation>> ListAsync(
         InstallationFilter filter, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The installations of one machine: the live ones where
+    /// <paramref name="deletedAt"/> is nothing, and otherwise the ones the
+    /// machine took with it at exactly that moment — which is what a restore
+    /// brings back and what a deletion of their own does not.
+    /// </summary>
+    Task<IReadOnlyList<Installation>> OnMachineAsync(
+        Guid machineId, DateTimeOffset? deletedAt, CancellationToken cancellationToken);
+
+    /// <summary>How many live installations still hang on a software — the number a refusal names.</summary>
+    Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken);
+
     /// <summary>The keys of the given rows, for the shapes that name one.</summary>
     Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken);
@@ -47,6 +59,13 @@ public interface IInstallations
 /// </summary>
 public sealed record InstallationFilter
 {
+    /// <summary>
+    /// Whether retired installations are in it. They are not, unless
+    /// <see cref="Status"/> asks for them by name: retiring is the normal end,
+    /// and a default list is what is still running (VISION 7).
+    /// </summary>
+    public bool Retired { get; init; }
+
     public Guid? MachineId { get; init; }
 
     public Guid? SoftwareId { get; init; }

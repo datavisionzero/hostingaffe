@@ -500,6 +500,35 @@ stemming none.
 
 `page_slug` is both the uniqueness and the order a flat wiki is listed in.
 
+## Assigned keys
+
+That a key was given out, once, and that it is therefore spent forever
+(`CONTEXT.md`, Key).
+
+```sql
+create table assigned_key (
+    kind text        not null check (kind in ('machine', 'software', 'installation')),
+    key  varchar(64) not null,
+
+    primary key (kind, key)
+);
+```
+
+**Two columns, one question.** While a deleted row is in its grace period it
+holds its own key and this table says nothing new; after the purge the row is
+gone, and without something that remembers, the key would be free again — which
+VISION 7 rules out. The primary key over both columns is what *enforces* the
+rule rather than leaving it to a query somebody can forget.
+
+It is not a bin and not a second history. The history was the other candidate —
+it survives the purge and names the key — but it is there to be read, no index
+could hold a uniqueness rule over it, and the rule would have become a query
+somebody forgets. The migration that created this table filled it from the rows
+that were already there: the rule is not "from now on".
+
+Nothing points at these rows and they point at nothing. The purge does not touch
+them.
+
 ## The history
 
 Every change to something that has a history: who, when, which field, from what
@@ -600,11 +629,24 @@ where nothing holds the two together.
 
 ## The purge
 
-There is no scheduler. At the end of every write transaction, up to twenty
-deleted pages whose grace period has passed are removed, plus up to twenty
+There is no scheduler. At the end of every write transaction, up to twenty rows
+of each kind whose grace period has passed are removed, plus up to twenty
 idempotency rows older than a day. The batch is small so that no request pays
 for a backlog, and the floor is a floor: an instance nobody writes to keeps its
 deleted rows longer. The write that would have paid for a scheduler does the
 work instead.
 
-The history is not purged. See above.
+**It runs from the leaves inward**: pages, then deployments and files, then
+installations, then machines and software. Every step that removes a parent asks
+that nothing still points at it, because the batch is capped and a child may be
+waiting for the next write; what is left standing is picked up next time.
+
+**A page loses its anchor here.** It does not follow a machine or an
+installation into deletion — that is what keeps a restore able to bring the
+whole picture back — but it cannot name one that is gone for good either, so the
+purge sets `machine_id` and `installation_id` to null and the page becomes a
+page of the instance.
+
+**The history is not purged, and neither are the assigned keys.** That is what
+VISION 7 asks for twice over: the history of a deleted machine still says that
+it existed and when it went, and the key it had is never given out again.

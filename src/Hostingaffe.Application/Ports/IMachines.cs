@@ -21,10 +21,16 @@ public interface IMachines
 
     /// <summary>
     /// Every live machine, by key. <paramref name="status"/> filters to one
-    /// status, and <paramref name="kind"/> to one kind; neither is a filter.
+    /// status and <paramref name="kind"/> to one kind; <paramref name="retired"/>
+    /// says whether the retired ones are in it at all, and they are not unless
+    /// <paramref name="status"/> asks for them by name.
     /// </summary>
     Task<IReadOnlyList<Machine>> ListAsync(
-        Status? status, MachineKind? kind, CancellationToken cancellationToken);
+        Status? status, MachineKind? kind, bool retired, CancellationToken cancellationToken);
+
+    /// <summary>The machines that run on this one, live or taken with it at exactly that moment.</summary>
+    Task<IReadOnlyList<Machine>> OnHostAsync(
+        Guid hostId, DateTimeOffset? deletedAt, CancellationToken cancellationToken);
 
     /// <summary>The keys of the given rows, for the shapes that name a host.</summary>
     Task<IReadOnlyDictionary<Guid, string>> KeysAsync(

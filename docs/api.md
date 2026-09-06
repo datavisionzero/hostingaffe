@@ -62,7 +62,7 @@ to message on `validation`.
 | `last-administrator` | 409 | this would leave the instance with none |
 | `secret-expired` | 410 | a one-time link, spent or expired |
 | `stale` | 412 | `If-Match` did not match; `current` carries the object |
-| `transition` | 422 | the object's state does not allow the act |
+| `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many) |
 | `smtp-not-configured` | 422 | the act needs a mail and the instance sends none |
 | `internal` | 500 | a bug; the document carries nothing else |
 
@@ -112,6 +112,48 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
 - An administrator invites users, grants and revokes the administrator role,
   deactivates and reactivates, and configures the instance.
 
+## Retiring, and deleting
+
+Two different ends, and telling them apart is the point (VISION 7).
+
+**Retiring is the normal end.** `status=retired` on a machine or an installation
+keeps everything it had — its installations, files, deployments and history are
+untouched — and it leaves the default list while staying reachable by its key:
+
+```
+GET /api/machines                  # what is still there
+GET /api/machines?retired=true     # and what has been retired as well
+GET /api/machines?status=retired   # exactly the retired ones
+GET /api/machines/ex44             # a retired machine, by its key, as always
+```
+
+**Deleting is for mistakes**, and follows planaffe ADR 0013: a soft delete,
+invisible everywhere at once, restorable for a grace period, removed for good
+afterwards, and open to agents because the grace period is the safety net.
+`DELETE` answers `204`, `POST …/restore` answers the object, and reading a
+deleted one is `deleted` with `restorable_until`.
+
+| deleting a | takes with it | and |
+|---|---|---|
+| machine | its files, its installations (with theirs), the vms it hosts | its pages stay |
+| installation | its files, its deployments | its pages stay |
+| software | nothing | **refused** while installations hang on it; `installations` counts them |
+| file | its revisions | |
+| deployment | nothing | its number is not handed out again |
+
+**A restore brings back what that deletion took**, and nothing else: every row a
+cascade touches carries the moment of the deletion, and a file deleted on its
+own the week before stays deleted.
+
+**A page does not follow its anchor.** It survives still naming what it hung on,
+so that restoring a machine restores the whole picture; only the purge unhooks
+it, and the page becomes a page of the instance.
+
+**The history survives everything, the purge included**, and so does the key. A
+key is written into a register when it is given out and is never given out
+again — creating a machine under the key of one that was purged is `validation`,
+and the message says why.
+
 ## Endpoints
 
 ### The instance and the caller
@@ -157,6 +199,7 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
 | `GET /api/machines/{key}` | the complete machine |
 | `PATCH /api/machines/{key}` | any field but the key; `If-Match` guards it |
 | `GET /api/machines/{key}/history` | who changed what, oldest first |
+| `DELETE /api/machines/{key}`, `POST /api/machines/{key}/restore` | soft, with the cascade above |
 
 The key is the address and is **immutable**: `key` in a change body is
 `unknown-field`, not a rename. Both request objects are closed — a field they
@@ -176,8 +219,8 @@ history says so.
 
 `status` is `planned`, `active` or `retired` and defaults to `active`: a record
 is usually made for a machine that already exists, and `planned` is the case a
-caller states. Retiring is a value here and not yet a behaviour — what a retired
-machine leaves and what a deleted one takes with it arrives with deleting.
+caller states. What retiring does and what deleting takes is above, under
+Retiring, and deleting.
 
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
@@ -191,6 +234,7 @@ characters. What is longer than that is the `description`, or a page.
 | `GET /api/software/{key}` | the complete software |
 | `PATCH /api/software/{key}` | any field but the key; `If-Match` guards it |
 | `GET /api/software/{key}/history` | who changed what, oldest first |
+| `DELETE /api/software/{key}`, `POST /api/software/{key}/restore` | refused while installations hang on it |
 
 **The collection is `/api/software`.** The word is uncountable, and there is no
 `/api/softwares` (`CONTEXT.md`, Software).
@@ -217,6 +261,7 @@ and that refusal needs the installation.
 | `GET /api/installations/{key}` | the complete installation |
 | `PATCH /api/installations/{key}` | any field but the key; `If-Match` guards it |
 | `GET /api/installations/{key}/history` | who changed what, oldest first |
+| `DELETE /api/installations/{key}`, `POST /api/installations/{key}/restore` | soft, with its files and deployments |
 
 The list filters by `machine`, `software`, `environment`, `role`, `status`,
 `backup`, `monitoring` and `logging`, each by one value. That is what makes the
@@ -273,6 +318,7 @@ same six endpoints, once under `/api/machines/{key}` and once under
 | `PUT …/files/{path}` | write it: a new revision |
 | `GET …/file-revisions/{path}` | every write, newest first, without the contents |
 | `GET …/file-history/{path}` | who changed what, oldest first |
+| `DELETE …/files/{path}`, `POST …/file-restore/{path}` | soft, with every revision |
 
 A path has slashes in it, so it is the last thing in an address — which is why
 the revisions and the history sit under a word of their own beside `files`
@@ -320,6 +366,7 @@ under that installation.
 | `GET /api/installations/{key}/deployments/{number}` | the complete deployment |
 | `PATCH /api/installations/{key}/deployments/{number}` | `ref`, `at`, `ticket`, `note` |
 | `GET /api/installations/{key}/deployments/{number}/history` | the corrections made to it |
+| `DELETE …/deployments/{number}`, `POST …/deployments/{number}/restore` | the other half of the correction rule |
 
 **There is no status.** A deployment is recorded when it is done. A rollback is
 a deployment to the previous version with a note that says so; a failed attempt

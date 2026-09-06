@@ -35,6 +35,25 @@ public sealed class Files(HostingaffeDbContext context) : IFiles
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<File>> UnderAsync(
+        AnchorKind kind, IEnumerable<Guid> ids, DateTimeOffset? deletedAt, CancellationToken cancellationToken)
+    {
+        var wanted = ids?.Distinct().ToArray() ?? [];
+
+        if (wanted.Length == 0)
+        {
+            return [];
+        }
+
+        var rows = kind is AnchorKind.Machine
+            ? context.Files.Where(f => f.MachineId != null && wanted.Contains(f.MachineId.Value))
+            : context.Files.Where(f => f.InstallationId != null && wanted.Contains(f.InstallationId.Value));
+
+        return await rows
+            .Where(f => deletedAt == null ? f.DeletedAt == null : f.DeletedAt == deletedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<File?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken)
     {
         if (context.Database.CurrentTransaction is null)

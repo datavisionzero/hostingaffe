@@ -151,6 +151,15 @@ builder.Services.AddScoped<CorrectDeployment>();
 // What a file hangs on and what a page is attached to, resolved in one place.
 builder.Services.AddScoped<Anchorage>();
 
+// The two ends of a record: retiring is a value the lists respect, deleting is
+// a soft delete with a cascade and a grace period (ADR 0013, VISION 7).
+builder.Services.AddScoped<Cascade>();
+builder.Services.AddScoped<MoveMachine>();
+builder.Services.AddScoped<MoveSoftware>();
+builder.Services.AddScoped<MoveInstallation>();
+builder.Services.AddScoped<MoveFile>();
+builder.Services.AddScoped<MoveDeployment>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();

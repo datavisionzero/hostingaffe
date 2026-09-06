@@ -12,13 +12,19 @@ public sealed class Machines(HostingaffeDbContext context) : IMachines
         context.Machines.SingleOrDefaultAsync(m => m.Key == key, cancellationToken);
 
     public async Task<IReadOnlyList<Machine>> ListAsync(
-        Status? status, MachineKind? kind, CancellationToken cancellationToken)
+        Status? status, MachineKind? kind, bool retired, CancellationToken cancellationToken)
     {
         var rows = context.Machines.Where(m => m.DeletedAt == null);
 
         if (status is { } wanted)
         {
             rows = rows.Where(m => m.Status == wanted);
+        }
+        else if (!retired)
+        {
+            // Retiring is the normal end, and a default list is what is still
+            // there. A retired machine stays reachable by its key.
+            rows = rows.Where(m => m.Status != Status.Retired);
         }
 
         if (kind is { } sort)
@@ -28,6 +34,12 @@ public sealed class Machines(HostingaffeDbContext context) : IMachines
 
         return await rows.OrderBy(m => m.Key).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Machine>> OnHostAsync(
+        Guid hostId, DateTimeOffset? deletedAt, CancellationToken cancellationToken) =>
+        await context.Machines
+            .Where(m => m.HostId == hostId && (deletedAt == null ? m.DeletedAt == null : m.DeletedAt == deletedAt))
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken)

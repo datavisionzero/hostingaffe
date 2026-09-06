@@ -187,6 +187,7 @@ public sealed class ReadSoftwareHistory(
 public sealed class CreateSoftware(
     ICallerIdentity callerIdentity,
     ISoftware software,
+    IKeys keys,
     IHistory history,
     ITransactions transactions,
     SoftwareAssembler assembler,
@@ -201,7 +202,7 @@ public sealed class CreateSoftware(
 
         var key = Validated.Field("key", () => Key.Normalize(request.Key ?? string.Empty));
 
-        await SoftwareWrites.TakenAsync(software, key, settings, cancellationToken);
+        await SoftwareWrites.TakenAsync(software, keys, key, settings, cancellationToken);
 
         var edit = new SoftwareEdit
         {
@@ -219,6 +220,7 @@ public sealed class CreateSoftware(
             SoftwareWrites.Apply(row, edit, caller.Id, now);
 
             software.Add(row);
+            keys.Assign(Keyed.Software, key);
             history.Add(HistoryEntry.OnSoftware(row.Id, caller.Id, now, HistoryField.Created));
 
             await software.SaveAsync(cancellationToken);
@@ -314,14 +316,26 @@ internal static class SoftwareWrites
     }
 
     /// <summary>
-    /// A key already taken is refused as <c>validation</c>, and a deleted
+    /// A key already taken is refused as <c>validation</c> — taken by a row
+    /// that is there, by one in its grace period, or by one the purge has
+    /// removed, which the register still remembers. A deleted
     /// software's key says so rather than pretending the name is free.
     /// </summary>
     public static async Task TakenAsync(
-        ISoftware software, string key, InstanceSettings settings, CancellationToken cancellationToken)
+        ISoftware software, IKeys keys, string key, InstanceSettings settings, CancellationToken cancellationToken)
     {
         if (await software.FindAnyAsync(key, cancellationToken) is not { } existing)
         {
+            // The row is gone, which is not the same as the key being free: a
+            // key is never reused, and the register is what remembers after the
+            // purge has taken the row that held it (VISION 7).
+            if (await keys.AssignedAsync(Keyed.Software, key, cancellationToken))
+            {
+                throw Refusal.Validation(
+                    "key",
+                    $"The software {key} existed and was deleted for good; a key is never given out twice.");
+            }
+
             return;
         }
 

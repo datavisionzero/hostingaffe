@@ -18,6 +18,14 @@ public interface IFiles
     /// <summary>Every live file of one owner, by path.</summary>
     Task<IReadOnlyList<File>> ListAsync(Anchor owner, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The files of several anchors of one kind: the live ones where
+    /// <paramref name="deletedAt"/> is nothing, and otherwise the ones their
+    /// owner took with it at exactly that moment.
+    /// </summary>
+    Task<IReadOnlyList<File>> UnderAsync(
+        AnchorKind kind, IEnumerable<Guid> ids, DateTimeOffset? deletedAt, CancellationToken cancellationToken);
+
     /// <summary>The row and its revisions, tracked and locked for the rest of the transaction.</summary>
     Task<File?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);
 

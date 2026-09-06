@@ -64,6 +64,12 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     public DbSet<HistoryEntry> History => Set<HistoryEntry>();
 
     /// <summary>
+    /// Every key ever given out, so that none is ever given out twice — not
+    /// even after the purge has taken the row that held it (VISION 7).
+    /// </summary>
+    public DbSet<AssignedKey> AssignedKeys => Set<AssignedKey>();
+
+    /// <summary>
     /// What a replayed write is answered from for 24 hours (<c>docs/api.md</c>,
     /// Idempotency). Not a Domain type: nothing the vision states is a rule
     /// about it, and it exists only for the HTTP adapter.

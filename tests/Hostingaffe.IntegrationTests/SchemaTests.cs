@@ -89,7 +89,8 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Equal(
             [
                 "__EFMigrationsHistory",
-                "browser_session", "deployment", "file", "file_revision", "history", "idempotency",
+                "assigned_key", "browser_session", "deployment", "file", "file_revision",
+                "history", "idempotency",
                 "identity", "identity_metadata", "installation", "installation_port",
                 "machine", "one_time_secret", "page", "software", "token",
             ],
@@ -123,8 +124,8 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "machine_host", "machine_key",
                 "one_live_secret_per_purpose", "one_time_secret_hash",
                 "page_on_installation", "page_on_machine", "page_search", "page_slug",
-                "pk_browser_session", "pk_deployment", "pk_file", "pk_file_revision",
-                "pk_history", "pk_idempotency",
+                "pk_assigned_key", "pk_browser_session", "pk_deployment", "pk_file",
+                "pk_file_revision", "pk_history", "pk_idempotency",
                 "pk_identity", "pk_identity_metadata", "pk_installation", "pk_installation_port",
                 "pk_machine", "pk_one_time_secret", "pk_page", "pk_software", "pk_token",
                 "software_key", "token_agent", "token_secret_hash",

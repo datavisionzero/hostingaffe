@@ -21,6 +21,14 @@ public interface IDeployments
     Task<IReadOnlyList<Deployment>> ListAsync(
         IEnumerable<Guid> installationIds, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The deployments of several installations: the live ones where
+    /// <paramref name="deletedAt"/> is nothing, and otherwise the ones their
+    /// installation took with it at exactly that moment.
+    /// </summary>
+    Task<IReadOnlyList<Deployment>> UnderAsync(
+        IEnumerable<Guid> installationIds, DateTimeOffset? deletedAt, CancellationToken cancellationToken);
+
     /// <summary>One by its number under its installation, deleted or not.</summary>
     Task<Deployment?> FindAnyAsync(Guid installationId, int number, CancellationToken cancellationToken);
 

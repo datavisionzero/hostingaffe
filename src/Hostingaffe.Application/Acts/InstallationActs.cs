@@ -296,10 +296,12 @@ public sealed class ListInstallations(
         string? backup,
         string? monitoring,
         string? logging,
+        bool retired,
         CancellationToken cancellationToken)
     {
         var filter = new InstallationFilter
         {
+            Retired = retired,
             MachineId = string.IsNullOrWhiteSpace(machine)
                 ? null
                 : (await Validated.FieldAsync("machine", () => machines.LiveAsync(machine, settings, cancellationToken))).Id,
@@ -364,6 +366,7 @@ public sealed class CreateInstallation(
     IMachines machines,
     ISoftware software,
     IDeployments deployments,
+    IKeys keys,
     IHistory history,
     ITransactions transactions,
     InstallationAssembler assembler,
@@ -389,7 +392,7 @@ public sealed class CreateInstallation(
         var role = request.Role
             ?? throw Refusal.Validation("role", "An installation is an application or a platform.");
 
-        await InstallationWrites.TakenAsync(installations, key, settings, cancellationToken);
+        await InstallationWrites.TakenAsync(installations, keys, key, settings, cancellationToken);
 
         var edit = InstallationWrites.Edit(request);
 
@@ -403,6 +406,7 @@ public sealed class CreateInstallation(
             InstallationWrites.Apply(row, edit, caller.Id, now);
 
             installations.Add(row);
+            keys.Assign(Keyed.Installation, key);
             history.Add(HistoryEntry.OnInstallation(row.Id, caller.Id, now, HistoryField.Created));
 
             // The first deployment is part of the same act, not a second call a
@@ -513,14 +517,26 @@ internal static class InstallationWrites
     }
 
     /// <summary>
-    /// A key already taken is refused as <c>validation</c>, and a deleted
+    /// A key already taken is refused as <c>validation</c> — taken by a row
+    /// that is there, by one in its grace period, or by one the purge has
+    /// removed, which the register still remembers. A deleted
     /// installation's key says so rather than pretending the name is free.
     /// </summary>
     public static async Task TakenAsync(
-        IInstallations installations, string key, InstanceSettings settings, CancellationToken cancellationToken)
+        IInstallations installations, IKeys keys, string key, InstanceSettings settings, CancellationToken cancellationToken)
     {
         if (await installations.FindAnyAsync(key, cancellationToken) is not { } existing)
         {
+            // The row is gone, which is not the same as the key being free: a
+            // key is never reused, and the register is what remembers after the
+            // purge has taken the row that held it (VISION 7).
+            if (await keys.AssignedAsync(Keyed.Installation, key, cancellationToken))
+            {
+                throw Refusal.Validation(
+                    "key",
+                    $"The installation {key} existed and was deleted for good; a key is never given out twice.");
+            }
+
             return;
         }
 

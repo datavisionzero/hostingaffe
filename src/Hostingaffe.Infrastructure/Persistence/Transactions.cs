@@ -14,11 +14,24 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <strong>The purge is opportunistic.</strong> Before the commit, up to twenty
-/// deleted pages whose grace period has passed are removed, plus up to twenty
-/// idempotency rows older than a day. The batch is small so that no request pays
-/// for a backlog, and the floor is a floor: an instance nobody writes to keeps
-/// its deleted rows longer. No scheduler; the write that would have paid for one
-/// does the work instead.
+/// rows of each kind whose grace period has passed are removed, plus up to
+/// twenty idempotency rows older than a day. The batch is small so that no
+/// request pays for a backlog, and the floor is a floor: an instance nobody
+/// writes to keeps its deleted rows longer. No scheduler; the write that would
+/// have paid for one does the work instead.
+/// </para>
+/// <para>
+/// It runs from the leaves inward — deployments and files, then installations,
+/// then machines and software — and every step that removes a parent asks that
+/// nothing still points at it, because the batch is capped and a child may be
+/// waiting for the next write. What is left standing is picked up next time.
+/// </para>
+/// <para>
+/// <strong>The history is never purged</strong>, and neither is the register of
+/// keys. That is what VISION 7 asks for: the history of a deleted machine still
+/// says that it existed and when it went, and the key it had is never given out
+/// again. A page is not purged with its anchor either — it loses the anchor and
+/// becomes a page of the instance.
 /// </para>
 /// </remarks>
 public sealed class Transactions(HostingaffeDbContext context, InstanceSettings settings) : ITransactions
@@ -56,6 +69,79 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
             delete from page where id in (
                 select id from page
                  where deleted_at is not null and deleted_at <= now() - {0}::interval
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
+
+        // The leaves first. A deployment and a file hold nothing up either.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from deployment where id in (
+                select id from deployment
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from file where id in (
+                select id from file
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
+
+        // A page does not follow its anchor into deletion, but it cannot name
+        // one that is gone for good either: at the purge it loses the anchor and
+        // becomes a page of the instance.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            update page set installation_id = null
+             where installation_id in (
+                select id from installation
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval)
+            """,
+            [settings.DeletionGrace], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from installation where id in (
+                select i.id from installation i
+                 where i.deleted_at is not null and i.deleted_at <= now() - {0}::interval
+                   and not exists (select 1 from file f where f.installation_id = i.id)
+                   and not exists (select 1 from deployment d where d.installation_id = i.id)
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            update page set machine_id = null
+             where machine_id in (
+                select id from machine
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval)
+            """,
+            [settings.DeletionGrace], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from machine where id in (
+                select m.id from machine m
+                 where m.deleted_at is not null and m.deleted_at <= now() - {0}::interval
+                   and not exists (select 1 from file f where f.machine_id = m.id)
+                   and not exists (select 1 from installation i where i.machine_id = m.id)
+                   and not exists (select 1 from machine g where g.host_id = m.id)
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from software where id in (
+                select s.id from software s
+                 where s.deleted_at is not null and s.deleted_at <= now() - {0}::interval
+                   and not exists (select 1 from installation i where i.software_id = s.id)
                  limit {1})
             """,
             [settings.DeletionGrace, Batch], cancellationToken);

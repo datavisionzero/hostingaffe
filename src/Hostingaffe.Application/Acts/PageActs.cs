@@ -399,7 +399,10 @@ public sealed class MovePage(
         {
             var row = await pages.LoadForWriteAsync(before.Id, cancellationToken)
                 ?? throw new Refusal(RefusalCode.NotFound, $"No page {slug}.");
+
             row.Restore();
+            history.Add(HistoryEntry.OnPage(row.Id, callerIdentity.Caller.Id, clock.GetUtcNow(), HistoryField.Restored));
+
             await pages.SaveAsync(cancellationToken);
             return row;
         }, cancellationToken);

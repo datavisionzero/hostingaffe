@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Hostingaffe.Application.Ports;
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.Installations;
 
 namespace Hostingaffe.Infrastructure.Persistence;
@@ -51,6 +52,10 @@ public sealed class Installations(HostingaffeDbContext context) : IInstallations
         {
             rows = rows.Where(i => i.Status == status);
         }
+        else if (!filter.Retired)
+        {
+            rows = rows.Where(i => i.Status != Status.Retired);
+        }
 
         if (filter.Backup is { } backup)
         {
@@ -69,6 +74,15 @@ public sealed class Installations(HostingaffeDbContext context) : IInstallations
 
         return await rows.OrderBy(i => i.Key).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Installation>> OnMachineAsync(
+        Guid machineId, DateTimeOffset? deletedAt, CancellationToken cancellationToken) =>
+        await context.Installations
+            .Where(i => i.MachineId == machineId && (deletedAt == null ? i.DeletedAt == null : i.DeletedAt == deletedAt))
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken) =>
+        context.Installations.CountAsync(i => i.SoftwareId == softwareId && i.DeletedAt == null, cancellationToken);
 
     public async Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken)

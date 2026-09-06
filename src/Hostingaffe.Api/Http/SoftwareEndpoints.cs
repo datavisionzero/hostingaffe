@@ -14,9 +14,10 @@ namespace Hostingaffe.Api.Http;
 /// is needed rather than invented here.
 /// </para>
 /// <para>
-/// There is no delete here yet. Deleting a software is refused while
-/// installations still hang on it, and that refusal needs the installation to
-/// exist; it arrives with deleting, for every entity at once.
+/// A software with installations is not deleted at all — not cascaded, refused,
+/// with a problem document that says how many there are. That is the one place
+/// in the record where a deletion is answered with a number instead of a
+/// deletion.
 /// </para>
 /// </remarks>
 public static class SoftwareEndpoints
@@ -67,6 +68,23 @@ public static class SoftwareEndpoints
             .Produces<SoftwareShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        door.MapDelete("/{key}", async (string key, MoveSoftware move, CancellationToken cancellationToken) =>
+            {
+                await move.DeleteAsync(key, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("DeleteSoftware")
+            .WithSummary("Soft-delete a software. One with installations still on it is refused, and the problem document says how many; nothing cascades from here.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        door.MapPost("/{key}/restore", (string key, MoveSoftware move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(key, cancellationToken))
+            .WithName("RestoreSoftware")
+            .WithSummary("Bring a deleted software back, under the key it kept.")
+            .Produces<SoftwareShape>()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         return endpoints;
     }

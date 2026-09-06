@@ -69,6 +69,22 @@ public static class DeploymentEndpoints
             .WithName("ReadDeploymentHistory")
             .WithSummary("Every correction made to the deployment, oldest first. The deployments themselves are not history entries; this is what was changed about one.");
 
+        door.MapDelete("/{number:int}", async (string key, int number, MoveDeployment move, CancellationToken cancellationToken) =>
+            {
+                await move.DeleteAsync(key, number, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("DeleteDeployment")
+            .WithSummary("Soft-delete a deployment. This is the other half of the correction rule: one recorded with the wrong version is deleted and recorded again. Its number is not handed out a second time.")
+            .Produces(StatusCodes.Status204NoContent);
+
+        door.MapPost("/{number:int}/restore", (string key, int number, MoveDeployment move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(key, number, cancellationToken))
+            .WithName("RestoreDeployment")
+            .WithSummary("Bring a deleted deployment back, under the number it kept.")
+            .Produces<DeploymentShape>()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         return endpoints;
     }
 }

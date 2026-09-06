@@ -212,13 +212,19 @@ public static class MachineLookup
 /// Every live machine, by key, slim. Not paginated: one instance holds one
 /// team's infrastructure (VISION 9), and that list is read in one screen.
 /// </summary>
+/// <remarks>
+/// Retired machines are not in it. Retiring is the normal end and keeps
+/// everything, but a default list is what is still there; <c>retired=true</c>
+/// puts them back, and <c>status=retired</c> asks for exactly them.
+/// </remarks>
 public sealed class ListMachines(IMachines machines)
 {
     public async Task<IReadOnlyList<MachineSummaryShape>> ExecuteAsync(
-        string? status, string? kind, CancellationToken cancellationToken) =>
+        string? status, string? kind, bool retired, CancellationToken cancellationToken) =>
         MachineAssembler.Summaries(await machines.ListAsync(
             Validated.Field("status", () => Spelling.Read<Status>(status, "status")),
             Validated.Field("kind", () => Spelling.Read<MachineKind>(kind, "kind")),
+            retired,
             cancellationToken));
 }
 
@@ -258,6 +264,7 @@ public sealed class ReadMachineHistory(
 public sealed class CreateMachine(
     ICallerIdentity callerIdentity,
     IMachines machines,
+    IKeys keys,
     IHistory history,
     ITransactions transactions,
     MachineAssembler assembler,
@@ -273,7 +280,7 @@ public sealed class CreateMachine(
         var key = Validated.Field("key", () => Key.Normalize(request.Key ?? string.Empty));
         var kind = request.Kind ?? throw Refusal.Validation("kind", "A machine is a vps, a dedicated, a vm or a local.");
 
-        await MachineWrites.TakenAsync(machines, key, settings, cancellationToken);
+        await MachineWrites.TakenAsync(machines, keys, key, settings, cancellationToken);
 
         var edit = await MachineWrites.EditAsync(
             machines,
@@ -312,6 +319,7 @@ public sealed class CreateMachine(
             MachineWrites.Apply(created, edit, caller.Id, now);
 
             machines.Add(created);
+            keys.Assign(Keyed.Machine, key);
             history.Add(HistoryEntry.OnMachine(created.Id, caller.Id, now, HistoryField.Created));
 
             await machines.SaveAsync(cancellationToken);
@@ -425,14 +433,26 @@ internal static class MachineWrites
     }
 
     /// <summary>
-    /// A key already taken is refused as <c>validation</c>, and a deleted
+    /// A key already taken is refused as <c>validation</c> — taken by a row
+    /// that is there, by one in its grace period, or by one the purge has
+    /// removed, which the register still remembers. A deleted
     /// machine's key says so rather than pretending the name is free.
     /// </summary>
     public static async Task TakenAsync(
-        IMachines machines, string key, InstanceSettings settings, CancellationToken cancellationToken)
+        IMachines machines, IKeys keys, string key, InstanceSettings settings, CancellationToken cancellationToken)
     {
         if (await machines.FindAnyAsync(key, cancellationToken) is not { } existing)
         {
+            // The row is gone, which is not the same as the key being free: a
+            // key is never reused, and the register is what remembers after the
+            // purge has taken the row that held it (VISION 7).
+            if (await keys.AssignedAsync(Keyed.Machine, key, cancellationToken))
+            {
+                throw Refusal.Validation(
+                    "key",
+                    $"The machine {key} existed and was deleted for good; a key is never given out twice.");
+            }
+
             return;
         }
 
