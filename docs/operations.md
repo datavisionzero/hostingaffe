@@ -98,6 +98,39 @@ Restoring is `psql` into an empty database, then starting the instance against
 it. Take one before every upgrade, and on a schedule that matches how much work
 you are willing to lose.
 
+## On a host, not on the instance
+
+`ha files sync` is the one command that touches a machine, and it belongs to
+the host rather than to the instance. It **pulls**: it runs over SSH on the
+machine itself, under the token of that session, and writes the installation's
+current files into a directory.
+
+```sh
+ha files sync /srv/logaffe --inst logaffe-prod --dry-run   # what it would do
+ha files sync /srv/logaffe --inst logaffe-prod             # and then do it
+```
+
+**It executes nothing.** No `docker compose up`, no reload, no check that
+anything came up. It writes files and stops; what to do after it is in the
+runbook of that installation.
+
+**Nothing on the host holds a token.** There is no configuration file to leave
+one in — the two environment variables come from the SSH session and go with
+it, which is why a host that is handed on carries no credentials of this
+instance.
+
+It keeps `.ha-sync.json` beside the files. That file is the only state outside
+Postgres, and it is what tells a file sync wrote from one that was always
+there: **what sync wrote, sync clears away** when it leaves the record, and
+**what sync never wrote, sync never touches**. Do not delete it lightly —
+without it, sync takes every file in the directory for somebody else's and
+stops clearing anything away.
+
+A run that reports `in the way` exits 5 and has left something as it found it:
+the record and the disk disagree about that path, and a person decides which is
+right. Take the file into the record with `ha files put`, or take it out of the
+directory.
+
 ## When something is wrong
 
 **It does not come up.** `docker compose logs hostingaffe`. The two starts that

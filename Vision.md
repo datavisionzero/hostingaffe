@@ -188,7 +188,7 @@ ha inst add logaffe-prod --machine caddy --software logaffe \
 ha files put logaffe-prod compose.override.yml --file ./compose.override.yml
 ha files put caddy-proxy sites/logaffe.caddy --file -
 ha files list logaffe-prod             # path, size, revision, who, when
-ha files sync logaffe-prod /srv/logaffe # on the machine: write the current files into place, show what changed
+ha files sync /srv/logaffe --inst logaffe-prod  # on the machine: write the current files into place, show what changed
 ha deploy logaffe-prod --version 1.4.0 --ref ghcr.io/datavisionzero/logaffe@sha256:… \
    --ticket LOG-42 --note-file -
 ha deploy list --inst logaffe-prod     # the history, newest first

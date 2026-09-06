@@ -26,7 +26,8 @@ func newFile(g *globals) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newFileList(g), newFileGet(g), newFilePut(g), newFileDiff(g),
-		newFileRevisions(g), newFileDelete(g), newFileRestore(g), newFileHistory(g))
+		newFileRevisions(g), newFileDelete(g), newFileRestore(g), newFileHistory(g),
+		newFileSync(g))
 	return cmd
 }
 
@@ -59,6 +60,11 @@ func (a *anchor) resolve() error {
 	}
 	return nil
 }
+
+// String is how an owner is written down: the kind and the key, because the
+// machine `caddy` and the installation `caddy` are different things and a
+// manifest that said only the key would not know which it holds.
+func (a anchor) String() string { return string(a.kind) + " " + a.key }
 
 func printFile(g *globals, cmd *cobra.Command, file api.File) error {
 	if g.json {

@@ -97,7 +97,7 @@ says whether this binary and that instance fit.
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
-| `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history` |
+| `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
 | `ha search` | one call over every field, every Markdown body and every file |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
@@ -299,6 +299,33 @@ says which writes there were.
 
 **`diff` puts two revisions side by side** as a unified diff. Without `--from`
 and `--to` it is the last change, which is the question somebody usually has.
+
+**`ha files sync DIR` is the one command that touches a machine, and it
+pulls.** It runs *on* the host, under the token of the SSH session — which is
+why there is no configuration file to leave a token in (VISION 9) — writes the
+owner's current files into `DIR`, and stops. **It executes nothing**: no
+`docker compose up`, no reload, no check that anything came up. What to do
+after it is in the runbook, and the agent does it.
+
+It keeps a **manifest**, `.ha-sync.json`, beside the files. That is the only
+piece of state outside the instance, and it is what makes the command usable at
+all, because it is the only way to tell a file sync put there from one that was
+always there:
+
+- **What sync wrote, sync clears away** once it has left the record — unless the
+  host changed it since, and then it stops being sync's and the manifest forgets
+  it, rather than an edit being thrown away.
+- **What sync never wrote, sync never touches.** A file of the record with
+  something else already at its path is reported `in the way` and left exactly
+  as it is; everything else is still written, and the command is **exit 5**,
+  because the directory is not what the record says and a script has to be able
+  to tell.
+- A file sync wrote that was changed on the host is `restored` and says so: the
+  record is what the machine runs.
+
+`--dry-run` prints the same lines and touches nothing. A directory holding one
+owner's files is not another owner's to sync into, and that is said before a
+single request goes out.
 
 **The refused paths are not rebuilt here.** `.env` and every `.env.*` but
 `.env.example`, anything under `secrets/`, and anything outside the owner's

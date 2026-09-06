@@ -45,9 +45,19 @@ func Run(ctx context.Context, args []string, env Env) int {
 	return exit.OK
 }
 
+// coded is an error that says which exit code it is — what `ha` itself decides,
+// where the instance answered nothing to decide it from. `files sync` finding a
+// file it never wrote in the way of one the record has is the case that made it
+// necessary: it is a conflict, and exit 1 is for a bug in ha.
+type coded interface {
+	error
+	ExitCode() int
+}
+
 func report(stderr io.Writer, err error) int {
 	var failure *client.Failure
 	var usage *config.UsageError
+	var own coded
 	switch {
 	case errors.As(err, &failure):
 		fmt.Fprintln(stderr, "ha:", failure.Message)
@@ -55,6 +65,9 @@ func report(stderr io.Writer, err error) int {
 	case errors.As(err, &usage):
 		fmt.Fprintln(stderr, "ha:", usage.Message)
 		return exit.Usage
+	case errors.As(err, &own):
+		fmt.Fprintln(stderr, "ha:", own.Error())
+		return own.ExitCode()
 	default:
 		fmt.Fprintln(stderr, "ha:", err)
 		return exit.Unexpected
