@@ -45,7 +45,6 @@ func TestIdentityVerbsPrintSecretsOnceAndHitTheirEndpoints(t *testing.T) {
 	}}
 	server := httptest.NewServer(f.handler())
 	defer server.Close()
-	dir := t.TempDir()
 
 	cases := []struct {
 		args   []string
@@ -79,7 +78,7 @@ func TestIdentityVerbsPrintSecretsOnceAndHitTheirEndpoints(t *testing.T) {
 		{[]string{"token", "revoke", "0198e0c0-0000-7000-8000-00000000000b"}, "DELETE", "/tokens/0198e0c0-0000-7000-8000-00000000000b", nil, "revoked", ""},
 	}
 	for _, c := range cases {
-		code, out, errOut := run(t, server, dir, c.args...)
+		code, out, errOut := run(t, server, c.args...)
 		if code != exit.OK {
 			t.Fatalf("%v: code %d, stderr %s", c.args, code, errOut)
 		}
@@ -109,7 +108,7 @@ func TestIdentityVerbsPrintSecretsOnceAndHitTheirEndpoints(t *testing.T) {
 
 	// A token is the one thing here without a name, so it is the one place
 	// where an argument that is not a UUID is still a usage error.
-	code, _, errOut := run(t, server, dir, "token", "revoke", "not-an-id")
+	code, _, errOut := run(t, server, "token", "revoke", "not-an-id")
 	if code != exit.Usage || !strings.Contains(errOut, "not a token id") {
 		t.Errorf("bad token id: code %d, stderr %q", code, errOut)
 	}
@@ -120,7 +119,7 @@ func TestVersionPrintsBothSidesAndSaysWhenTheyDoNotFit(t *testing.T) {
 	server := httptest.NewServer(f.handler())
 	defer server.Close()
 
-	code, out, _ := run(t, server, t.TempDir(), "version", "--json")
+	code, out, _ := run(t, server, "version", "--json")
 	if code != exit.OK || !strings.Contains(out, `"ha": "0.0.0-dev"`) || !strings.Contains(out, `"hostingaffe": "0.0.0-dev"`) {
 		t.Fatalf("code %d, out %s", code, out)
 	}

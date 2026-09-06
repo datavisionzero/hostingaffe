@@ -58,8 +58,8 @@ public abstract class Identity
     public string Name { get; private set; } = null!;
 
     /// <summary>
-    /// Whether this identity administers the instance — users, projects, and
-    /// everything outside a single project's content. Held by users only.
+    /// Whether this identity administers the instance — users, agents and
+    /// tokens (VISION 9). Held by users only.
     /// </summary>
     public bool Administrator { get; protected set; }
 

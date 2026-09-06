@@ -5,8 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -56,26 +54,17 @@ func readAll(r *http.Request) (string, error) {
 	return buf.String(), err
 }
 
-func run(t *testing.T, server *httptest.Server, dir string, args ...string) (code int, stdout, stderr string) {
+func run(t *testing.T, server *httptest.Server, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
 	code = Run(context.Background(), args, Env{
 		Getenv: func(k string) string {
 			return map[string]string{"HOSTINGAFFE_URL": server.URL, "HOSTINGAFFE_TOKEN": "ha_test-token-of-thirty-two-characters-or-more"}[k]
 		},
-		Dir:    dir,
 		Stdin:  strings.NewReader(""),
 		Stdout: &out,
 		Stderr: &errOut,
 		HTTP:   server.Client(),
 	})
 	return code, out.String(), errOut.String()
-}
-
-func repository(t *testing.T, content string) string {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, ".hostingaffe"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return dir
 }

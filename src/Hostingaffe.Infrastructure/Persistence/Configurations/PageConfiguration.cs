@@ -3,12 +3,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NpgsqlTypes;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 
 /// <summary>
-/// The project's flat wiki (<c>docs/storage.md</c>, Pages). The unique index
+/// The instance's flat wiki (<c>docs/storage.md</c>, Pages). The unique index
 /// covers deleted rows on purpose: a slug stays spent until the purge, so that
 /// a restore never lands on a name somebody else has taken (ADR 0013).
 /// </summary>
@@ -21,19 +20,11 @@ public sealed class PageConfiguration : IEntityTypeConfiguration<Page>
         builder.HasKey(p => p.Id).HasName("pk_page");
         builder.Property(p => p.Id).HasColumnName("id");
 
-        builder.Property(p => p.ProjectId).HasColumnName("project_id").IsRequired();
-        builder.HasOne<Project>()
-            .WithMany()
-            .HasForeignKey(p => p.ProjectId)
-            .HasConstraintName("fk_page_project")
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.Property(p => p.Slug).HasColumnName("slug").IsRequired();
 
-        // One index for both jobs: it holds the slug unique in the project and
-        // it is the order a flat wiki is listed in, which is the only order it
-        // has.
-        builder.HasIndex(p => new { p.ProjectId, p.Slug }).IsUnique().HasDatabaseName("page_slug");
+        // One index for both jobs: it holds the slug unique and it is the order
+        // a flat wiki is listed in, which is the only order it has.
+        builder.HasIndex(p => p.Slug).IsUnique().HasDatabaseName("page_slug");
 
         builder.Property(p => p.Title).HasColumnName("title").IsRequired();
 

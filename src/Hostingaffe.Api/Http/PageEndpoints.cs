@@ -59,28 +59,27 @@ public sealed class ChangePageRequestConverter : JsonConverter<ChangePageRequest
 }
 
 /// <summary>
-/// Pages (<c>docs/api.md</c>): the project's flat wiki, under the project,
-/// because a page is named within a project rather than carrying a key that
-/// already says which one (ADR 0021).
+/// Pages (<c>docs/api.md</c>): the instance's flat wiki, reached by the slug
+/// that is a page's address rather than by a key (ADR 0021).
 /// </summary>
 public static class PageEndpoints
 {
     public static IEndpointRouteBuilder MapPages(this IEndpointRouteBuilder endpoints)
     {
-        var door = endpoints.MapGroup("/projects/{key}/pages")
+        var door = endpoints.MapGroup("/pages")
             .RequireAuthorization()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        door.MapGet(string.Empty, (string key, string? q, ListPages list, CancellationToken cancellationToken) =>
-                list.ExecuteAsync(key, q, cancellationToken))
+        door.MapGet(string.Empty, (string? q, ListPages list, CancellationToken cancellationToken) =>
+                list.ExecuteAsync(q, cancellationToken))
             .WithName("ListPages")
-            .WithSummary("Every page of the project as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.");
+            .WithSummary("Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.");
 
-        door.MapPost(string.Empty, async (string key, CreatePageRequest? request, CreatePage create, CancellationToken cancellationToken) =>
+        door.MapPost(string.Empty, async (CreatePageRequest? request, CreatePage create, CancellationToken cancellationToken) =>
             {
-                var page = await create.ExecuteAsync(key, request ?? new CreatePageRequest(null, null, null), cancellationToken);
-                return Results.Created($"/projects/{key}/pages/{page.Slug}", page);
+                var page = await create.ExecuteAsync(request ?? new CreatePageRequest(null, null, null), cancellationToken);
+                return Results.Created($"/pages/{page.Slug}", page);
             })
             .WithName("CreatePage")
             .WithSummary("Create a page: the slug is given, never derived from the title.")
@@ -88,14 +87,13 @@ public static class PageEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
-        door.MapGet("/{slug}", (string key, string slug, ReadPage read, CancellationToken cancellationToken) =>
-                read.ExecuteAsync(key, slug, cancellationToken))
+        door.MapGet("/{slug}", (string slug, ReadPage read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(slug, cancellationToken))
             .WithName("ReadPage")
             .WithSummary("The complete page: the Markdown, the author and who touched it last.");
 
-        door.MapPatch("/{slug}", (string key, string slug, ChangePageRequest? request, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
+        door.MapPatch("/{slug}", (string slug, ChangePageRequest? request, HttpRequest http, ChangePage change, CancellationToken cancellationToken) =>
                 change.ExecuteAsync(
-                    key,
                     slug,
                     new PageChanges(request?.Slug, request?.Title, request?.BodyGiven ?? false, request?.Body),
                     http.Headers.IfMatch.ToString(),
@@ -106,17 +104,17 @@ public static class PageEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
-        door.MapDelete("/{slug}", async (string key, string slug, MovePage move, CancellationToken cancellationToken) =>
+        door.MapDelete("/{slug}", async (string slug, MovePage move, CancellationToken cancellationToken) =>
             {
-                await move.DeleteAsync(key, slug, cancellationToken);
+                await move.DeleteAsync(slug, cancellationToken);
                 return Results.NoContent();
             })
             .WithName("DeletePage")
             .WithSummary("Soft-delete a page; its slug stays spent until the purge, so a restore can never land on a taken name.")
             .Produces(StatusCodes.Status204NoContent);
 
-        door.MapPost("/{slug}/restore", (string key, string slug, MovePage move, CancellationToken cancellationToken) =>
-                move.RestoreAsync(key, slug, cancellationToken))
+        door.MapPost("/{slug}/restore", (string slug, MovePage move, CancellationToken cancellationToken) =>
+                move.RestoreAsync(slug, cancellationToken))
             .WithName("RestorePage")
             .WithSummary("Bring a deleted page back, under the slug it kept.")
             .Produces<PageShape>()

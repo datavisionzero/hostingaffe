@@ -287,59 +287,6 @@
         }
       }
     },
-    "/admin/projects": {
-      "get": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Every project, optionally including deleted projects. Administrators only.",
-        "operationId": "ListAdminProjects",
-        "parameters": [
-          {
-            "name": "deleted",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AdminProject"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/users": {
       "post": {
         "tags": [
@@ -1240,556 +1187,14 @@
         }
       }
     },
-    "/projects": {
-      "post": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Create a project with the key that prefixes everything in it. Users only.",
-        "operationId": "CreateProject",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateProjectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      },
+    "/pages": {
       "get": {
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Every project the caller sees. Not paginated.",
-        "operationId": "ListProjects",
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Project"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{key}": {
-      "get": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "One project by key.",
-        "operationId": "ReadProject",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Change the name or the instructions page. Users only; the key is immutable.",
-        "operationId": "ChangeProject",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeProjectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Soft-delete the project with everything in it. Administrators only.",
-        "operationId": "DeleteProject",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "204": {
-            "description": "No Content"
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{key}/restore": {
-      "post": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Bring a deleted project back, with everything in it. Administrators only.",
-        "operationId": "RestoreProject",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{key}/users": {
-      "get": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Assigned users. Assigned users and administrators only.",
-        "operationId": "ListProjectUsers",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserSummary"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{key}/users/{id}": {
-      "put": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Grant project access to a user. Administrators only.",
-        "operationId": "GrantProjectAccess",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "204": {
-            "description": "No Content"
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Remove a user's project access. Administrators only.",
-        "operationId": "RevokeProjectAccess",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "204": {
-            "description": "No Content"
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{key}/pages": {
-      "get": {
-        "tags": [
-          "hostingaffe"
-        ],
-        "summary": "Every page of the project as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.",
+        "summary": "Every page as a slim PageSummary, by slug, without the bodies. `q` is the full-text filter over title and body; not paginated.",
         "operationId": "ListPages",
         "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "q",
             "in": "query",
@@ -1840,16 +1245,6 @@
         ],
         "summary": "Create a page: the slug is given, never derived from the title.",
         "operationId": "CreatePage",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1914,7 +1309,7 @@
         }
       }
     },
-    "/projects/{key}/pages/{slug}": {
+    "/pages/{slug}": {
       "get": {
         "tags": [
           "hostingaffe"
@@ -1922,14 +1317,6 @@
         "summary": "The complete page: the Markdown, the author and who touched it last.",
         "operationId": "ReadPage",
         "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "slug",
             "in": "path",
@@ -1979,14 +1366,6 @@
         "summary": "Change the title, the Markdown or the slug; `If-Match` with the `updated_at` last read guards the document. A rename leaves nothing behind at the old slug.",
         "operationId": "ChangePage",
         "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "slug",
             "in": "path",
@@ -2067,14 +1446,6 @@
         "operationId": "DeletePage",
         "parameters": [
           {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "slug",
             "in": "path",
             "required": true,
@@ -2110,7 +1481,7 @@
         }
       }
     },
-    "/projects/{key}/pages/{slug}/restore": {
+    "/pages/{slug}/restore": {
       "post": {
         "tags": [
           "hostingaffe"
@@ -2118,14 +1489,6 @@
         "summary": "Bring a deleted page back, under the slug it kept.",
         "operationId": "RestorePage",
         "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "slug",
             "in": "path",
@@ -2287,34 +1650,6 @@
   },
   "components": {
     "schemas": {
-      "AdminProject": {
-        "required": [
-          "key",
-          "name",
-          "created_at",
-          "deleted_at"
-        ],
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "deleted_at": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date-time"
-          }
-        }
-      },
       "AgentMetadata": {
         "required": [
           "kind",
@@ -2528,27 +1863,6 @@
           }
         }
       },
-      "ChangeProjectRequest": {
-        "required": [
-          "name",
-          "instructions_page"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "instructions_page": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
       "CreateAgentRequest": {
         "required": [
           "name"
@@ -2584,27 +1898,6 @@
             ]
           },
           "body": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "CreateProjectRequest": {
-        "required": [
-          "key",
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "name": {
             "type": [
               "null",
               "string"
@@ -2814,7 +2107,6 @@
       "Page": {
         "required": [
           "slug",
-          "project",
           "title",
           "body",
           "author",
@@ -2825,9 +2117,6 @@
         "type": "object",
         "properties": {
           "slug": {
-            "type": "string"
-          },
-          "project": {
             "type": "string"
           },
           "title": {
@@ -2855,7 +2144,6 @@
       "PageSummary": {
         "required": [
           "slug",
-          "project",
           "title",
           "updated_by",
           "created_at",
@@ -2864,9 +2152,6 @@
         "type": "object",
         "properties": {
           "slug": {
-            "type": "string"
-          },
-          "project": {
             "type": "string"
           },
           "title": {
@@ -2939,38 +2224,6 @@
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "Project": {
-        "required": [
-          "key",
-          "name",
-          "instructions_page",
-          "created_at",
-          "updated_at"
-        ],
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "instructions_page": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },

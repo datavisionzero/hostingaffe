@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { api, describe, type Schemas } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,18 +10,17 @@ type PageSummary = Schemas["PageSummary"];
 type Loaded = { at: "asking" } | { at: "failed"; why: string } | { at: "known"; items: PageSummary[] };
 
 /**
- * The project's wiki, flat and by slug — no tree, no table of contents. What
+ * The wiki, flat and by slug — no tree, no table of contents. What
  * replaces the navigation a hierarchy would give is the search, which the
  * command palette already reaches (VISION 7).
  */
 export function PagesView() {
-  const { project } = useParams();
   const [params, setParams] = useSearchParams();
   // The filter lives in the URL: a pasted link says what it shows.
   const query = params.get("q") ?? "";
   const [asked, setAsked] = useState<{ of: string; loaded: Loaded } | null>(null);
   const searchId = useId();
-  const at = `${project}/${query}`;
+  const at = query;
   const loaded: Loaded = asked !== null && asked.of === at ? asked.loaded : { at: "asking" };
 
   const filtered = query !== "";
@@ -39,11 +38,8 @@ export function PagesView() {
 
     void (async () => {
       try {
-        const { data, error, response } = await api.GET("/projects/{key}/pages", {
-          params: {
-            path: { key: project! },
-            query: { q: query === "" ? undefined : query },
-          },
+        const { data, error, response } = await api.GET("/pages", {
+          params: { query: { q: query === "" ? undefined : query } },
         });
 
         if (current) {
@@ -59,12 +55,12 @@ export function PagesView() {
     return () => {
       current = false;
     };
-  }, [at, project, query]);
+  }, [at, query]);
 
   return (
     <>
       <PageHeader title="Pages" meta={loaded.at === "known" ? `${loaded.items.length}` : undefined}>
-        <Button size="sm" render={<Link to={`/${project}/pages/new`} />}>New page</Button>
+        <Button size="sm" render={<Link to="/pages/new" />}>New page</Button>
       </PageHeader>
       <div className="grid gap-2 border-b px-4 py-2">
         {/* The search is what this wiki has instead of a tree, so it stands
@@ -82,16 +78,16 @@ export function PagesView() {
         </div>
       </div>
       {loaded.at === "failed" && <p className="p-4 text-sm text-destructive">{loaded.why}</p>}
-      {/* An empty project and an empty filtered result are different states:
-          one is a wiki nobody has written in yet, the other is a filter that
+      {/* An empty wiki and an empty filtered result are different states: one
+          is a wiki nobody has written in yet, the other is a filter that
           matched nothing. */}
       {loaded.at === "known" && loaded.items.length === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
           <p className="font-medium">{filtered ? "Nothing matches." : "No pages yet."}</p>
           {!filtered && (
             <p className="max-w-md text-sm text-muted-foreground">
-              A page is what a project knows and no ticket asks for: the architecture, the conventions, what an
-              operator has to know — and the plan tickets are cut from later.
+              A page is what the team knows and no record holds: the architecture, the conventions, what an
+              operator has to know.
             </p>
           )}
         </div>
@@ -100,7 +96,7 @@ export function PagesView() {
         <ul className="divide-y">
           {loaded.items.map((page) => (
             <li key={page.slug}>
-              <Link to={pagePath(project!, page.slug)} className="flex min-h-10 items-center gap-3 px-4 py-1 hover:bg-accent">
+              <Link to={pagePath(page.slug)} className="flex min-h-10 items-center gap-3 px-4 py-1 hover:bg-accent">
                 <span className="w-40 shrink-0 truncate font-mono text-xs text-muted-foreground">{page.slug}</span>
                 <span className="min-w-0 flex-1 truncate">{page.title}</span>
                 <span className="hidden w-44 shrink-0 truncate text-right text-xs text-muted-foreground md:block">

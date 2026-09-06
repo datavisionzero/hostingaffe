@@ -40,14 +40,13 @@ public sealed class ContractTests(PostgresFixture postgres)
         var paths = document["paths"]!.AsObject().Select(path => path.Key).Order(StringComparer.Ordinal);
         Assert.Equal(
             [
-                "/admin/projects", "/admin/smtp", "/admin/smtp/test",
+                "/admin/smtp", "/admin/smtp/test",
                 "/agents", "/agents/{id}",
                 "/email-changes/confirm",
                 "/invitations/accept",
-                "/me", "/me/email", "/me/metadata", "/me/password", "/password-recovery", "/password-recovery/complete",
-                "/projects", "/projects/{key}",
-                "/projects/{key}/pages", "/projects/{key}/pages/{slug}", "/projects/{key}/pages/{slug}/restore",
-                "/projects/{key}/restore", "/projects/{key}/users", "/projects/{key}/users/{id}",
+                "/me", "/me/email", "/me/metadata", "/me/password",
+                "/pages", "/pages/{slug}", "/pages/{slug}/restore",
+                "/password-recovery", "/password-recovery/complete",
                 "/session", "/session/bootstrap", "/sessions", "/sessions/{id}",
                 "/tokens", "/tokens/{id}", "/users", "/users/{id}", "/users/{id}/deactivate",
                 "/users/{id}/invitation", "/users/{id}/reactivate", "/version",
@@ -60,7 +59,7 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("IdentityRef", schemas);
         Assert.Contains("Me", schemas);
         Assert.Contains("Page", schemas);
-        Assert.Contains("Project", schemas);
+        Assert.Contains("PageSummary", schemas);
         Assert.Contains("SmtpStatus", schemas);
         Assert.Contains("VersionResponse", schemas);
         Assert.Contains("ProblemDetails", schemas);

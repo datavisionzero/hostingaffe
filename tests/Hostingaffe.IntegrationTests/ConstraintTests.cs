@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Hostingaffe.Domain.Identities;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.IntegrationTests;
 
@@ -122,25 +121,6 @@ public sealed class ConstraintTests(PostgresFixture postgres)
             () => db.Context.SaveChangesAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal("token_secret_hash", Assert.IsType<PostgresException>(refusal.InnerException).ConstraintName);
-    }
-
-    // -- project ---------------------------------------------------------------
-
-    [Fact]
-    public async Task A_project_key_is_taken_even_while_the_project_is_deleted()
-    {
-        await using var db = await Migrated.SeededAsync(postgres);
-        await db.Context.Database.ExecuteSqlRawAsync(
-            "update project set deleted_at = now(), deleted_by = {0} where id = {1}",
-            [db.User.Id, db.Project.Id],
-            TestContext.Current.CancellationToken);
-
-        db.Context.Projects.Add(Project.Create("PLAN", "hostingaffe again", db.User.Id, Migrated.Now));
-
-        var refusal = await Assert.ThrowsAsync<DbUpdateException>(
-            () => db.Context.SaveChangesAsync(TestContext.Current.CancellationToken));
-
-        Assert.Equal("project_key", Assert.IsType<PostgresException>(refusal.InnerException).ConstraintName);
     }
 
     // -- history ---------------------------------------------------------------

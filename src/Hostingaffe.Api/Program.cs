@@ -90,20 +90,7 @@ builder.Services.AddScoped<ChangePassword>();
 builder.Services.AddSingleton(InstanceSettings.FromVariables(
     builder.Configuration[InstanceSettings.DeletionGraceVariable]));
 
-// Projects: the bracket everything belongs to.
-builder.Services.AddScoped<CreateProject>();
-builder.Services.AddScoped<ListProjects>();
-builder.Services.AddScoped<ListAdminProjects>();
-builder.Services.AddScoped<ReadProject>();
-builder.Services.AddScoped<ChangeProject>();
-builder.Services.AddScoped<DeleteProject>();
-builder.Services.AddScoped<RestoreProject>();
-builder.Services.AddScoped<ProjectScope>();
-builder.Services.AddScoped<ListProjectUsers>();
-builder.Services.AddScoped<GrantProjectAccess>();
-builder.Services.AddScoped<RevokeProjectAccess>();
-
-// The flat wiki (VISION 7, ADR 0021): a project's pages, addressed by slug.
+// The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
 builder.Services.AddScoped<ReadPage>();
@@ -155,15 +142,13 @@ if (trustedProxies.Configured)
 app.UseSerilogRequestLogging();
 app.UseHostingaffeVersion();
 
-// Explicit, because two middlewares below read what routing decided rather than
-// what the caller typed: the project-scope door reads the endpoint's route
-// pattern, and the CSRF guard its `AllowAnonymous` metadata. A host adds this
-// by itself, at the front, and both would still work — saying it here is what
-// keeps a later reordering from silently moving them in front of it.
+// Explicit, because the CSRF guard below reads what routing decided rather than
+// what the caller typed: the endpoint's `AllowAnonymous` metadata. A host adds
+// this by itself, at the front, and it would still work — saying it here is
+// what keeps a later reordering from silently moving it in front.
 app.UseRouting();
 
 app.UseAuthentication();
-app.UseMiddleware<ProjectScopeMiddleware>();
 app.UseMiddleware<BrowserCsrfMiddleware>();
 app.UseHostingaffeIdempotency();
 app.UseAuthorization();
@@ -175,14 +160,13 @@ app.MapOpenApi();
 app.MapInstance();
 app.MapIdentities();
 app.MapBrowserIdentity();
-app.MapProjects();
 app.MapPages();
 app.MapSmtp();
 
 // The web application: built by its own toolchain into wwwroot at image build
 // time (deploy/Dockerfile) or by a local `npm run build`; in development the
 // Vite dev server serves it and this finds nothing. Every path no endpoint
-// took is the SPA's — its router decides what `/PLAN/ready` is.
+// took is the SPA's — its router decides what `/pages/architecture` is.
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("index.html");

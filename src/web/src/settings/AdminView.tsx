@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, Navigate, Route, Routes, useParams } from "react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Navigate } from "react-router";
 import { api, describe, type Schemas } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/session/useSession";
 import { reporting } from "@/shared/report";
-import { date, submitting } from "./forms";
 import { Row, RowMenu, Rows, Said, Section, SettingsShell } from "./SettingsShell";
 
 type User = Schemas["UserSummary"];
-type AdminProject = Schemas["AdminProject"];
 type Smtp = Schemas["SmtpStatus"];
 
 /** The instance's own administration, one area per address. */
@@ -24,7 +22,6 @@ export function AdminView() {
       title="Instance administration"
       areas={[
         { to: "users", label: "Users", element: <Users /> },
-        { to: "projects", path: "projects/*", label: "Projects", element: <Projects /> },
         { to: "email", label: "Transactional email", element: <Email /> },
       ]}
     />
@@ -74,117 +71,6 @@ function Users() {
           />
         ))}
       </Rows>
-      <Said notice={notice} />
-    </Section>
-  );
-}
-
-/**
- * The projects of the instance, as a list with a detail behind each one. The
- * single box held a form and a button per permitted user for every project at
- * once — it grew with projects times users — and it asked every project for
- * its access list on opening, to show one of them.
- */
-function Projects() {
-  return (
-    <Routes>
-      <Route index element={<ProjectList />} />
-      <Route path=":key" element={<ProjectAccess />} />
-    </Routes>
-  );
-}
-
-function useAdminProjects(): AdminProject[] {
-  const [projects, setProjects] = useState<AdminProject[]>([]);
-
-  useEffect(() => {
-    let current = true;
-    void (async () => {
-      const { data } = await api.GET("/admin/projects", { params: { query: { deleted: "all" } } });
-      if (current) setProjects(data ?? []);
-    })();
-    return () => { current = false; };
-  }, []);
-
-  return projects;
-}
-
-function ProjectList() {
-  const projects = useAdminProjects();
-
-  return (
-    <Section title="Projects" description="Every project of the instance, deleted ones included.">
-      <Rows empty="No projects.">
-        {projects.map((p) => (
-          <Row
-            key={p.key}
-            title={<Link className="hover:underline" to={p.key}>{p.key} · {p.name}</Link>}
-            detail={p.deleted_at ? `Deleted ${date(p.deleted_at)}` : undefined}
-          />
-        ))}
-      </Rows>
-    </Section>
-  );
-}
-
-function ProjectAccess() {
-  const { key } = useParams();
-  const [project, setProject] = useState<AdminProject>();
-  const [users, setUsers] = useState<User[]>([]);
-  const [permitted, setPermitted] = useState<User[]>([]);
-  const [notice, setNotice] = useState("");
-
-  const load = useCallback(async () => {
-    const [all, everybody, projects] = await Promise.all([
-      api.GET("/projects/{key}/users", { params: { path: { key: key! } } }),
-      api.GET("/users"),
-      api.GET("/admin/projects", { params: { query: { deleted: "all" } } }),
-    ]);
-    setPermitted(all.data ?? []);
-    setUsers(everybody.data ?? []);
-    setProject((projects.data ?? []).find((candidate) => candidate.key === key));
-  }, [key]);
-
-  useEffect(() => { void (async () => { await load(); })(); }, [load]);
-  const report = reporting(setNotice, load);
-
-  // Everyone who does not have access to this project yet. With nobody left
-  // the select has no options, contributes no form entry, and the id read
-  // back out of it was the string "null".
-  const grantable = users.filter((candidate) => !permitted.some((x) => x.id === candidate.id));
-
-  return (
-    <Section title={project === undefined ? key! : `${project.key} · ${project.name}`} description="Who may see and write in this project.">
-      <p className="mb-3 text-sm"><Link className="text-brand hover:underline" to="..">All projects</Link></p>
-      {project?.deleted_at != null ? (
-        <>
-          <p className="mb-3 text-sm text-muted-foreground">Deleted {date(project.deleted_at)}.</p>
-          <Button size="sm" variant="outline" onClick={() => void report(api.POST("/projects/{key}/restore", { params: { path: { key: key! } } }), `${key} restored.`)}>Restore</Button>
-        </>
-      ) : (
-        <>
-          <form className="mb-3 flex gap-2" onSubmit={(e) => void submitting(e, setNotice, async (data) => { if (grantable.length === 0) return; const id = String(data.get("user")); const r = await api.PUT("/projects/{key}/users/{id}", { params: { path: { key: key!, id } } }); if (!r.response.ok) throw new Error(describe(r.error, r.response.status)); await load(); })}>
-            <select name="user" aria-label={`User for ${key}`} className="h-8 flex-1 rounded-md border bg-background px-2 text-sm">
-              {grantable.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <Button type="submit" size="sm" variant="outline" disabled={grantable.length === 0}>Grant access</Button>
-          </form>
-          <Rows empty="Nobody has access.">
-            {permitted.map((u) => (
-              <Row
-                key={u.id}
-                title={u.name}
-                detail={`${u.email} · ${u.state}${u.administrator ? " · administrator" : ""}`}
-                action={
-                  <RowMenu label={`Actions for ${u.name}`}>
-                    <DropdownMenuItem onClick={() => void report(api.DELETE("/projects/{key}/users/{id}", { params: { path: { key: key!, id: u.id } } }), `${u.name} no longer has access to ${key}.`)}>Remove access</DropdownMenuItem>
-                  </RowMenu>
-                }
-              />
-            ))}
-          </Rows>
-        </>
-      )}
       <Said notice={notice} />
     </Section>
   );

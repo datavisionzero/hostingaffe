@@ -2,14 +2,12 @@ using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Application.Acts;
 
 /// <summary>The slim page every list returns: everything but the document itself (ADR 0012).</summary>
 public sealed record PageSummaryShape(
     string Slug,
-    string Project,
     string Title,
     IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt,
@@ -18,7 +16,6 @@ public sealed record PageSummaryShape(
 /// <summary>The complete page: the summary plus the Markdown and the author.</summary>
 public sealed record PageShape(
     string Slug,
-    string Project,
     string Title,
     string Body,
     IdentityRef Author,
@@ -35,10 +32,8 @@ public sealed record PageChanges(string? Slug, string? Title, bool BodyGiven, st
 public sealed class PageAssembler(IIdentities identities)
 {
     public async Task<IReadOnlyList<PageSummaryShape>> SummariesAsync(
-        Project project, IReadOnlyList<Page> rows, CancellationToken cancellationToken)
+        IReadOnlyList<Page> rows, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(project);
-
         if (rows.Count == 0)
         {
             return [];
@@ -50,7 +45,6 @@ public sealed class PageAssembler(IIdentities identities)
         [
             .. rows.Select(p => new PageSummaryShape(
                 p.Slug,
-                project.Key,
                 p.Title,
                 people[p.UpdatedBy],
                 p.CreatedAt,
@@ -58,16 +52,14 @@ public sealed class PageAssembler(IIdentities identities)
         ];
     }
 
-    public async Task<PageShape> CompleteAsync(Project project, Page page, CancellationToken cancellationToken)
+    public async Task<PageShape> CompleteAsync(Page page, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(page);
 
         var people = await PeopleAsync([page.CreatedBy, page.UpdatedBy], cancellationToken);
 
         return new PageShape(
             page.Slug,
-            project.Key,
             page.Title,
             page.Body,
             people[page.CreatedBy],
@@ -90,77 +82,54 @@ public sealed class PageAssembler(IIdentities identities)
     }
 }
 
-/// <summary>The lookups every page act starts with: the project, the scope, then the slug.</summary>
+/// <summary>The lookup every page act starts with: the slug.</summary>
 public static class PageLookup
 {
-    public static async Task<Project> ProjectAsync(
-        this IProjects projects, ProjectScope scope, string projectKey, InstanceSettings settings, CancellationToken cancellationToken)
-    {
-        var project = await projects.LiveAsync(projectKey, settings, cancellationToken);
-        await scope.RequireAsync(project.Id, cancellationToken);
-        return project;
-    }
-
     /// <exception cref="Refusal"><c>not-found</c>, or <c>deleted</c> with <c>restorable_until</c>.</exception>
     public static async Task<Page> LiveAsync(
-        this IPages pages, Project project, string slug, InstanceSettings settings, CancellationToken cancellationToken)
+        this IPages pages, string slug, InstanceSettings settings, CancellationToken cancellationToken)
     {
-        var page = await pages.AnyAsync(project, slug, cancellationToken);
+        var page = await pages.AnyAsync(slug, cancellationToken);
 
         return page.Deleted
             ? throw new Refusal(
                 RefusalCode.Deleted,
-                $"Page {project.Key}/{page.Slug} is deleted and can be restored until at least {page.DeletedAt!.Value + settings.DeletionGrace:u}.",
+                $"Page {page.Slug} is deleted and can be restored until at least {page.DeletedAt!.Value + settings.DeletionGrace:u}.",
                 new Dictionary<string, object?> { ["restorable_until"] = page.DeletedAt.Value + settings.DeletionGrace })
             : page;
     }
 
-    public static async Task<Page> AnyAsync(
-        this IPages pages, Project project, string slug, CancellationToken cancellationToken)
+    public static async Task<Page> AnyAsync(this IPages pages, string slug, CancellationToken cancellationToken)
     {
         // An address that is not a slug names nothing, and says so as `not-found`
         // rather than as `validation`: it arrived in the path, not in a body.
         var normalized = slug?.Trim() ?? string.Empty;
 
-        return (Slug.IsValid(normalized)
-            ? await pages.FindAnyAsync(project.Id, normalized, cancellationToken)
-            : null)
-            ?? throw new Refusal(RefusalCode.NotFound, $"No page {project.Key}/{normalized}.");
+        return (Slug.IsValid(normalized) ? await pages.FindAnyAsync(normalized, cancellationToken) : null)
+            ?? throw new Refusal(RefusalCode.NotFound, $"No page {normalized}.");
     }
 }
 
 /// <summary>
-/// Every page of the project, by slug, without the bodies. Not paginated: the
-/// wiki is flat and small, and <c>q</c> is what a reader navigates it by, since
-/// the search is what the product put in a hierarchy's place (VISION 7).
+/// Every page, by slug, without the bodies. Not paginated: the wiki is flat and
+/// small, and <c>q</c> is what a reader navigates it by, since the search is
+/// what the product put in a hierarchy's place (VISION 7).
 /// </summary>
-public sealed class ListPages(IProjects projects, ProjectScope scope, IPages pages, PageAssembler assembler, InstanceSettings settings)
+public sealed class ListPages(IPages pages, PageAssembler assembler)
 {
-    public async Task<IReadOnlyList<PageSummaryShape>> ExecuteAsync(
-        string projectKey, string? search, CancellationToken cancellationToken)
-    {
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-        var rows = await pages.ListAsync(project.Id, search, cancellationToken);
-
-        return await assembler.SummariesAsync(project, rows, cancellationToken);
-    }
+    public async Task<IReadOnlyList<PageSummaryShape>> ExecuteAsync(string? search, CancellationToken cancellationToken) =>
+        await assembler.SummariesAsync(await pages.ListAsync(search, cancellationToken), cancellationToken);
 }
 
-public sealed class ReadPage(IProjects projects, ProjectScope scope, IPages pages, PageAssembler assembler, InstanceSettings settings)
+public sealed class ReadPage(IPages pages, PageAssembler assembler, InstanceSettings settings)
 {
-    public async Task<PageShape> ExecuteAsync(string projectKey, string slug, CancellationToken cancellationToken)
-    {
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-
-        return await assembler.CompleteAsync(project, await pages.LiveAsync(project, slug, settings, cancellationToken), cancellationToken);
-    }
+    public async Task<PageShape> ExecuteAsync(string slug, CancellationToken cancellationToken) =>
+        await assembler.CompleteAsync(await pages.LiveAsync(slug, settings, cancellationToken), cancellationToken);
 }
 
-/// <summary>A page of the project's wiki, in one transaction.</summary>
+/// <summary>A page of the wiki, in one transaction.</summary>
 public sealed class CreatePage(
     ICallerIdentity callerIdentity,
-    IProjects projects,
-    ProjectScope scope,
     IPages pages,
     IHistory history,
     ITransactions transactions,
@@ -168,21 +137,20 @@ public sealed class CreatePage(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task<PageShape> ExecuteAsync(string projectKey, CreatePageRequest request, CancellationToken cancellationToken)
+    public async Task<PageShape> ExecuteAsync(CreatePageRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var caller = callerIdentity.Caller;
 
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
         var slug = Validated.Field("slug", () => Slug.Normalize(request.Slug ?? string.Empty));
         var title = Validated.Field("title", () => Page.NormalizeTitle(request.Title!));
 
-        await PageWrites.TakenAsync(pages, project, slug, settings, cancellationToken);
+        await PageWrites.TakenAsync(pages, slug, settings, cancellationToken);
 
         var page = await transactions.RunAsync(async () =>
         {
             var now = clock.GetUtcNow();
-            var created = Page.Create(project.Id, slug, title, request.Body, caller.Id, now);
+            var created = Page.Create(slug, title, request.Body, caller.Id, now);
 
             pages.Add(created);
             history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Created));
@@ -191,7 +159,7 @@ public sealed class CreatePage(
             return created;
         }, cancellationToken);
 
-        return await assembler.CompleteAsync(project, page, cancellationToken);
+        return await assembler.CompleteAsync(page, cancellationToken);
     }
 }
 
@@ -203,8 +171,6 @@ public sealed class CreatePage(
 /// </summary>
 public sealed class ChangePage(
     ICallerIdentity callerIdentity,
-    IProjects projects,
-    ProjectScope scope,
     IPages pages,
     IHistory history,
     ITransactions transactions,
@@ -213,32 +179,31 @@ public sealed class ChangePage(
     TimeProvider clock)
 {
     public async Task<PageShape> ExecuteAsync(
-        string projectKey, string slug, PageChanges changes, string? ifMatch, CancellationToken cancellationToken)
+        string slug, PageChanges changes, string? ifMatch, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(changes);
         var caller = callerIdentity.Caller;
 
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-        var before = await pages.LiveAsync(project, slug, settings, cancellationToken);
+        var before = await pages.LiveAsync(slug, settings, cancellationToken);
         var expected = GuardedWrite.Expected(ifMatch);
 
         var renamed = changes.Slug is null ? null : Validated.Field("slug", () => Slug.Normalize(changes.Slug));
         if (renamed is not null && renamed != before.Slug)
         {
-            await PageWrites.TakenAsync(pages, project, renamed, settings, cancellationToken);
+            await PageWrites.TakenAsync(pages, renamed, settings, cancellationToken);
         }
 
         var page = await transactions.RunAsync(async () =>
         {
             var row = await pages.LoadForWriteAsync(before.Id, cancellationToken)
-                ?? throw new Refusal(RefusalCode.NotFound, $"No page {project.Key}/{slug}.");
+                ?? throw new Refusal(RefusalCode.NotFound, $"No page {slug}.");
 
             if (expected is { } version && row.UpdatedAt != version)
             {
                 throw new Refusal(
                     RefusalCode.Stale,
-                    $"{project.Key}/{row.Slug} changed at {row.UpdatedAt:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}; you last read it at {version:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}.",
-                    new Dictionary<string, object?> { ["current"] = await assembler.CompleteAsync(project, row, cancellationToken) });
+                    $"{row.Slug} changed at {row.UpdatedAt:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}; you last read it at {version:yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'}.",
+                    new Dictionary<string, object?> { ["current"] = await assembler.CompleteAsync(row, cancellationToken) });
             }
 
             var now = clock.GetUtcNow();
@@ -267,15 +232,13 @@ public sealed class ChangePage(
             return row;
         }, cancellationToken);
 
-        return await assembler.CompleteAsync(project, page, cancellationToken);
+        return await assembler.CompleteAsync(page, cancellationToken);
     }
 }
 
 /// <summary>Delete and restore: soft, with the grace period of everything else (ADR 0013).</summary>
 public sealed class MovePage(
     ICallerIdentity callerIdentity,
-    IProjects projects,
-    ProjectScope scope,
     IPages pages,
     IHistory history,
     ITransactions transactions,
@@ -283,16 +246,15 @@ public sealed class MovePage(
     InstanceSettings settings,
     TimeProvider clock)
 {
-    public async Task DeleteAsync(string projectKey, string slug, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string slug, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller;
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-        var before = await pages.LiveAsync(project, slug, settings, cancellationToken);
+        var before = await pages.LiveAsync(slug, settings, cancellationToken);
 
         await transactions.RunAsync(async () =>
         {
             var row = await pages.LoadForWriteAsync(before.Id, cancellationToken)
-                ?? throw new Refusal(RefusalCode.NotFound, $"No page {project.Key}/{slug}.");
+                ?? throw new Refusal(RefusalCode.NotFound, $"No page {slug}.");
 
             var now = clock.GetUtcNow();
             row.Delete(caller.Id, now);
@@ -303,45 +265,43 @@ public sealed class MovePage(
     }
 
     /// <summary>The slug was never given away while the page was deleted, so this cannot land on a taken name.</summary>
-    public async Task<PageShape> RestoreAsync(string projectKey, string slug, CancellationToken cancellationToken)
+    public async Task<PageShape> RestoreAsync(string slug, CancellationToken cancellationToken)
     {
-        var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-        var before = await pages.AnyAsync(project, slug, cancellationToken);
+        var before = await pages.AnyAsync(slug, cancellationToken);
         if (!before.Deleted)
         {
-            throw new Refusal(RefusalCode.Transition, $"Page {project.Key}/{before.Slug} is not deleted.");
+            throw new Refusal(RefusalCode.Transition, $"Page {before.Slug} is not deleted.");
         }
 
         var page = await transactions.RunAsync(async () =>
         {
             var row = await pages.LoadForWriteAsync(before.Id, cancellationToken)
-                ?? throw new Refusal(RefusalCode.NotFound, $"No page {project.Key}/{slug}.");
+                ?? throw new Refusal(RefusalCode.NotFound, $"No page {slug}.");
             row.Restore();
             await pages.SaveAsync(cancellationToken);
             return row;
         }, cancellationToken);
 
-        return await assembler.CompleteAsync(project, page, cancellationToken);
+        return await assembler.CompleteAsync(page, cancellationToken);
     }
 }
 
 internal static class PageWrites
 {
     /// <summary>
-    /// A slug already in the project is refused as <c>validation</c>, and a
-    /// deleted page's slug says so rather than pretending the name is in use —
-    /// the same answer a taken label name gives, for the same reason.
+    /// A slug already taken is refused as <c>validation</c>, and a deleted
+    /// page's slug says so rather than pretending the name is free.
     /// </summary>
     public static async Task TakenAsync(
-        IPages pages, Project project, string slug, InstanceSettings settings, CancellationToken cancellationToken)
+        IPages pages, string slug, InstanceSettings settings, CancellationToken cancellationToken)
     {
-        if (await pages.FindAnyAsync(project.Id, slug, cancellationToken) is not { } existing)
+        if (await pages.FindAnyAsync(slug, cancellationToken) is not { } existing)
         {
             return;
         }
 
         throw Refusal.Validation("slug", existing.Deleted
             ? $"The page {slug} is deleted and can be restored until at least {existing.DeletedAt!.Value + settings.DeletionGrace:u}; a new one cannot take its slug until it is purged."
-            : $"The page {slug} exists in {project.Key}.");
+            : $"The page {slug} exists.");
     }
 }

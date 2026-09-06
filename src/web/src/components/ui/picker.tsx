@@ -25,8 +25,7 @@ type Option = { at: "choice"; choice: Choice } | { at: "create"; name: string };
  * Every field this replaced asked for a name that had to exist already and
  * showed nothing of what did — a word typed against a dictionary it would not
  * open, with the typo surfacing as a refusal over the whole form after saving.
- * The fillings differ in where the rows come from (the project's labels, its
- * epics, its members, a search across issues) and in nothing else, so the
+ * The fillings differ in where the rows come from and in nothing else, so the
  * keyboard, the chips and the refusal at the field are written once here.
  *
  * Plain elements and Tailwind, as ADR 0017 requires; the combobox roles are

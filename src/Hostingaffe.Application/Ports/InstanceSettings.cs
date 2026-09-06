@@ -1,8 +1,8 @@
 namespace Hostingaffe.Application.Ports;
 
 /// <summary>
-/// The dial an operator sets per instance, never per project (ADR 0013): how
-/// long a deleted row can be restored before the purge may take it.
+/// The dial an operator sets, once per instance (ADR 0013): how long a deleted
+/// row can be restored before the purge may take it.
 /// </summary>
 public sealed record InstanceSettings(TimeSpan DeletionGrace)
 {

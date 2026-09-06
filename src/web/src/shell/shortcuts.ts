@@ -17,7 +17,6 @@ export type Group = (typeof groups)[number];
 export type ShortcutId =
   | "global:palette"
   | "global:sidebar"
-  | "global:projects"
   | "global:shortcuts"
   | "global:create"
   | "form:cancel"
@@ -48,12 +47,11 @@ export const modLabel =
 
 export const shortcuts: Shortcut[] = [
   { id: "global:palette", key: "k", mod: true, what: "Search or jump to anything", group: "Global" },
-  { id: "global:projects", key: "p", what: "Switch project", group: "Global" },
   { id: "global:sidebar", key: "b", mod: true, what: "Fold the navigation", group: "Global" },
   { id: "global:shortcuts", key: "?", what: "Show this list", group: "Global" },
-  // Creating belongs to the project, not to a list of it: the key answers on
-  // every screen the project has.
-  { id: "global:create", key: "c", what: "New page in this project", group: "Global" },
+  // Creating belongs to the instance, not to one of its screens: the key
+  // answers wherever the frame stands.
+  { id: "global:create", key: "c", what: "New page", group: "Global" },
 
   // The same key the button beside it is: one behaviour, two ways to it.
   { id: "form:cancel", key: "Escape", what: "Leave the form, asking first if anything was written", group: "Forms" },

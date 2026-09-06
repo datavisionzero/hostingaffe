@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Infrastructure.Persistence;
 
@@ -36,11 +35,7 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
     public DbSet<BrowserSession> BrowserSessions => Set<BrowserSession>();
 
-    public DbSet<Project> Projects => Set<Project>();
-
-    public DbSet<ProjectAccess> ProjectAccesses => Set<ProjectAccess>();
-
-    /// <summary>The project's flat wiki (VISION 7, ADR 0021).</summary>
+    /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();
 
     public DbSet<HistoryEntry> History => Set<HistoryEntry>();

@@ -24,7 +24,6 @@ export const api = createClient<paths>({
 
 export type Schemas = components["schemas"];
 export type Me = Schemas["Me"];
-export type Project = Schemas["Project"];
 export type Problem = Schemas["ProblemDetails"];
 
 /**

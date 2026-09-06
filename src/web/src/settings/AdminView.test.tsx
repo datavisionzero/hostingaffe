@@ -1,9 +1,9 @@
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes, useLocation } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
 import { SessionProvider } from "@/session/Session";
-import { aProject, aUser, installInstance, renderAt } from "@/shared/testing";
+import { aUser, installInstance, renderAt } from "@/shared/testing";
 import { AdminView } from "./AdminView";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -13,7 +13,6 @@ const invited = { id: "0199a000-0000-7000-8000-000000000002", name: "newcomer", 
 
 function admin(routes: Parameters<typeof installInstance>[0], at = "/admin/users") {
   const instance = installInstance({
-    "GET /admin/projects": [{ ...aProject, deleted_at: null }],
     "GET /admin/smtp": { configured: false, host: null, port: null, security: null, sender: null },
     ...routes,
   });
@@ -50,23 +49,6 @@ it("shows an invited user without a reload of the page", async () => {
 
   expect(await screen.findByText("newcomer@example.test · invited")).toBeInTheDocument();
   expect(screen.getByLabelText("Name")).toHaveValue("");
-});
-
-// An empty select contributes no form entry, and the id read back out of it
-// was the string "null", which went out as `PUT /projects/PLAN/users/null`.
-it("offers no access to grant when everybody already has it", async () => {
-  const instance = admin({
-    "GET /users": [maintainer],
-    "GET /projects/PLAN/users": [maintainer],
-  }, "/admin/projects/PLAN");
-  const user = userEvent.setup();
-
-  const grant = await screen.findByRole("button", { name: "Grant access" });
-  expect(grant).toBeDisabled();
-  expect(within(screen.getByLabelText("User for PLAN")).queryAllByRole("option")).toHaveLength(0);
-
-  await user.click(grant);
-  expect(instance.calls.some((call) => call.method === "PUT")).toBe(false);
 });
 
 // A refusal is a sentence the screen owes the reader. Both of these used to
@@ -119,46 +101,16 @@ it("lands on the users area when no area is named", async () => {
   expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
 });
 
-// The single box asked every project for its access list on opening, to show
-// one of them. The list asks for none, and the detail asks for its own.
-it("asks for a project's access only on the project's own address", async () => {
-  const second = { ...aProject, key: "LOG", name: "logaffe", deleted_at: null };
-  const instance = admin({
-    "GET /users": [maintainer],
-    "GET /admin/projects": [{ ...aProject, deleted_at: null }, second],
-    "GET /projects/PLAN/users": [maintainer],
-  }, "/admin/projects");
+// An area is an address, and picking another one leaves the current one
+// rather than growing the address a segment at a time.
+it("leaves the current area behind when another is picked", async () => {
+  admin({ "GET /users": [maintainer] }, "/admin/email");
   const user = userEvent.setup();
 
-  await screen.findByRole("link", { name: "PLAN · hostingaffe" });
-  expect(instance.calls.some((call) => call.url.includes("/users") && call.url.includes("/projects/"))).toBe(false);
+  expect(await screen.findByRole("link", { name: "Transactional email" })).toHaveAttribute("aria-current", "page");
 
-  await user.click(screen.getByRole("link", { name: "PLAN · hostingaffe" }));
-  expect(await screen.findByRole("button", { name: "Grant access" })).toBeInTheDocument();
-  expect(instance.calls.filter((call) => new URL(call.url).pathname.endsWith("/users") && new URL(call.url).pathname.startsWith("/projects/"))).toHaveLength(1);
-});
-
-// The widest of the three areas: `projects/*` matches two segments, so the
-// address of the screen is two segments up rather than one. The nav entries
-// were relative, and a relative link inside a splat route resolves against
-// everything the splat matched: from here "Users" led to
-// `/admin/projects/PLAN/users`, which is no area at all, and every further
-// click added another segment.
-it("leaves a project behind when another area is picked", async () => {
-  admin({ "GET /users": [maintainer], "GET /projects/PLAN/users": [maintainer] }, "/admin/projects/PLAN");
-  const user = userEvent.setup();
-
-  await user.click(await screen.findByRole("link", { name: "Users" }));
+  await user.click(screen.getByRole("link", { name: "Users" }));
 
   expect(screen.getByTestId("at")).toHaveTextContent("/admin/users");
   expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-});
-
-// An entry that led somewhere nobody stands never read as the current one
-// either, not even while its own area was open.
-it("marks the area a project is read in as the current one", async () => {
-  admin({ "GET /users": [maintainer], "GET /projects/PLAN/users": [maintainer] }, "/admin/projects/PLAN");
-
-  expect(await screen.findByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
-  expect(screen.getByRole("link", { name: "Users" })).not.toHaveAttribute("aria-current");
 });

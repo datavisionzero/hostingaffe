@@ -1,22 +1,14 @@
 // Package config is where ha learns which instance it talks to and as whom:
-// two environment variables, and an optional .hostingaffe file in the repository
-// that fixes the project (VISION 6.1, 13).
+// two environment variables, and nothing else. There is no project file and no
+// project (VISION 6.1, 9) — one instance holds one team's infrastructure, and
+// every token reads all of it.
 package config
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 )
-
-// FileName is the project file: checked in at the root of a repository, it
-// points from that repository at exactly one project (CONTEXT.md, Project
-// file).
-const FileName = ".hostingaffe"
 
 // Config is what a command runs with.
 type Config struct {
@@ -25,10 +17,6 @@ type Config struct {
 	// Token is the caller's token, from HOSTINGAFFE_TOKEN; the server tells a user
 	// token from an agent token, ha never says which it holds (ADR 0015).
 	Token string
-	// Project is the project key, from the file or from --project.
-	Project string
-	// File is where the project file was found, or empty.
-	File string
 }
 
 // UsageError is a mistake in the environment or the arguments: exit 2.
@@ -36,10 +24,9 @@ type UsageError struct{ Message string }
 
 func (e *UsageError) Error() string { return e.Message }
 
-// Load reads the environment and looks for the project file from dir upwards.
-// Every value the file sets can be overridden by a flag; that is the caller's,
-// after Load.
-func Load(getenv func(string) string, dir string) (Config, error) {
+// Load reads the environment. Every value can be overridden by a flag; that is
+// the caller's, after Load.
+func Load(getenv func(string) string) (Config, error) {
 	cfg := Config{URL: strings.TrimSpace(getenv("HOSTINGAFFE_URL")), Token: strings.TrimSpace(getenv("HOSTINGAFFE_TOKEN"))}
 
 	if cfg.URL == "" {
@@ -52,80 +39,5 @@ func Load(getenv func(string) string, dir string) (Config, error) {
 		return cfg, &UsageError{"HOSTINGAFFE_TOKEN is not set: a user token or an agent token."}
 	}
 
-	path, found := find(dir)
-	if found {
-		file, err := parse(path)
-		if err != nil {
-			return cfg, &UsageError{fmt.Sprintf("%s: %v", path, err)}
-		}
-		cfg.File = path
-		cfg.Project = file.project
-	}
-
 	return cfg, nil
-}
-
-type projectFile struct {
-	project string
-}
-
-// find walks up from dir to the root, the way git finds its own directory.
-func find(dir string) (string, bool) {
-	for {
-		candidate := filepath.Join(dir, FileName)
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate, true
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
-	}
-}
-
-// parse reads `key = value` lines; `#` starts a comment. One key is known,
-// `project`, and anything else is a mistake rather than ignored — a misspelt
-// `projekt` that silently did nothing would send every command to the wrong
-// project.
-func parse(path string) (projectFile, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return projectFile{}, err
-	}
-	defer f.Close()
-
-	var file projectFile
-	scanner := bufio.NewScanner(f)
-	line := 0
-	for scanner.Scan() {
-		line++
-		text := strings.TrimSpace(scanner.Text())
-		if text == "" || strings.HasPrefix(text, "#") {
-			continue
-		}
-
-		key, value, ok := strings.Cut(text, "=")
-		if !ok {
-			return projectFile{}, fmt.Errorf("line %d: expected `key = value`", line)
-		}
-
-		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
-		switch key {
-		case "project":
-			file.project = strings.ToUpper(value)
-		default:
-			return projectFile{}, fmt.Errorf("line %d: unknown key %q; the file knows `project`", line, key)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return projectFile{}, err
-	}
-
-	if file.project == "" {
-		return projectFile{}, errors.New("no `project = KEY` line")
-	}
-
-	return file, nil
 }

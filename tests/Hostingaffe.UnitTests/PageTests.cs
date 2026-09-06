@@ -11,8 +11,6 @@ public sealed class PageTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 5, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly Guid Project = Guid.CreateVersion7();
-
     private static readonly Guid Author = Guid.CreateVersion7();
 
     [Theory]
@@ -53,7 +51,7 @@ public sealed class PageTests
     [Fact]
     public void A_new_page_is_its_author_in_both_places()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", null, Author, Now);
+        var page = Page.Create("architecture", "Architecture", null, Author, Now);
 
         Assert.Equal("architecture", page.Slug);
         Assert.Equal("Architecture", page.Title);
@@ -70,17 +68,17 @@ public sealed class PageTests
     [InlineData("   ")]
     [InlineData("two\nlines")]
     public void A_title_is_one_line_and_not_blank(string title) =>
-        Assert.Throws<ArgumentException>(() => Page.Create(Project, "architecture", title, null, Author, Now));
+        Assert.Throws<ArgumentException>(() => Page.Create("architecture", title, null, Author, Now));
 
     [Fact]
     public void A_title_has_a_ceiling() =>
         Assert.Throws<ArgumentException>(() =>
-            Page.Create(Project, "architecture", new string('a', Page.TitleMaxLength + 1), null, Author, Now));
+            Page.Create("architecture", new string('a', Page.TitleMaxLength + 1), null, Author, Now));
 
     [Fact]
     public void Every_edit_moves_the_version_and_says_who()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", "# Old", Author, Now);
+        var page = Page.Create("architecture", "Architecture", "# Old", Author, Now);
         var editor = Guid.CreateVersion7();
         var later = Now.AddHours(1);
 
@@ -96,7 +94,7 @@ public sealed class PageTests
     [Fact]
     public void Rewriting_with_nothing_empties_the_document()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", "# Old", Author, Now);
+        var page = Page.Create("architecture", "Architecture", "# Old", Author, Now);
 
         page.Rewrite(null, Author, Now.AddHours(1));
 
@@ -106,7 +104,7 @@ public sealed class PageTests
     [Fact]
     public void Renaming_changes_the_address_and_nothing_else()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", "# The body", Author, Now);
+        var page = Page.Create("architecture", "Architecture", "# The body", Author, Now);
 
         page.Rename("betriebshandbuch", Author, Now.AddHours(1));
 
@@ -119,7 +117,7 @@ public sealed class PageTests
     [Fact]
     public void A_rename_to_something_that_is_not_a_slug_is_refused()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", null, Author, Now);
+        var page = Page.Create("architecture", "Architecture", null, Author, Now);
 
         Assert.Throws<ArgumentException>(() => page.Rename("Not A Slug", Author, Now.AddHours(1)));
         Assert.Equal("architecture", page.Slug);
@@ -128,7 +126,7 @@ public sealed class PageTests
     [Fact]
     public void Deleting_is_soft_and_restoring_undoes_exactly_it()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", "# The body", Author, Now);
+        var page = Page.Create("architecture", "Architecture", "# The body", Author, Now);
         var deleter = Guid.CreateVersion7();
 
         page.Delete(deleter, Now.AddHours(1));
@@ -152,7 +150,7 @@ public sealed class PageTests
     [Fact]
     public void Deleting_twice_keeps_the_first_deletion()
     {
-        var page = Page.Create(Project, "architecture", "Architecture", null, Author, Now);
+        var page = Page.Create("architecture", "Architecture", null, Author, Now);
         var first = Guid.CreateVersion7();
 
         page.Delete(first, Now.AddHours(1));

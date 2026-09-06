@@ -8,10 +8,9 @@ namespace Hostingaffe.Domain.Pages;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Lower case for the reason a label name is lower case — so that
-/// <c>architecture</c> and <c>Architecture</c> cannot both exist in one
-/// project — and hyphen-separated because the slug is read aloud in running
-/// text, where an underscore or a slash reads as punctuation nobody meant.
+/// Lower case so that <c>architecture</c> and <c>Architecture</c> cannot both
+/// exist, and hyphen-separated because the slug is read aloud in running text,
+/// where an underscore or a slash reads as punctuation nobody meant.
 /// </para>
 /// <para>
 /// It is validated, never derived from the title: a title is a sentence and an

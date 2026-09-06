@@ -2,7 +2,7 @@ namespace Hostingaffe.Application.Ports;
 
 /// <summary>
 /// The three variables of ADR 0008, and nothing else: where logaffe answers, the
-/// token that names the project there, and the floor. logaffe is the target as
+/// token that names the stream there, and the floor. logaffe is the target as
 /// soon as the first two are set; otherwise the instance logs to the console
 /// and a rolling file.
 /// </summary>

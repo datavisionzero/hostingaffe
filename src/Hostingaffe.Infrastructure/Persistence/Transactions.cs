@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Hostingaffe.Application.Ports;
-using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Infrastructure.Persistence;
 
@@ -15,14 +13,12 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// commit.
 /// </para>
 /// <para>
-/// <strong>The purge is opportunistic.</strong> Before the commit, for every
-/// project a written row belongs to, up to twenty of that project's deleted
-/// pages whose grace period has passed are removed — the cascade taking their
-/// history with them — plus up to twenty idempotency rows older than a day, and
-/// up to twenty deleted projects past their grace period, instance-wide. The
-/// batch is small so that no request pays for a backlog; the floor is a floor,
-/// and a project nobody writes to keeps its deleted rows longer. No scheduler:
-/// the write that would have paid for one does the work instead.
+/// <strong>The purge is opportunistic.</strong> Before the commit, up to twenty
+/// deleted pages whose grace period has passed are removed — the cascade taking
+/// their history with them — plus up to twenty idempotency rows older than a
+/// day. The batch is small so that no request pays for a backlog, and the floor
+/// is a floor: an instance nobody writes to keeps its deleted rows longer. No
+/// scheduler; the write that would have paid for one does the work instead.
 /// </para>
 /// </remarks>
 public sealed class Transactions(HostingaffeDbContext context, InstanceSettings settings) : ITransactions
@@ -52,32 +48,15 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
 
     private async Task PurgeAsync(CancellationToken cancellationToken)
     {
-        var projects = context.ChangeTracker.Entries()
-            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted or EntityState.Unchanged)
-            .Select(e => e.Entity switch
-            {
-                Page page => page.ProjectId,
-                Project project => project.Id,
-                _ => (Guid?)null,
-            })
-            .OfType<Guid>()
-            .Distinct()
-            .ToArray();
-
-        var grace = settings.DeletionGrace;
-
-        foreach (var projectId in projects)
-        {
-            // A page holds nothing else up: its slug comes free with the row.
-            await context.Database.ExecuteSqlRawAsync(
-                """
-                delete from page where id in (
-                    select id from page
-                     where project_id = {0} and deleted_at is not null and deleted_at <= now() - {1}::interval
-                     limit {2})
-                """,
-                [projectId, grace, Batch], cancellationToken);
-        }
+        // A page holds nothing else up: its slug comes free with the row.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from page where id in (
+                select id from page
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval
+                 limit {1})
+            """,
+            [settings.DeletionGrace, Batch], cancellationToken);
 
         await context.Database.ExecuteSqlRawAsync(
             """
@@ -87,16 +66,5 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
                  limit {0})
             """,
             [Batch], cancellationToken);
-
-        // A deleted project goes with everything in it, on the next write
-        // anywhere: the administrator who typed the key decided that.
-        await context.Database.ExecuteSqlRawAsync(
-            """
-            delete from project where id in (
-                select id from project
-                 where deleted_at is not null and deleted_at <= now() - {0}::interval
-                 limit {1})
-            """,
-            [grace, Batch], cancellationToken);
     }
 }

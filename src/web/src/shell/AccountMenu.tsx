@@ -19,7 +19,7 @@ import { Keys } from "./ShortcutsDialog";
  * who is signed in, the theme, the keys, settings, sign out.
  *
  * The overview of the keys is here rather than in the sidebar because the
- * sidebar carries the views of one project and the keys belong to the whole
+ * sidebar carries the views of the instance and the keys belong to the whole
  * application — and because a list of shortcuts reachable only by a shortcut
  * helps nobody who has not found one yet.
  */

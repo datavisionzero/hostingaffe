@@ -4,9 +4,10 @@ using Hostingaffe.Domain;
 namespace Hostingaffe.Application.Acts;
 
 /// <summary>
-/// The coarse permission line of cut one (<c>docs/api.md</c>, Who may do what):
-/// an agent works in projects, a user administers them, an administrator
-/// administers users.
+/// The permission line of VISION 9 (<c>docs/api.md</c>, Who may do what): every
+/// identity reads everything and writes content; an agent administers no
+/// identities (planaffe ADR 0015), and an administrator manages users, agents
+/// and tokens.
 /// </summary>
 public static class Permissions
 {

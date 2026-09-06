@@ -1,17 +1,12 @@
 import { CommandIcon } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Navigate, Route, Routes, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { PagesView } from "@/pages/PagesView";
-import { ProjectSwitcher } from "@/projects/ProjectSwitcher";
-import { NewProjectView } from "@/projects/NewProjectView";
-import { ProjectsContext } from "@/projects/context";
-import { lastProject, rememberProject, useProjects, type Projects } from "@/projects/useProjects";
 import { SettingsView } from "@/settings/SettingsView";
 import { AdminView } from "@/settings/AdminView";
-import { ProjectSettingsView } from "@/settings/ProjectSettingsView";
 import { AccountMenu } from "./AccountMenu";
 import { AppSidebar } from "./AppSidebar";
 import { Palette } from "./Palette";
@@ -25,41 +20,20 @@ const NewPageView = lazy(() => import("@/pages/PageView").then((module) => ({ de
 
 /**
  * The application shell of ADR 0006: the frame every screen sits in, rendered
- * before any data arrives and never remounted by navigation. The current
- * project is read from the URL — `/:project/…` — so that the frame and the
- * screen agree without either telling the other.
+ * before any data arrives and never remounted by navigation. One instance holds
+ * one team's infrastructure and every user sees all of it (VISION 9), so the
+ * frame stands in the instance and not in a part of it.
  */
 export function Shell() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const list = useProjects();
-  const projects = list.projects;
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  const match = matchPath("/:project/*", location.pathname);
-  const projectKey = match?.params.project;
-  const viewPath = match?.params["*"] ?? "pages";
-  const currentView = viewPath.split("/")[0] || "pages";
-
-  const current =
-    projects.at === "known" && projectKey !== undefined
-      ? projects.projects.find((project) => project.key === projectKey)
-      : undefined;
-
-  useEffect(() => {
-    if (current !== undefined) {
-      rememberProject(current.key);
-    }
-  }, [current]);
-
   // The keys the frame itself owns, read from `shortcuts.ts` so that this
-  // handler and the overview it feeds cannot come apart. `p`, `?` and `c` are
-  // bare keys on purpose: ⌘P is the browser's print, and taking printing away
-  // from an issue tracker costs more than the switcher gains. Bare keys are
-  // what the lists already use — `j`, `k`, `/` — so they join that alphabet
-  // instead of fighting the browser for a modifier.
+  // handler and the overview it feeds cannot come apart. `?` and `c` are bare
+  // keys on purpose: ⌘P is the browser's print, and bare keys are the alphabet
+  // the screens already use rather than a fight with the browser for a
+  // modifier.
   useEffect(() => {
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (is("global:palette", event)) {
@@ -77,45 +51,26 @@ export function Shell() {
         return;
       }
 
-      if (is("global:projects", event)) {
-        event.preventDefault();
-        setSwitcherOpen(true);
-      } else if (is("global:shortcuts", event)) {
+      if (is("global:shortcuts", event)) {
         event.preventDefault();
         setShortcutsOpen(true);
-      } else if (is("global:create", event) && current !== undefined) {
-        // The project the frame is standing in, not the one in the address:
-        // `/settings` matches `/:project/*` too, and nothing is created there.
+      } else if (is("global:create", event)) {
         event.preventDefault();
-        void navigate(`/${current.key}/pages/new`);
+        void navigate("/pages/new");
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [current, navigate]);
-
-  const known = projects.at === "known" ? projects.projects : [];
+  }, [navigate]);
 
   return (
-    // The list and the way back to it (ADR 0006: the shell is not remounted by
-    // navigation): a screen that adds a project asks the frame to catch up
-    // rather than leaving it on a list the new project is not in.
-    <ProjectsContext.Provider value={list}>
     <SidebarProvider>
-      <AppSidebar project={current} />
+      <AppSidebar />
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
           <SidebarTrigger className="md:hidden" />
           <Separator orientation="vertical" className="mr-1 h-4! md:hidden" />
-          <ProjectSwitcher
-            projects={projects}
-            current={current}
-            viewPath={currentView}
-            open={switcherOpen}
-            onOpenChange={setSwitcherOpen}
-            reload={list.reload}
-          />
           <div className="flex-1" />
           <Button
             variant="outline"
@@ -140,58 +95,23 @@ export function Shell() {
         </header>
 
         <Routes>
-          <Route path="/" element={<Landing projects={projects} />} />
+          <Route path="/" element={<Navigate to="/pages" replace />} />
           <Route path="/settings/*" element={<SettingsView />} />
           <Route path="/admin/*" element={<AdminView />} />
-          <Route path="/projects/new" element={<NewProjectView />} />
-          <Route path="/:project">
-            <Route index element={<Navigate to="pages" replace />} />
-            <Route path="pages" element={<PagesView />} />
-            <Route path="pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
-            <Route path="pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />
-            <Route path="settings/*" element={<ProjectSettingsView />} />
-          </Route>
+          <Route path="/pages" element={<PagesView />} />
+          <Route path="/pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
+          <Route path="/pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />
         </Routes>
       </SidebarInset>
 
       <Palette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
-        projects={known}
-        current={current}
         onShortcuts={() => setShortcutsOpen(true)}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </SidebarProvider>
-    </ProjectsContext.Provider>
   );
-}
-
-/**
- * `/` is nowhere: it lands in the project the user was in last, or the first
- * one.
- */
-function Landing({ projects }: { projects: Projects }) {
-  if (projects.at === "asking") {
-    return <Busy title="Looking for your projects…" />;
-  }
-
-  if (projects.at === "failed") {
-    return <Empty title="The projects could not be loaded." />;
-  }
-
-  const remembered = lastProject();
-  const target = projects.projects.find((project) => project.key === remembered) ?? projects.projects[0];
-
-  if (target === undefined) {
-    return (
-      <Empty title="No project yet.">
-        <code className="font-mono">ha project create --key PLAN --name "…"</code> makes the first one.
-      </Empty>
-    );
-  }
-
-  return <Navigate to={`/${target.key}/pages`} replace />;
 }
 
 /**

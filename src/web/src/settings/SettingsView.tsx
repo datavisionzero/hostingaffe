@@ -105,7 +105,7 @@ function Agents() {
   const report = reporting(setNotice, load);
 
   return (
-    <Section title="Agents" description="Each agent has one token and inherits your project access.">
+    <Section title="Agents" description="Each agent has one token and acts as itself (planaffe ADR 0015).">
       {secret && <Secret value={secret} />}
       <form className="mb-3 flex max-w-lg gap-2" onSubmit={(e) => void submitting(e, setNotice, async (data, form) => { const r = await api.POST("/agents", { body: { name: String(data.get("name")) || null } }); if (!r.data) throw new Error(describe(r.error, r.response.status)); setSecret(r.data.token.secret); await load(); form.reset(); })}>
         <Input name="name" placeholder="Optional agent name" aria-label="Agent name" />

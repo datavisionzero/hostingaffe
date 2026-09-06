@@ -3,14 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 using Hostingaffe.Infrastructure.Persistence;
 
 namespace Hostingaffe.IntegrationTests;
 
 /// <summary>
 /// A migrated database with the rows most tests need to say anything: a user,
-/// an agent the user owns, a project, and one page in it.
+/// an agent the user owns, and one page.
 /// </summary>
 internal sealed class Migrated(string connectionString) : IAsyncDisposable
 {
@@ -23,8 +22,6 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
     public User User { get; private set; } = null!;
 
     public Agent Agent { get; private set; } = null!;
-
-    public Project Project { get; private set; } = null!;
 
     public Page Page { get; private set; } = null!;
 
@@ -42,10 +39,9 @@ internal sealed class Migrated(string connectionString) : IAsyncDisposable
 
         migrated.User = User.Create("maintainer", administrator: true, Now);
         migrated.Agent = Agent.Create("quiet-otter-42", migrated.User.Id, Now);
-        migrated.Project = Project.Create("PLAN", "hostingaffe", migrated.User.Id, Now);
-        migrated.Page = Page.Create(migrated.Project.Id, "welcome", "Welcome", "The seeded page.", migrated.User.Id, Now);
+        migrated.Page = Page.Create("welcome", "Welcome", "The seeded page.", migrated.User.Id, Now);
 
-        context.AddRange(migrated.User, migrated.Agent, migrated.Project, migrated.Page);
+        context.AddRange(migrated.User, migrated.Agent, migrated.Page);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         context.ChangeTracker.Clear();
 

@@ -47,7 +47,7 @@ public sealed class Identities(HostingaffeDbContext context) : IIdentities
         await context.Users.OrderBy(u => u.CreatedAt).ThenBy(u => u.Id).ToListAsync(cancellationToken);
 
     // One statement for the list: the agent, its owner and its one token,
-    // which the partial unique index `token_agent` guarantees is one. Projected
+    // which the partial unique index `token_agent` guarantees is one. Read
     // to a plain shape and built afterwards: EF Core translates joins on
     // columns, not the construction of a record out of three entities.
     public async Task<IReadOnlyList<AgentRow>> ListAgentsAsync(CancellationToken cancellationToken)

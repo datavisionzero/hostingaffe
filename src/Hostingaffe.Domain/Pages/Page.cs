@@ -1,28 +1,25 @@
 namespace Hostingaffe.Domain.Pages;
 
 /// <summary>
-/// A Markdown document in a project, addressed by its slug: the project's flat
-/// wiki, and the place a plan lives until tickets are cut from it
+/// A Markdown document addressed by its slug: the instance's flat wiki
 /// (<c>CONTEXT.md</c>, Page; VISION 7).
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is the one object in the product not reached through a key (ADR 0021),
-/// and the slug it is reached by may be renamed: the old one leads nowhere
-/// afterwards, and the rename stands in the history.
+/// The slug it is reached by may be renamed: the old one leads nowhere
+/// afterwards, and the rename stands in the history (ADR 0021).
 /// </para>
 /// <para>
-/// <see cref="UpdatedAt"/> is the version, as at the issue and the epic, so
-/// that a page inherits the guarded write of <c>docs/api.md</c>
-/// ("Concurrency on text fields") rather than carrying a mechanism of its own.
-/// Every edit moves it and names who made it, because a wiki's list is read
-/// for who touched what last.
+/// <see cref="UpdatedAt"/> is the version, so that a page inherits the guarded
+/// write of <c>docs/api.md</c> ("Concurrency on text fields") rather than
+/// carrying a mechanism of its own. Every edit moves it and names who made it,
+/// because a wiki's list is read for who touched what last.
 /// </para>
 /// <para>
 /// Uniqueness of the slug is the store's and the database's, not this type's:
-/// it needs the project's other pages. A deleted page keeps its slug until the
-/// purge takes it, so that restoring one never lands on a name somebody else
-/// has taken (ADR 0013).
+/// it needs the other pages. A deleted page keeps its slug until the purge
+/// takes it, so that restoring one never lands on a name somebody else has
+/// taken (ADR 0013).
 /// </para>
 /// </remarks>
 public sealed class Page
@@ -34,10 +31,9 @@ public sealed class Page
         // EF Core materializes through this; every other route goes through Create.
     }
 
-    private Page(Guid id, Guid projectId, string slug, string title, string body, Guid createdBy, DateTimeOffset createdAt)
+    private Page(Guid id, string slug, string title, string body, Guid createdBy, DateTimeOffset createdAt)
     {
         Id = id;
-        ProjectId = projectId;
         Slug = slug;
         Title = title;
         Body = body;
@@ -49,9 +45,7 @@ public sealed class Page
 
     public Guid Id { get; private init; }
 
-    public Guid ProjectId { get; private init; }
-
-    /// <summary>The address, unique within the project and renameable (ADR 0021).</summary>
+    /// <summary>The address, unique in the instance and renameable (ADR 0021).</summary>
     public string Slug { get; private set; } = null!;
 
     public string Title { get; private set; } = null!;
@@ -75,10 +69,9 @@ public sealed class Page
 
     public bool Deleted => DeletedAt is not null;
 
-    public static Page Create(Guid projectId, string slug, string title, string? body, Guid createdBy, DateTimeOffset createdAt) =>
+    public static Page Create(string slug, string title, string? body, Guid createdBy, DateTimeOffset createdAt) =>
         new(
             Guid.CreateVersion7(),
-            projectId,
             Domain.Pages.Slug.Normalize(slug),
             NormalizeTitle(title),
             body ?? string.Empty,

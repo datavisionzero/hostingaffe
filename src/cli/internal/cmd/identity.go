@@ -180,7 +180,7 @@ func newUser(g *globals) *cobra.Command {
 			return nil
 		},
 	}
-	create.Flags().BoolVar(&administrator, "administrator", false, "administers the instance: users, projects, and everything outside one project")
+	create.Flags().BoolVar(&administrator, "administrator", false, "administers the instance: users, agents and tokens")
 	create.Flags().StringVar(&email, "email", "", "email address to receive the invitation (required)")
 	_ = create.MarkFlagRequired("email")
 	list := &cobra.Command{

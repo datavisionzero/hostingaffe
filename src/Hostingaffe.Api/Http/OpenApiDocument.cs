@@ -22,7 +22,7 @@ public static class OpenApiDocument
 {
     /// <summary>
     /// A CLR type ending in <c>Shape</c> is the contract's shape of the Domain
-    /// type of the same name — <c>ProjectShape</c> is the <c>Project</c> of
+    /// type of the same name — <c>PageShape</c> is the <c>Page</c> of
     /// <c>docs/api.md</c> — so the suffix is dropped from the schema id and both
     /// generated clients see the name the document uses.
     /// </summary>

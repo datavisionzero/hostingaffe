@@ -45,7 +45,7 @@ services:
       HOSTINGAFFE_SMTP_FROM_ADDRESS: "${HOSTINGAFFE_SMTP_FROM_ADDRESS:-}"
       HOSTINGAFFE_SMTP_FROM_NAME: "${HOSTINGAFFE_SMTP_FROM_NAME:-}"
       # How long a deleted row can be restored before the purge may take it
-      # (ADR 0013). Per instance, never per project.
+      # (ADR 0013).
       HOSTINGAFFE_DELETION_GRACE_DAYS: "${HOSTINGAFFE_DELETION_GRACE_DAYS:-7}"
       # Where the log goes (ADR 0008): into a logaffe instance when both are set,
       # into the console and a rolling file under /app/logs otherwise.

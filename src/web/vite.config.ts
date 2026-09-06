@@ -11,14 +11,13 @@ import { defineConfig } from "vitest/config";
  * API at its own origin there as well as in the image.
  */
 const instanceRoutes = [
+  "/admin",
   "/agents",
-  "/epics",
-  "/issues",
+  "/email-changes",
   "/invitations",
   "/me",
   "/openapi",
-  "/projects",
-  "/questions",
+  "/pages",
   "/password-recovery",
   "/session",
   "/sessions",

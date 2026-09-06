@@ -1,6 +1,4 @@
 import { NavLink, useLocation } from "react-router";
-import { SettingsIcon } from "lucide-react";
-import type { Project } from "@/api/client";
 import {
   Sidebar,
   SidebarContent,
@@ -18,11 +16,11 @@ import { useSession } from "@/session/useSession";
 import { viewPath, views } from "./views";
 
 /**
- * The left navigation of ADR 0006: the views of the current project, in two
- * groups. On a phone the same component is the drawer the header button
- * opens — one application, not a reduced one.
+ * The left navigation of ADR 0006: the views of the instance, in two groups. On
+ * a phone the same component is the drawer the header button opens — one
+ * application, not a reduced one.
  */
-export function AppSidebar({ project }: { project: Project | undefined }) {
+export function AppSidebar() {
   const { me } = useSession();
   const { setOpenMobile } = useSidebar();
   const { pathname } = useLocation();
@@ -42,7 +40,7 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
       </SidebarHeader>
 
       <SidebarContent>
-        <nav aria-label="Views of the project">
+        <nav aria-label="Views of the instance">
         {groups.map((group) => (
           <SidebarGroup key={group.id}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
@@ -51,30 +49,19 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
                 {views
                   .filter((view) => view.group === group.id)
                   .map((view) => {
-                    const path = project === undefined ? "" : viewPath(project.key, view);
-                    return <SidebarMenuItem key={view.id}>
-                      {project === undefined ? (
-                        <SidebarMenuButton disabled>
-                          <view.icon />
-                          <span>{view.label}</span>
-                        </SidebarMenuButton>
-                      ) : (
+                    const path = viewPath(view);
+                    return (
+                      <SidebarMenuItem key={view.id}>
                         <SidebarMenuButton
                           isActive={pathname === path || pathname.startsWith(`${path}/`)}
-                          render={
-                            <NavLink
-                              to={path}
-                              onClick={() => setOpenMobile(false)}
-                            />
-                          }
+                          render={<NavLink to={path} onClick={() => setOpenMobile(false)} />}
                         >
                           <view.icon />
                           <span>{view.label}</span>
                         </SidebarMenuButton>
-                      )}
-                    </SidebarMenuItem>;
+                      </SidebarMenuItem>
+                    );
                   })}
-                {group.id === "structure" && project !== undefined && <SidebarMenuItem><SidebarMenuButton isActive={pathname === `/${project.key}/settings`} render={<NavLink to={`/${project.key}/settings`} onClick={() => setOpenMobile(false)} />}><SettingsIcon /><span>Project settings</span></SidebarMenuButton></SidebarMenuItem>}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

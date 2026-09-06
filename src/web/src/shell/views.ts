@@ -1,9 +1,9 @@
 import { FileTextIcon, type LucideIcon } from "lucide-react";
 
 /**
- * The views of a project, as ADR 0006 lists them, in the order the navigation
- * shows them. Every view is a route under `/:project/`, so that a pasted link
- * says what it shows.
+ * The views of the instance, as ADR 0006 lists them, in the order the
+ * navigation shows them. Every view is a route of its own, so that a pasted
+ * link says what it shows.
  */
 export type View = {
   id: string;
@@ -19,15 +19,15 @@ export const views: View[] = [
   {
     id: "pages",
     label: "Pages",
-    path: "pages",
+    path: "/pages",
     icon: FileTextIcon,
     group: "structure",
-    hint: "What the project knows and no ticket asks for.",
+    hint: "What the team knows and no record holds.",
   },
 ];
 
-export function viewPath(project: string, view: View): string {
-  return `/${project}/${view.path}`;
+export function viewPath(view: View): string {
+  return view.path;
 }
 
 /**
@@ -35,6 +35,6 @@ export function viewPath(project: string, view: View): string {
  * a key (ADR 0021), so the slug is what the path carries — escaped, because it
  * is the author's word and not a generated one.
  */
-export function pagePath(project: string, slug: string): string {
-  return `/${project}/pages/${encodeURIComponent(slug)}`;
+export function pagePath(slug: string): string {
+  return `/pages/${encodeURIComponent(slug)}`;
 }

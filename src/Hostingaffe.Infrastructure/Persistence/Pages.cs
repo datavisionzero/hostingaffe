@@ -8,20 +8,12 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// <summary>The page rows, ordered by the slug — the only order a flat wiki has.</summary>
 public sealed class Pages(HostingaffeDbContext context) : IPages
 {
-    public Task<Page?> FindLiveAsync(Guid projectId, string slug, CancellationToken cancellationToken) =>
-        context.Pages.SingleOrDefaultAsync(p => p.ProjectId == projectId && p.Slug == slug && p.DeletedAt == null, cancellationToken);
+    public Task<Page?> FindAnyAsync(string slug, CancellationToken cancellationToken) =>
+        context.Pages.SingleOrDefaultAsync(p => p.Slug == slug, cancellationToken);
 
-    public Task<Page?> FindAnyAsync(Guid projectId, string slug, CancellationToken cancellationToken) =>
-        context.Pages.SingleOrDefaultAsync(p => p.ProjectId == projectId && p.Slug == slug, cancellationToken);
-
-    public async Task<IReadOnlyList<Page>> FindLiveManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
-        ids.Count == 0
-            ? []
-            : await context.Pages.Where(p => ids.Contains(p.Id) && p.DeletedAt == null).ToListAsync(cancellationToken);
-
-    public async Task<IReadOnlyList<Page>> ListAsync(Guid projectId, string? search, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Page>> ListAsync(string? search, CancellationToken cancellationToken)
     {
-        var rows = context.Pages.Where(p => p.ProjectId == projectId && p.DeletedAt == null);
+        var rows = context.Pages.Where(p => p.DeletedAt == null);
 
         // The same `simple` configuration and the same words a search box
         // takes as everywhere else (docs/storage.md, Full-text search): a

@@ -18,15 +18,15 @@ type Load<T> = { at: "asking" } | { at: "failed"; why: string } | { at: "known";
 const asking = { at: "asking" } as const;
 
 /**
- * A page of the project's wiki: the Markdown, rendered in the browser and
+ * A page of the wiki: the Markdown, rendered in the browser and
  * never as HTML (ADR 0007), with the editor in its place rather than beside
  * it. The address is the slug, which is why renaming is its own act here too —
  * nothing forwards, and every link written to the old one stops working
  * (ADR 0021).
  */
 export function PageView() {
-  const { project, slug } = useParams();
-  const at = `${project}/${slug}`;
+  const { slug } = useParams();
+  const at = slug ?? "";
   const [state, setState] = useState<{ at: string; page: Load<Page> }>();
   // Both are about the page in the address, so both carry it: walking to
   // another page leaves neither the editor nor a deleted one's way back open.
@@ -41,8 +41,8 @@ export function PageView() {
 
     void (async () => {
       try {
-        const { data, error, response } = await api.GET("/projects/{key}/pages/{slug}", {
-          params: { path: { key: project!, slug: slug! } },
+        const { data, error, response } = await api.GET("/pages/{slug}", {
+          params: { path: { slug: slug! } },
         });
 
         if (live) {
@@ -61,7 +61,7 @@ export function PageView() {
     return () => {
       live = false;
     };
-  }, [at, project, slug]);
+  }, [at, slug]);
 
   if (current.at === "asking") {
     return (
@@ -81,7 +81,7 @@ export function PageView() {
         <PageHeader title={slug!} />
         <p className="p-4 text-sm text-destructive">{current.why}</p>
         <p className="px-4 text-sm">
-          <Link className="text-brand hover:underline" to={`/${project}/pages`}>All pages</Link>
+          <Link className="text-brand hover:underline" to="/pages">All pages</Link>
         </p>
       </>
     );
@@ -89,7 +89,7 @@ export function PageView() {
 
   const page = current.value;
   const changed = (value: Page) => {
-    setState({ at: `${project}/${value.slug}`, page: { at: "known", value } });
+    setState({ at: value.slug, page: { at: "known", value } });
     setEditingAt(undefined);
   };
 
@@ -98,10 +98,9 @@ export function PageView() {
       <>
         <PageHeader title={deleted.slug} />
         <div className="m-auto grid max-w-md justify-items-center gap-3 p-8 text-center">
-          <p>This page is deleted and hidden from the project. Its slug is held until the grace period is over.</p>
+          <p>This page is deleted and hidden from the wiki. Its slug is held until the grace period is over.</p>
           <Restore
             page={deleted}
-            project={project!}
             onChanged={(value) => {
               setRemoved(undefined);
               changed(value);
@@ -116,7 +115,7 @@ export function PageView() {
     return (
       <>
         <PageHeader title={`Edit ${page.slug}`} />
-        <EditPageForm project={project!} page={page} onSaved={changed} onCancel={() => setEditingAt(undefined)} />
+        <EditPageForm page={page} onSaved={changed} onCancel={() => setEditingAt(undefined)} />
       </>
     );
   }
@@ -137,7 +136,7 @@ export function PageView() {
       <div className="max-w-3xl flex-1 p-4 md:p-6">
         {page.body === "" ? (
           <p className="text-sm text-muted-foreground">
-            This page is empty. It is the place for what the project knows and no ticket asks for.
+            This page is empty. It is the place for what the team knows and no record holds.
           </p>
         ) : (
           <Markdown>{page.body}</Markdown>
@@ -145,15 +144,15 @@ export function PageView() {
 
         <Section title="Actions">
           <div className="flex flex-wrap gap-2">
-            <Rename project={project!} page={page} onChanged={changed} />
+            <Rename page={page} onChanged={changed} />
             <ActionDialog
               trigger={<Button variant="destructive">Delete page</Button>}
               title={`Delete ${page.slug}?`}
-              description="The page will be hidden from the project, but can be restored during the grace period. Its slug stays taken until then, so nothing else can move into the address."
+              description="The page will be hidden from the wiki, but can be restored during the grace period. Its slug stays taken until then, so nothing else can move into the address."
               confirmLabel="Delete page"
               onConfirm={async () => {
-                const result = await api.DELETE("/projects/{key}/pages/{slug}", {
-                  params: { path: { key: project!, slug: page.slug } },
+                const result = await api.DELETE("/pages/{slug}", {
+                  params: { path: { slug: page.slug } },
                 });
                 if (!result.response.ok) throw new Error(describe(result.error, result.response.status));
                 setRemoved({ at, page });
@@ -174,7 +173,7 @@ export function PageView() {
   );
 }
 
-function Restore({ project, page, onChanged }: { project: string; page: Page; onChanged: (page: Page) => void }) {
+function Restore({ page, onChanged }: { page: Page; onChanged: (page: Page) => void }) {
   const [busy, setBusy] = useState(false);
   const [why, setWhy] = useState<string>();
 
@@ -182,8 +181,8 @@ function Restore({ project, page, onChanged }: { project: string; page: Page; on
     setBusy(true);
     setWhy(undefined);
     try {
-      const { data, error, response } = await api.POST("/projects/{key}/pages/{slug}/restore", {
-        params: { path: { key: project, slug: page.slug } },
+      const { data, error, response } = await api.POST("/pages/{slug}/restore", {
+        params: { path: { slug: page.slug } },
       });
       if (data === undefined) throw new Error(describe(error, response.status));
       onChanged(data);
@@ -209,7 +208,7 @@ function Restore({ project, page, onChanged }: { project: string; page: Page; on
  * address leads nowhere afterwards, nothing forwards, and every reference
  * written to it stops working (ADR 0021). That is worth being told once.
  */
-function Rename({ project, page, onChanged }: { project: string; page: Page; onChanged: (page: Page) => void }) {
+function Rename({ page, onChanged }: { page: Page; onChanged: (page: Page) => void }) {
   const navigate = useNavigate();
 
   return (
@@ -221,20 +220,19 @@ function Rename({ project, page, onChanged }: { project: string; page: Page; onC
       initialValue={page.slug}
       submitLabel="Rename page"
       onSubmit={async (slug) => {
-        const { data, error, response } = await api.PATCH("/projects/{key}/pages/{slug}", {
-          params: { path: { key: project, slug: page.slug } },
+        const { data, error, response } = await api.PATCH("/pages/{slug}", {
+          params: { path: { slug: page.slug } },
           body: { slug },
         });
         if (data === undefined) throw new Error(describe(error, response.status));
         onChanged(data);
-        void navigate(pagePath(project, data.slug), { replace: true });
+        void navigate(pagePath(data.slug), { replace: true });
       }}
     />
   );
 }
 
-function EditPageForm({ project, page, onSaved, onCancel }: {
-  project: string;
+function EditPageForm({ page, onSaved, onCancel }: {
   page: Page;
   onSaved: (page: Page) => void;
   onCancel: () => void;
@@ -256,8 +254,8 @@ function EditPageForm({ project, page, onSaved, onCancel }: {
       // and an agent both edit, and neither may overwrite the other silently.
       write={async (draft) => {
         setConflict(undefined);
-        const answer = await api.PATCH("/projects/{key}/pages/{slug}", {
-          params: { path: { key: project, slug: page.slug } },
+        const answer = await api.PATCH("/pages/{slug}", {
+          params: { path: { slug: page.slug } },
           headers: { "If-Match": version },
           body: { title: draft.title, body: draft.body },
         });
@@ -277,7 +275,6 @@ function EditPageForm({ project, page, onSaved, onCancel }: {
 
 /** Create a page: the slug is given here and never derived from the title (ADR 0021). */
 export function NewPageView() {
-  const { project } = useParams();
   const navigate = useNavigate();
 
   return (
@@ -286,9 +283,9 @@ export function NewPageView() {
       <PageForm
         slugField
         submit="Create page"
-        onCancel={() => void navigate(`/${project}/pages`)}
-        write={(draft) => api.POST("/projects/{key}/pages", { params: { path: { key: project! } }, body: draft })}
-        onWritten={(page) => void navigate(pagePath(project!, page.slug), { replace: true })}
+        onCancel={() => void navigate("/pages")}
+        write={(draft) => api.POST("/pages", { body: draft })}
+        onWritten={(page) => void navigate(pagePath(page.slug), { replace: true })}
       />
     </>
   );

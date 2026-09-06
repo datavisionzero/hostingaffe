@@ -1,10 +1,9 @@
 import { ArrowRightIcon, SearchIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
-import { api, type Project, type Schemas } from "@/api/client";
+import { api, type Schemas } from "@/api/client";
 import { useTheme } from "@/components/theme-provider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { rememberProject } from "@/projects/useProjects";
 import { useSession } from "@/session/useSession";
 import { cn } from "@/lib/utils";
 import { Keys } from "./ShortcutsDialog";
@@ -29,9 +28,9 @@ const matches = 5;
 const settle = 150;
 
 /**
- * The command palette — ⌘K, or Ctrl+K — over the views, the projects and the
- * few acts the shell itself has. Words typed into it ask the instance for a
- * few full-text matches.
+ * The command palette — ⌘K, or Ctrl+K — over the views and the few acts the
+ * shell itself has. Words typed into it ask the instance for a few full-text
+ * matches.
  *
  * For the wiki this is more than a nicety: the pages are flat because the
  * search is what a hierarchy would have been, so this is how one is found at
@@ -43,27 +42,20 @@ const settle = 150;
 type PaletteProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projects: Project[];
-  current: Project | undefined;
   /** The overview of the keys, which the palette is one of the ways to. */
   onShortcuts: () => void;
 };
 
-export function Palette({ open, onOpenChange, projects, current, onShortcuts }: PaletteProps) {
+export function Palette({ open, onOpenChange, onShortcuts }: PaletteProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="top-[20%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
         <DialogHeader className="sr-only">
           <DialogTitle>Command palette</DialogTitle>
-          <DialogDescription>Search views, projects and commands, or type an issue key.</DialogDescription>
+          <DialogDescription>Search pages, views and commands.</DialogDescription>
         </DialogHeader>
         {open && (
-          <PaletteBody
-            onOpenChange={onOpenChange}
-            projects={projects}
-            current={current}
-            onShortcuts={onShortcuts}
-          />
+          <PaletteBody onOpenChange={onOpenChange} onShortcuts={onShortcuts} />
         )}
       </DialogContent>
     </Dialog>
@@ -71,7 +63,7 @@ export function Palette({ open, onOpenChange, projects, current, onShortcuts }: 
 }
 
 /** Mounted while the palette is open, so that its query starts empty every time. */
-function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<PaletteProps, "open">) {
+function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
   const { signOut } = useSession();
@@ -81,10 +73,8 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
   const searchId = useId();
 
   const needle = query.trim();
-  const projectKey = current?.key;
-  // Words, and a project to search in. `q` is the same full-text search the
-  // page list itself uses.
-  const searching = projectKey !== undefined && needle.length >= shortest;
+  // `q` is the same full-text search the page list itself uses.
+  const searching = needle.length >= shortest;
 
   useEffect(() => {
     if (!searching) {
@@ -98,8 +88,8 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const pages = await api.GET("/projects/{key}/pages", {
-            params: { path: { key: projectKey }, query: { q: needle } },
+          const pages = await api.GET("/pages", {
+            params: { query: { q: needle } },
             signal: controller.signal,
           });
 
@@ -114,7 +104,7 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
       clearTimeout(timer);
       controller.abort();
     };
-  }, [needle, projectKey, searching]);
+  }, [needle, searching]);
 
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => {
@@ -124,7 +114,7 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
 
     const list: Command[] = [];
 
-    if (searching && projectKey !== undefined) {
+    if (searching) {
       const hits = found.of === needle ? found : { pages: [] };
 
       for (const page of hits.pages) {
@@ -133,46 +123,25 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
           label: page.title,
           hint: page.slug,
           group: "Pages",
-          run: go(pagePath(projectKey, page.slug)),
+          run: go(pagePath(page.slug)),
           found: true,
         });
       }
     }
 
-    if (current !== undefined) {
-      for (const view of views) {
-        list.push({
-          id: `view:${view.id}`,
-          label: view.label,
-          hint: view.hint,
-          group: current.key,
-          run: go(viewPath(current.key, view)),
-        });
-      }
+    for (const view of views) {
+      list.push({
+        id: `view:${view.id}`,
+        label: view.label,
+        hint: view.hint,
+        group: "Go to",
+        run: go(viewPath(view)),
+      });
     }
 
     // The palette is the other way to everything the screens offer, so what
     // can be created is reachable from it too.
-    if (current !== undefined) {
-      list.push({ id: "create:page", label: "Create page", hint: current.key, group: "Create", run: go(`/${current.key}/pages/new`) });
-    }
-
-    list.push({ id: "create:project", label: "Create project", group: "Create", run: go("/projects/new") });
-
-    for (const project of projects) {
-      if (project.key !== current?.key) {
-        list.push({
-          id: `project:${project.key}`,
-          label: project.name,
-          hint: project.key,
-          group: "Switch project",
-          run: () => {
-            rememberProject(project.key);
-            go(`/${project.key}/pages`)();
-          },
-        });
-      }
-    }
+    list.push({ id: "create:page", label: "Create page", group: "Create", run: go("/pages/new") });
 
     list.push(
       { id: "theme:light", label: "Light theme", group: "Appearance", run: () => { onOpenChange(false); setTheme("light"); } },
@@ -190,7 +159,7 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
     );
 
     return list;
-  }, [current, found, navigate, needle, onOpenChange, onShortcuts, projectKey, projects, searching, setTheme, signOut]);
+  }, [found, navigate, needle, onOpenChange, onShortcuts, searching, setTheme, signOut]);
 
   const matching = useMemo(() => {
     const lowered = needle.toLowerCase();

@@ -20,23 +20,11 @@ func JSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-func Project(w io.Writer, p api.Project) {
-	fmt.Fprintf(w, "%s  %s\n", p.Key, p.Name)
-	if p.InstructionsPage != nil {
-		fmt.Fprintf(w, "instructions: %s\n", *p.InstructionsPage)
-	}
-}
-
-// ProjectLine prints one project as a list line.
-func ProjectLine(w io.Writer, p api.Project) {
-	fmt.Fprintf(w, "%-10s %s\n", p.Key, p.Name)
-}
-
-// Page prints the head — where it lives, what it is called, when it last moved
-// — and then the Markdown exactly as it is stored, so that the output can be
+// Page prints the head — the address, what it is called, when it last moved —
+// and then the Markdown exactly as it is stored, so that the output can be
 // piped straight back into `--body-file -`.
 func Page(w io.Writer, p api.Page) {
-	fmt.Fprintf(w, "%s/%s  %s\n", p.Project, p.Slug, p.Title)
+	fmt.Fprintf(w, "%s  %s\n", p.Slug, p.Title)
 	fmt.Fprintf(w, "updated: %s by %s  author: %s\n", p.UpdatedAt.Format(time.RFC3339), p.UpdatedBy.Name, p.Author.Name)
 	if p.Body != "" {
 		fmt.Fprintf(w, "\n%s\n", p.Body)

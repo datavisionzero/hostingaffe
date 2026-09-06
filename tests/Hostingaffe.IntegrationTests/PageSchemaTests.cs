@@ -8,9 +8,9 @@ namespace Hostingaffe.IntegrationTests;
 
 /// <summary>
 /// What the database holds about a page and no substitute could vouch for
-/// (<c>docs/storage.md</c>, Pages): the slug is unique within the project even
-/// when two creators race for it, it stays spent while the page is deleted, and
-/// the purge is what gives it back.
+/// (<c>docs/storage.md</c>, Pages): the slug is unique even when two creators
+/// race for it, it stays spent while the page is deleted, and the purge is what
+/// gives it back.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class PageSchemaTests(PostgresFixture postgres)
@@ -26,7 +26,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
             await using var context = Migrated.ContextFor(db.ConnectionString);
             try
             {
-                context.Pages.Add(Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now));
+                context.Pages.Add(Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
                 return true;
             }
@@ -42,21 +42,6 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         Assert.Equal(1, await reader.Pages.CountAsync(p => p.Slug == "architecture", TestContext.Current.CancellationToken));
     }
 
-    [Fact]
-    public async Task Two_projects_may_both_have_architecture()
-    {
-        await using var db = await Migrated.SeededAsync(postgres);
-        var other = Domain.Projects.Project.Create("LOG", "logaffe", db.User.Id, Migrated.Now);
-        db.Context.Projects.Add(other);
-
-        db.Context.Pages.Add(Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now));
-        db.Context.Pages.Add(Page.Create(other.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now));
-        await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        await using var reader = db.Reader();
-        Assert.Equal(2, await reader.Pages.CountAsync(p => p.Slug == "architecture", TestContext.Current.CancellationToken));
-    }
-
     /// <summary>
     /// The index covers deleted rows on purpose: a restore must never land on a
     /// name somebody else has taken in the meantime (ADR 0013).
@@ -65,13 +50,13 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
     public async Task A_deleted_page_keeps_its_slug_until_the_purge()
     {
         await using var db = await Migrated.SeededAsync(postgres);
-        var page = Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now);
+        var page = Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now);
         page.Delete(db.User.Id, Migrated.Now);
         db.Context.Pages.Add(page);
         await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
         db.Context.ChangeTracker.Clear();
 
-        db.Context.Pages.Add(Page.Create(db.Project.Id, "architecture", "Architecture again", null, db.User.Id, Migrated.Now));
+        db.Context.Pages.Add(Page.Create("architecture", "Architecture again", null, db.User.Id, Migrated.Now));
 
         var refusal = await Assert.ThrowsAsync<DbUpdateException>(() =>
             db.Context.SaveChangesAsync(TestContext.Current.CancellationToken));
@@ -85,7 +70,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         await using var db = await Migrated.SeededAsync(postgres);
         var grace = TimeSpan.FromDays(7);
 
-        var page = Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now);
+        var page = Page.Create("architecture", "Architecture", null, db.User.Id, Migrated.Now);
         page.Delete(db.User.Id, DateTimeOffset.UtcNow - grace - TimeSpan.FromDays(1));
         db.Context.Pages.Add(page);
         db.Context.History.Add(Domain.History.HistoryEntry.OnPage(
@@ -93,15 +78,14 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
         db.Context.ChangeTracker.Clear();
 
-        // The purge runs at the end of any write transaction that touched the
-        // project, and not before the write itself: here it is an unrelated
-        // page that pays for it.
+        // The purge runs at the end of any write transaction, and not before
+        // the write itself: here it is an unrelated page that pays for it.
         await using (var context = Migrated.ContextFor(db.ConnectionString))
         {
             var transactions = new Transactions(context, new InstanceSettings(grace));
             await transactions.RunAsync(async () =>
             {
-                context.Pages.Add(Page.Create(db.Project.Id, "onboarding", "Onboarding", null, db.User.Id, Migrated.Now));
+                context.Pages.Add(Page.Create("onboarding", "Onboarding", null, db.User.Id, Migrated.Now));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
                 return true;
             }, TestContext.Current.CancellationToken);
@@ -110,7 +94,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         // The slug is free, so the same name can be taken again.
         await using (var context = Migrated.ContextFor(db.ConnectionString))
         {
-            context.Pages.Add(Page.Create(db.Project.Id, "architecture", "Architecture again", null, db.User.Id, Migrated.Now));
+            context.Pages.Add(Page.Create("architecture", "Architecture again", null, db.User.Id, Migrated.Now));
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
@@ -120,20 +104,6 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
 
         // The history went with the row: it dies with its subject (ADR 0013).
         Assert.Empty(await reader.History.ToListAsync(TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task Deleting_the_project_takes_its_pages()
-    {
-        await using var db = await Migrated.SeededAsync(postgres);
-        db.Context.Pages.Add(Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now));
-        await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        await db.Context.Database.ExecuteSqlRawAsync(
-            "delete from project where id = {0}", [db.Project.Id], TestContext.Current.CancellationToken);
-
-        await using var reader = db.Reader();
-        Assert.Empty(await reader.Pages.ToListAsync(TestContext.Current.CancellationToken));
     }
 
     private static bool Unique(DbUpdateException exception) =>

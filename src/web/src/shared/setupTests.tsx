@@ -21,8 +21,8 @@ window.matchMedia ??= (query: string) =>
     dispatchEvent: () => false,
   }) as MediaQueryList;
 
-// The jsdom vitest ships gives the page no storage. The token, the theme and
-// the last project live there, so the tests get a Storage of their own.
+// The jsdom vitest ships gives the page no storage. The theme lives there, so
+// the tests get a Storage of their own.
 if (typeof window.localStorage === "undefined" || window.localStorage === null) {
   const store = new Map<string, string>();
   const storage: Storage = {

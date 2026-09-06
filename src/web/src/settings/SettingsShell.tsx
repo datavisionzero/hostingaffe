@@ -27,7 +27,7 @@ function useScreen() {
 export type Area = {
   /** Where the nav entry leads, relative to the screen. */
   to: string;
-  /** The route pattern, where it is wider than the entry — `projects/*`. */
+  /** The route pattern, where it is wider than the entry — `things/*`. */
   path?: string;
   label: string;
   element: ReactNode;
@@ -39,8 +39,8 @@ export type Area = {
  * Each of them used to be one long page of sections with no navigation inside
  * it: `/admin` was one address for three subjects, nobody could be sent to the
  * user administration, and a reload always landed at the top. What the roadmap
- * adds — project-wide agent instructions, notifications, a forge connection —
- * had nowhere to go but another box at the bottom.
+ * adds — notifications, a forge connection — had nowhere to go but another box
+ * at the bottom.
  *
  * So an area is an address. Adding one costs an entry in this list and a
  * route, and nothing else moves.

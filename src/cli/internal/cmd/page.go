@@ -17,7 +17,7 @@ import (
 )
 
 func newPage(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "page", Short: "Pages: the project's flat wiki — Markdown addressed by a slug, for what is knowledge rather than an assignment."}
+	cmd := &cobra.Command{Use: "page", Short: "Pages: the instance's flat wiki — Markdown addressed by a slug, for what is knowledge rather than an assignment."}
 	cmd.AddCommand(newPageList(g), newPageView(g), newPageCreate(g), newPageEdit(g), newPageRename(g), newPageDelete(g), newPageRestore(g))
 	return cmd
 }
@@ -33,18 +33,13 @@ func printPage(g *globals, cmd *cobra.Command, page api.Page) error {
 func newPageList(g *globals) *cobra.Command {
 	var query string
 	cmd := &cobra.Command{
-		Use: "list", Short: "Every page of the project, by slug, without the bodies.", Args: cobra.NoArgs,
+		Use: "list", Short: "Every page, by slug, without the bodies.", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, c, err := g.load()
+			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			project, err := requireProject(cfg)
-			if err != nil {
-				return err
-			}
-			params := &api.ListPagesParams{Q: optional(query)}
-			resp, err := c.ListPagesWithResponse(cmd.Context(), project, params)
+			resp, err := c.ListPagesWithResponse(cmd.Context(), &api.ListPagesParams{Q: optional(query)})
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -68,15 +63,11 @@ func newPageView(g *globals) *cobra.Command {
 	return &cobra.Command{
 		Use: "view SLUG", Short: "The page: the head, then the Markdown as it is stored.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, c, err := g.load()
+			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			project, err := requireProject(cfg)
-			if err != nil {
-				return err
-			}
-			resp, err := c.ReadPageWithResponse(cmd.Context(), project, args[0])
+			resp, err := c.ReadPageWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -93,11 +84,7 @@ func newPageCreate(g *globals) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "create SLUG --title TITLE", Short: "Create a page; the slug is the address you give it, never derived from the title.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, c, err := g.load()
-			if err != nil {
-				return err
-			}
-			project, err := requireProject(cfg)
+			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
@@ -109,7 +96,7 @@ func newPageCreate(g *globals) *cobra.Command {
 				return err
 			}
 			request := api.CreatePageRequest{Slug: &args[0], Title: &title, Body: body}
-			resp, err := c.CreatePageWithResponse(cmd.Context(), project, request)
+			resp, err := c.CreatePageWithResponse(cmd.Context(), request)
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -168,16 +155,12 @@ func newPageRename(g *globals) *cobra.Command {
 }
 
 func changePage(g *globals, cmd *cobra.Command, slug string, changes map[string]any, ifMatch string) error {
-	cfg, c, err := g.load()
-	if err != nil {
-		return err
-	}
-	project, err := requireProject(cfg)
+	_, c, err := g.load()
 	if err != nil {
 		return err
 	}
 	body, _ := json.Marshal(changes)
-	resp, err := c.ChangePageWithBodyWithResponse(cmd.Context(), project, slug, "application/json", bytes.NewReader(body), func(_ context.Context, req *http.Request) error {
+	resp, err := c.ChangePageWithBodyWithResponse(cmd.Context(), slug, "application/json", bytes.NewReader(body), func(_ context.Context, req *http.Request) error {
 		if ifMatch != "" {
 			req.Header.Set("If-Match", `"`+strings.Trim(ifMatch, `"`)+`"`)
 		}
@@ -196,15 +179,11 @@ func newPageDelete(g *globals) *cobra.Command {
 	return &cobra.Command{
 		Use: "delete SLUG", Short: "Soft-delete a page; its slug stays taken until the grace period is over.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, c, err := g.load()
+			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			project, err := requireProject(cfg)
-			if err != nil {
-				return err
-			}
-			resp, err := c.DeletePageWithResponse(cmd.Context(), project, args[0])
+			resp, err := c.DeletePageWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -224,15 +203,11 @@ func newPageRestore(g *globals) *cobra.Command {
 	return &cobra.Command{
 		Use: "restore SLUG", Short: "Bring a deleted page back, under the slug it kept.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, c, err := g.load()
+			_, c, err := g.load()
 			if err != nil {
 				return err
 			}
-			project, err := requireProject(cfg)
-			if err != nil {
-				return err
-			}
-			resp, err := c.RestorePageWithResponse(cmd.Context(), project, args[0])
+			resp, err := c.RestorePageWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return client.Transport(err)
 			}
