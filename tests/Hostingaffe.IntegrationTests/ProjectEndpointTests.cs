@@ -26,18 +26,17 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task A_project_round_trips_with_its_switches_and_its_kind_labels()
+    public async Task A_project_round_trips()
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
-        using var created = await admin.PostAsJsonAsync("/projects", new { key = "PLAN", name = "hostingaffe", review_required = true }, Ct);
+        using var created = await admin.PostAsJsonAsync("/projects", new { key = "PLAN", name = "hostingaffe" }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal("/projects/PLAN", created.Headers.Location?.ToString());
         var project = await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
         Assert.Equal("PLAN", project.GetProperty("key").GetString());
-        Assert.False(project.GetProperty("triage_required").GetBoolean());
-        Assert.True(project.GetProperty("review_required").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, project.GetProperty("instructions_page").ValueKind);
 
         var read = await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN", Ct);
         Assert.Equal("hostingaffe", read.GetProperty("name").GetString());
@@ -45,22 +44,12 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         var listed = await admin.GetFromJsonAsync<JsonElement>("/projects", Ct);
         Assert.Equal("PLAN", Assert.Single(listed.EnumerateArray()).GetProperty("key").GetString());
 
-        // The `kind` group, with a line each.
-        var labels = await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/labels", Ct);
-        Assert.Equal(["bug", "chore", "feature"], labels.EnumerateArray().Select(l => l.GetProperty("name").GetString()));
-        Assert.All(labels.EnumerateArray(), l =>
-        {
-            Assert.Equal("kind", l.GetProperty("group").GetString());
-            Assert.False(string.IsNullOrEmpty(l.GetProperty("description").GetString()));
-        });
-
         // PATCH changes what is present and nothing else.
-        using var changed = await admin.PatchAsJsonAsync("/projects/PLAN", new { triage_required = true }, Ct);
+        using var changed = await admin.PatchAsJsonAsync("/projects/PLAN", new { name = "renamed" }, Ct);
         Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
         var after = await changed.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        Assert.True(after.GetProperty("triage_required").GetBoolean());
-        Assert.True(after.GetProperty("review_required").GetBoolean());
-        Assert.Equal("hostingaffe", after.GetProperty("name").GetString());
+        Assert.Equal("renamed", after.GetProperty("name").GetString());
+        Assert.Equal("PLAN", after.GetProperty("key").GetString());
     }
 
     [Fact]
@@ -99,8 +88,8 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         var problem = await Problem(read, HttpStatusCode.NotFound, "deleted");
         Assert.True(problem.TryGetProperty("restorable_until", out _));
 
-        using var labels = await admin.GetAsync("/projects/PLAN/labels", Ct);
-        await Problem(labels, HttpStatusCode.NotFound, "deleted");
+        using var pages = await admin.GetAsync("/projects/PLAN/pages", Ct);
+        await Problem(pages, HttpStatusCode.NotFound, "deleted");
 
         using var restored = await admin.PostAsync("/projects/PLAN/restore", null, Ct);
         Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
@@ -132,7 +121,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, (await agent.GetAsync("/projects", Ct)).StatusCode);
         Assert.Empty((await agent.GetFromJsonAsync<JsonElement>("/projects", Ct)).EnumerateArray());
         await Problem(await agent.GetAsync("/projects/PLAN", Ct), HttpStatusCode.NotFound, "not-found");
-        await Problem(await user.GetAsync("/issues?project=PLAN", Ct), HttpStatusCode.NotFound, "not-found");
+        await Problem(await user.GetAsync("/projects/PLAN/pages", Ct), HttpStatusCode.NotFound, "not-found");
 
         using var granted = await admin.PutAsync($"/projects/PLAN/users/{otherId}", null, Ct);
         Assert.Equal(HttpStatusCode.NoContent, granted.StatusCode);
@@ -151,38 +140,11 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         await Problem(await user.DeleteAsync("/projects/PLAN", Ct), HttpStatusCode.Forbidden, "forbidden");
     }
 
-    [Fact]
-    public async Task Collections_are_scoped_and_a_foreign_blocker_stays_anonymous_but_open()
-    {
-        await using var instance = await AnInstance.BootstrappedAsync(postgres);
-        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
-        await admin.PostAsJsonAsync("/projects", new { key = "ONE", name = "one" }, Ct);
-        await admin.PostAsJsonAsync("/projects", new { key = "TWO", name = "two" }, Ct);
-        await admin.PostAsJsonAsync("/issues", new { project = "ONE", issues = new[] { new { title = "Visible" } } }, Ct);
-        await admin.PostAsJsonAsync("/issues", new { project = "TWO", issues = new[] { new { title = "Hidden" } } }, Ct);
-        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync("/issues/ONE-1/blocked-by/TWO-1", null, Ct)).StatusCode);
-
-        using var user = instance.ClientWith(await instance.AddActiveUserAsync("reader"));
-        var users = await admin.GetFromJsonAsync<JsonElement>("/users", Ct);
-        var userId = users.EnumerateArray().Single(value => value.GetProperty("name").GetString() == "reader").GetProperty("id").GetGuid();
-        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsync($"/projects/ONE/users/{userId}", null, Ct)).StatusCode);
-
-        var listed = await user.GetFromJsonAsync<JsonElement>("/issues", Ct);
-        Assert.Equal(1, listed.GetProperty("total").GetInt32());
-        Assert.Equal("ONE-1", listed.GetProperty("items")[0].GetProperty("key").GetString());
-        var blocker = Assert.Single(listed.GetProperty("items")[0].GetProperty("blocked_by").EnumerateArray());
-        Assert.Equal(JsonValueKind.Null, blocker.GetProperty("key").ValueKind);
-        Assert.True(blocker.GetProperty("open").GetBoolean());
-
-        await Problem(await user.GetAsync("/issues/TWO-1", Ct), HttpStatusCode.NotFound, "not-found");
-        await Problem(await user.GetAsync("/issues?project=TWO", Ct), HttpStatusCode.NotFound, "not-found");
-    }
-
     /// <summary>
     /// Routing matches literal segments without regard to case, so every
     /// project-content route answers under a spelling the scope guard has to
     /// recognise as its own. It once compared the request path and let
-    /// <c>/Issues/PLAN-1</c> past with no check at all.
+    /// <c>/Projects/PLAN</c> past with no check at all.
     /// </summary>
     [Fact]
     public async Task Project_scope_holds_when_the_route_is_spelled_in_another_case()
@@ -190,28 +152,18 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         await admin.PostAsJsonAsync("/projects", new { key = "PLAN", name = "hostingaffe" }, Ct);
-        await admin.PostAsJsonAsync("/issues", new { project = "PLAN", issues = new[] { new { title = "Secret work" } } }, Ct);
-        await admin.PostAsJsonAsync("/projects/PLAN/labels", new { name = "secret" }, Ct);
-        using var asked = await admin.PostAsJsonAsync("/issues/PLAN-1/questions", new { question = "Which secret?" }, Ct);
-        var question = (await asked.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString();
+        await admin.PostAsJsonAsync("/projects/PLAN/pages", new { slug = "secret", title = "Secret work" }, Ct);
 
         using var outsider = instance.ClientWith(await instance.AddActiveUserAsync("outsider"));
         foreach (var (method, path, body) in new (HttpMethod Method, string Path, object? Body)[]
         {
             (HttpMethod.Get, "/Projects/PLAN", null),
-            (HttpMethod.Get, "/Projects/PLAN/labels", null),
-            (HttpMethod.Post, "/Projects/PLAN/labels", new { name = "planted" }),
-            (HttpMethod.Delete, "/Projects/PLAN/labels/secret", null),
-            (HttpMethod.Get, "/Projects/PLAN/releases", null),
-            (HttpMethod.Get, "/Projects/PLAN/needs-you", null),
-            (HttpMethod.Get, "/Issues/PLAN-1", null),
-            (HttpMethod.Patch, "/Issues/PLAN-1", new { title = "hijacked" }),
-            (HttpMethod.Get, "/Issues/PLAN-1/history", null),
-            (HttpMethod.Post, "/Issues/PLAN-1/comments", new { body = "hello" }),
-            (HttpMethod.Post, "/Issues/PLAN-1/questions", new { question = "leak?" }),
-            (HttpMethod.Post, "/Issues/PLAN-1/claim", null),
-            (HttpMethod.Get, $"/Questions/{question}", null),
-            (HttpMethod.Post, $"/Questions/{question}/answer", new { answer = "planted" }),
+            (HttpMethod.Patch, "/Projects/PLAN", new { name = "hijacked" }),
+            (HttpMethod.Get, "/Projects/PLAN/pages", null),
+            (HttpMethod.Post, "/Projects/PLAN/pages", new { slug = "planted", title = "Planted" }),
+            (HttpMethod.Get, "/Projects/PLAN/pages/secret", null),
+            (HttpMethod.Patch, "/Projects/PLAN/pages/secret", new { title = "hijacked" }),
+            (HttpMethod.Delete, "/Projects/PLAN/pages/secret", null),
         })
         {
             using var request = new HttpRequestMessage(method, path);
@@ -220,38 +172,30 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         }
 
         // Nothing the outsider sent was written: the refusal came before the handler.
-        var labels = await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/labels", Ct);
-        Assert.Contains("secret", labels.EnumerateArray().Select(label => label.GetProperty("name").GetString()));
-        Assert.DoesNotContain("planted", labels.EnumerateArray().Select(label => label.GetProperty("name").GetString()));
-
-        var issue = await admin.GetFromJsonAsync<JsonElement>("/issues/PLAN-1", Ct);
-        Assert.Equal("Secret work", issue.GetProperty("title").GetString());
-        Assert.Equal("todo", issue.GetProperty("status").GetString());
-        Assert.Empty(issue.GetProperty("comments").EnumerateArray());
-        Assert.Single(issue.GetProperty("questions").EnumerateArray());
-        Assert.Equal(JsonValueKind.Null, issue.GetProperty("questions")[0].GetProperty("answer").ValueKind);
+        Assert.Equal("hostingaffe", (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN", Ct)).GetProperty("name").GetString());
+        Assert.Equal(
+            ["secret"],
+            (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/pages", Ct))
+                .EnumerateArray().Select(page => page.GetProperty("slug").GetString()));
+        Assert.Equal("Secret work", (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/pages/secret", Ct)).GetProperty("title").GetString());
     }
 
     /// <summary>
-    /// The page every agent is handed with every ticket (VISION 15.3): a user
-    /// designates it, an agent may not, and it arrives inside the context
-    /// package rather than on a route of its own.
+    /// The page every agent is handed with its work (VISION 15.3): a user
+    /// designates it and an agent may not.
     /// </summary>
     [Fact]
-    public async Task The_instructions_page_is_designated_by_a_user_and_travels_with_every_ticket()
+    public async Task The_instructions_page_is_designated_by_a_user_and_follows_the_page_it_names()
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         await admin.PostAsJsonAsync("/projects", new { key = "PLAN", name = "hostingaffe" }, Ct);
         await admin.PostAsJsonAsync(
             "/projects/PLAN/pages", new { slug = "agents", title = "How work runs here", body = "Tests run with `just test`." }, Ct);
-        await admin.PostAsJsonAsync("/issues", new { project = "PLAN", issues = new[] { new { title = "The work" } } }, Ct);
 
-        // Designated by nobody yet: the package carries the ticket and no instructions.
+        // Designated by nobody yet.
         var project = await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN", Ct);
         Assert.Equal(JsonValueKind.Null, project.GetProperty("instructions_page").ValueKind);
-        var before = await admin.GetFromJsonAsync<JsonElement>("/issues/PLAN-1", Ct);
-        Assert.Equal(JsonValueKind.Null, before.GetProperty("project_context").GetProperty("instructions").ValueKind);
 
         // A slug that names nothing is refused at the field it arrived in.
         using var unknown = await admin.PatchAsJsonAsync("/projects/PLAN", new { instructions_page = "nowhere" }, Ct);
@@ -262,21 +206,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, designated.StatusCode);
         Assert.Equal("agents", (await designated.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("instructions_page").GetString());
 
-        // In the package, with the document itself — and in the same object
-        // every act answers with, which is what makes claiming deliver it.
-        var read = await admin.GetFromJsonAsync<JsonElement>("/issues/PLAN-1", Ct);
-        var instructions = read.GetProperty("project_context").GetProperty("instructions");
-        Assert.Equal("agents", instructions.GetProperty("slug").GetString());
-        Assert.Equal("How work runs here", instructions.GetProperty("title").GetString());
-        Assert.Equal("Tests run with `just test`.", instructions.GetProperty("body").GetString());
-
         using var agent = await Agent(instance, admin, "worker");
-        using var claimed = await agent.PostAsJsonAsync("/issues/PLAN-1/claim", new { }, Ct);
-        Assert.Equal(HttpStatusCode.OK, claimed.StatusCode);
-        Assert.Equal(
-            "Tests run with `just test`.",
-            (await claimed.Content.ReadFromJsonAsync<JsonElement>(Ct))
-                .GetProperty("project_context").GetProperty("instructions").GetProperty("body").GetString());
 
         // An agent may not point the project at a page: it would be writing its own instructions.
         using var byAgent = await agent.PatchAsJsonAsync("/projects/PLAN", new { instructions_page = "agents" }, Ct);
@@ -291,9 +221,6 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres)
 
         // Deleting it goes quiet rather than refusing, and the restore brings it back.
         Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync("/projects/PLAN/pages/house-rules", Ct)).StatusCode);
-        Assert.Equal(
-            JsonValueKind.Null,
-            (await admin.GetFromJsonAsync<JsonElement>("/issues/PLAN-1", Ct)).GetProperty("project_context").GetProperty("instructions").ValueKind);
         Assert.Equal(JsonValueKind.Null, (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN", Ct)).GetProperty("instructions_page").ValueKind);
 
         using var restored = await admin.PostAsync("/projects/PLAN/pages/house-rules/restore", null, Ct);

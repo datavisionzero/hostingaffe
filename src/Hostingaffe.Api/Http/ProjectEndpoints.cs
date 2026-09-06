@@ -1,12 +1,10 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.OpenApi;
-using Microsoft.OpenApi;
 using Hostingaffe.Application.Acts;
 
 namespace Hostingaffe.Api.Http;
 
 /// <param name="Key">Upper case, a letter first, two to ten characters; never changed afterwards.</param>
-public sealed record CreateProjectRequest(string? Key, string? Name, bool? TriageRequired, bool? ReviewRequired);
+public sealed record CreateProjectRequest(string? Key, string? Name);
 
 /// <summary>
 /// Only what is present changes; the key is not among them.
@@ -15,7 +13,7 @@ public sealed record CreateProjectRequest(string? Key, string? Name, bool? Triag
 /// type is the contract's; the act takes <see cref="ProjectChanges"/>, which
 /// tells absent from null.
 /// </summary>
-public sealed record ChangeProjectRequest(string? Name, bool? TriageRequired, bool? ReviewRequired, string? InstructionsPage);
+public sealed record ChangeProjectRequest(string? Name, string? InstructionsPage);
 
 /// <summary>Projects (<c>docs/api.md</c>): read by anyone, changed by a user, deleted by an administrator.</summary>
 public static class ProjectEndpoints
@@ -34,12 +32,11 @@ public static class ProjectEndpoints
 
         door.MapPost(string.Empty, async (CreateProjectRequest? request, CreateProject create, CancellationToken cancellationToken) =>
             {
-                var project = await create.ExecuteAsync(
-                    request?.Key, request?.Name, request?.TriageRequired ?? false, request?.ReviewRequired ?? false, cancellationToken);
+                var project = await create.ExecuteAsync(request?.Key, request?.Name, cancellationToken);
                 return Results.Created($"/projects/{project.Key}", project);
             })
             .WithName("CreateProject")
-            .WithSummary("Create a project with its key and the `kind` label group. Users only.")
+            .WithSummary("Create a project with the key that prefixes everything in it. Users only.")
             .Produces<ProjectShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -59,7 +56,7 @@ public static class ProjectEndpoints
                 return await change.ExecuteAsync(key, Changes(body.RootElement), cancellationToken);
             })
             .WithName("ChangeProject")
-            .WithSummary("Change the name, the switches or the instructions page. Users only; the key is immutable.")
+            .WithSummary("Change the name or the instructions page. Users only; the key is immutable.")
             .Accepts<ChangeProjectRequest>("application/json")
             .Produces<ProjectShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -114,45 +111,12 @@ public static class ProjectEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        // The question at the centre of the product (VISION 10): the list, and the act.
-        door.MapGet("/{key}/next", (string key, HttpRequest http, bool? ready, string? epic, string? repo, int? limit, Next next, CancellationToken cancellationToken) =>
-                next.PreviewAsync(key, new NextRequest(ready, epic, [.. http.Query["label"].OfType<string>()], repo, limit, null), cancellationToken))
-            .WithName("PreviewNext")
-            .WithSummary("What the caller would be handed, in that order — the ready-for-agents list — and why the rest is not on it.")
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
-
-        door.MapPost("/{key}/next", (string key, NextRequest? request, Next next, CancellationToken cancellationToken) =>
-                next.TakeAsync(key, request ?? new NextRequest(null, null, null, null, null, null), cancellationToken))
-            .WithName("TakeNext")
-            .WithSummary("Take the highest-ranked workable issue and claim it for the caller, in one transaction. 200 with `issue: null` when nothing is workable.")
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
-
-        door.MapGet("/{key}/needs-you", async (string key, string? cursor, int? limit, int? wait, HttpRequest request, HttpResponse response, NeedsYou needsYou, CancellationToken cancellationToken) =>
-            {
-                var answer = await needsYou.WaitAsync(key, cursor, limit, wait, request.Headers.IfNoneMatch, cancellationToken);
-                response.Headers.ETag = answer.ETag;
-                return answer.Page is null ? Results.StatusCode(StatusCodes.Status304NotModified) : Results.Ok(answer.Page);
-            })
-            .WithName("ListNeedsYou")
-            .WithSummary("What only a human can resolve: questions, review, unready under triage, then stuck blocker chains.")
-            .AddOpenApiOperationTransformer(NeedsYouValidator)
-            .Produces<NeedsYouPage>()
-            .Produces(StatusCodes.Status304NotModified)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
-
         return endpoints;
     }
 
     // Present, present-as-null and absent are three things in a PATCH, and only
-    // the raw document tells them apart — the same reading `PATCH /issues/{key}`
-    // does, for the same reason: `instructions_page` set to null takes the
-    // designation away, and leaving it out leaves it alone.
+    // the raw document tells them apart: `instructions_page` set to null takes
+    // the designation away, and leaving it out leaves it alone.
     private static ProjectChanges Changes(JsonElement body)
     {
         if (body.ValueKind is not JsonValueKind.Object)
@@ -162,45 +126,10 @@ public static class ProjectEndpoints
 
         return new ProjectChanges(
             Text(body, "name"),
-            Flag(body, "triage_required"),
-            Flag(body, "review_required"),
             body.TryGetProperty("instructions_page", out _),
             Text(body, "instructions_page"));
     }
 
     private static string? Text(JsonElement body, string property) =>
         body.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.String ? value.GetString() : null;
-
-    private static bool? Flag(JsonElement body, string property) =>
-        body.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? value.GetBoolean()
-            : null;
-
-    private static Task NeedsYouValidator(
-        OpenApiOperation operation,
-        OpenApiOperationTransformerContext context,
-        CancellationToken cancellationToken)
-    {
-        operation.Parameters ??= [];
-        operation.Parameters.Add(new OpenApiParameter
-        {
-            Name = "If-None-Match",
-            In = ParameterLocation.Header,
-            Description = "The ETag of the last page; with wait, return when that page changes.",
-            Schema = new OpenApiSchema { Type = JsonSchemaType.String },
-        });
-
-        foreach (var status in new[] { "200", "304" })
-        {
-            var response = (OpenApiResponse)operation.Responses![status];
-            response.Headers ??= new Dictionary<string, IOpenApiHeader>();
-            response.Headers["ETag"] = new OpenApiHeader
-            {
-                Description = "Validator for this needs-you page.",
-                Schema = new OpenApiSchema { Type = JsonSchemaType.String },
-            };
-        }
-
-        return Task.CompletedTask;
-    }
 }

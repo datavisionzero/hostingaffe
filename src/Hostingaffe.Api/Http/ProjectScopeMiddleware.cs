@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Routing.Patterns;
 using Hostingaffe.Application.Acts;
 using Hostingaffe.Application.Ports;
-using Hostingaffe.Domain;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Api.Http;
 
@@ -14,22 +12,22 @@ namespace Hostingaffe.Api.Http;
 /// <remarks>
 /// The route the endpoint was registered under is what is read here, never the
 /// path the caller typed. Routing matches literal segments without regard to
-/// case, so <c>/Issues/PLAN-1</c> reaches the same handler as
-/// <c>/issues/PLAN-1</c>, and a guard that compared the request path let one of
+/// case, so <c>/Projects/PLAN</c> reaches the same handler as
+/// <c>/projects/PLAN</c>, and a guard that compared the request path let one of
 /// the two through with no check at all. The pattern is ours and the route
 /// values are the ones routing bound, which is why both are safe to switch on.
 /// </remarks>
 public sealed class ProjectScopeMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext http, ProjectScope scope, IProjects projects, IIssues issues)
+    public async Task InvokeAsync(HttpContext http, ProjectScope scope, IProjects projects)
     {
-        if (http.User.Identity?.IsAuthenticated == true && ProjectId(http, projects, issues) is { } projectId)
+        if (http.User.Identity?.IsAuthenticated == true && ProjectId(http, projects) is { } projectId)
             await scope.RequireAsync(await projectId, http.RequestAborted);
 
         await next(http);
     }
 
-    private static Task<Guid>? ProjectId(HttpContext http, IProjects projects, IIssues issues)
+    private static Task<Guid>? ProjectId(HttpContext http, IProjects projects)
     {
         // No endpoint is no project content: an unrouted path is the SPA's
         // fallback or a 404, and neither loads a row.
@@ -49,18 +47,6 @@ public sealed class ProjectScopeMiddleware(RequestDelegate next)
             case "projects" when values["key"] is string projectKey:
                 return FromProjectKey(projects, projectKey, http.RequestAborted);
 
-            case "issues" when values["key"] is string issueKey && IssueKey.TryParse(issueKey, out var issueProject, out _):
-                return FromProjectKey(projects, issueProject, http.RequestAborted);
-
-            case "epics" when values["key"] is string epicKey && EpicKey.TryParse(epicKey, out var epicProject, out _):
-                return FromProjectKey(projects, epicProject, http.RequestAborted);
-
-            case "questions" when values["id"] is string question && Guid.TryParse(question, out var questionId):
-                return FromQuestion(issues, questionId, http.RequestAborted);
-
-            case "comments" when values["id"] is string comment && Guid.TryParse(comment, out var commentId):
-                return FromComment(issues, commentId, http.RequestAborted);
-
             default:
                 return null;
         }
@@ -75,16 +61,4 @@ public sealed class ProjectScopeMiddleware(RequestDelegate next)
 
     private static async Task<Guid> FromProjectKey(IProjects projects, string key, CancellationToken cancellationToken) =>
         (await projects.FindByKeyAsync(key.Trim().ToUpperInvariant(), cancellationToken))?.Id ?? Guid.Empty;
-
-    private static async Task<Guid> FromQuestion(IIssues issues, Guid id, CancellationToken cancellationToken) =>
-        (await issues.FindQuestionAsync(id, cancellationToken))?.ProjectId ?? Guid.Empty;
-
-    // A comment carries no project of its own; the issue it hangs on does.
-    private static async Task<Guid> FromComment(IIssues issues, Guid id, CancellationToken cancellationToken)
-    {
-        if (await issues.FindCommentAsync(id, cancellationToken) is not { } comment) return Guid.Empty;
-
-        var issue = (await issues.FindLiveManyAsync([comment.IssueId], cancellationToken)).SingleOrDefault();
-        return issue?.ProjectId ?? Guid.Empty;
-    }
 }

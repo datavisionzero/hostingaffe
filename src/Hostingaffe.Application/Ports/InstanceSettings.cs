@@ -1,23 +1,18 @@
 namespace Hostingaffe.Application.Ports;
 
 /// <summary>
-/// The two dials an operator sets per instance, never per project (VISION 11,
-/// ADR 0013): how long an agent's claim lives without a write, and how long a
-/// deleted row can be restored before the purge may take it.
+/// The dial an operator sets per instance, never per project (ADR 0013): how
+/// long a deleted row can be restored before the purge may take it.
 /// </summary>
-public sealed record InstanceSettings(TimeSpan ClaimExpiry, TimeSpan DeletionGrace)
+public sealed record InstanceSettings(TimeSpan DeletionGrace)
 {
-    public const string ClaimExpiryVariable = "HOSTINGAFFE_CLAIM_EXPIRY_HOURS";
-
     public const string DeletionGraceVariable = "HOSTINGAFFE_DELETION_GRACE_DAYS";
 
-    public static readonly InstanceSettings Defaults = new(TimeSpan.FromHours(4), TimeSpan.FromDays(7));
+    public static readonly InstanceSettings Defaults = new(TimeSpan.FromDays(7));
 
-    /// <exception cref="ArgumentException">A variable is set and is not a positive number.</exception>
-    public static InstanceSettings FromVariables(string? claimExpiryHours, string? deletionGraceDays) =>
-        new(
-            Read(claimExpiryHours, ClaimExpiryVariable, Defaults.ClaimExpiry, TimeSpan.FromHours),
-            Read(deletionGraceDays, DeletionGraceVariable, Defaults.DeletionGrace, TimeSpan.FromDays));
+    /// <exception cref="ArgumentException">The variable is set and is not a positive number.</exception>
+    public static InstanceSettings FromVariables(string? deletionGraceDays) =>
+        new(Read(deletionGraceDays, DeletionGraceVariable, Defaults.DeletionGrace, TimeSpan.FromDays));
 
     private static TimeSpan Read(string? value, string variable, TimeSpan fallback, Func<double, TimeSpan> unit)
     {

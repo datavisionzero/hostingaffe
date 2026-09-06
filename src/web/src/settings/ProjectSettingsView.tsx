@@ -49,12 +49,10 @@ function General() {
 
   return (
     <>
-      <Section title="Project" description="The key is permanent; the name and workflow switches can change.">
+      <Section title="Project" description="The key is permanent; the name can change.">
         {project && (
-          <form className="grid max-w-lg gap-3" onSubmit={(e) => void submitting(e, setNotice, async (data) => { const r = await api.PATCH("/projects/{key}", { params: { path: { key: key! } }, body: { name: String(data.get("name")), triage_required: data.has("triage"), review_required: data.has("review") } as never }); if (!r.data) throw new Error(describe(r.error, r.response.status)); setProject(r.data); })}>
+          <form className="grid max-w-lg gap-3" onSubmit={(e) => void submitting(e, setNotice, async (data) => { const r = await api.PATCH("/projects/{key}", { params: { path: { key: key! } }, body: { name: String(data.get("name")) } as never }); if (!r.data) throw new Error(describe(r.error, r.response.status)); setProject(r.data); })}>
             <label className="text-sm">Name<Input name="name" defaultValue={project.name} /></label>
-            <label className="flex gap-2 text-sm"><input name="triage" type="checkbox" defaultChecked={project.triage_required} /> Require triage before agents take issues</label>
-            <label className="flex gap-2 text-sm"><input name="review" type="checkbox" defaultChecked={project.review_required} /> Require review before issues are done</label>
             <Button type="submit" className="w-fit">Save project</Button>
           </form>
         )}

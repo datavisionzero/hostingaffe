@@ -6,21 +6,21 @@ namespace Hostingaffe.Domain.History;
 /// dies only with its subject (ADR 0013).
 /// </summary>
 /// <remarks>
-/// An issue's history, an epic's and a page's live in one table because they
-/// are one concept and the two smaller ones are tiny; every row points at
-/// exactly one of the three, and the table's check constraint holds that too.
+/// The page is the only subject there is at present. The table is written to
+/// carry more than one — a row names its subject rather than being a column of
+/// it — because the entities this product is about get their history the same
+/// way, and a mechanism that has to be rebuilt to take a second subject is one
+/// that was built for the first by accident.
 /// </remarks>
 public sealed class HistoryEntry
 {
     private HistoryEntry()
     {
-        // EF Core materializes through this; every other route goes through OnIssue, OnEpic or OnPage.
+        // EF Core materializes through this; every other route goes through OnPage.
     }
 
     private HistoryEntry(
-        Guid? issueId,
-        Guid? epicId,
-        Guid? pageId,
+        Guid pageId,
         Guid actorId,
         DateTimeOffset at,
         string field,
@@ -28,8 +28,6 @@ public sealed class HistoryEntry
         string? newValue,
         string? note)
     {
-        IssueId = issueId;
-        EpicId = epicId;
         PageId = pageId;
         ActorId = actorId;
         At = at;
@@ -42,11 +40,7 @@ public sealed class HistoryEntry
     /// <summary>Assigned by the database, in the order the rows were written.</summary>
     public long Id { get; private init; }
 
-    public Guid? IssueId { get; private init; }
-
-    public Guid? EpicId { get; private init; }
-
-    public Guid? PageId { get; private init; }
+    public Guid PageId { get; private init; }
 
     public Guid ActorId { get; private init; }
 
@@ -59,28 +53,12 @@ public sealed class HistoryEntry
 
     public string? NewValue { get; private init; }
 
-    /// <summary>One of <see cref="HistoryNote"/>, or nothing.</summary>
+    /// <summary>
+    /// What the two values cannot carry, for the changes that need a word
+    /// beside them. Nothing writes one yet; the column is here because the
+    /// history is a mechanism and not a table this product filled in.
+    /// </summary>
     public string? Note { get; private init; }
-
-    public static HistoryEntry OnIssue(
-        Guid issueId,
-        Guid actorId,
-        DateTimeOffset at,
-        string field,
-        string? oldValue = null,
-        string? newValue = null,
-        string? note = null) =>
-        new(issueId, null, null, actorId, at, Named(field), oldValue, newValue, note);
-
-    public static HistoryEntry OnEpic(
-        Guid epicId,
-        Guid actorId,
-        DateTimeOffset at,
-        string field,
-        string? oldValue = null,
-        string? newValue = null,
-        string? note = null) =>
-        new(null, epicId, null, actorId, at, Named(field), oldValue, newValue, note);
 
     public static HistoryEntry OnPage(
         Guid pageId,
@@ -90,7 +68,7 @@ public sealed class HistoryEntry
         string? oldValue = null,
         string? newValue = null,
         string? note = null) =>
-        new(null, null, pageId, actorId, at, Named(field), oldValue, newValue, note);
+        new(pageId, actorId, at, Named(field), oldValue, newValue, note);
 
     private static string Named(string field) =>
         string.IsNullOrWhiteSpace(field)

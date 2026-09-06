@@ -89,17 +89,17 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Equal(
             [
                 "__EFMigrationsHistory",
-                "blocker", "browser_session", "comment", "epic", "epic_label", "history", "idempotency", "identity", "identity_metadata",
-                "issue", "issue_label", "label", "one_time_secret", "page", "page_label", "project", "project_access", "question", "release", "release_issue", "token",
+                "browser_session", "history", "idempotency", "identity", "identity_metadata",
+                "one_time_secret", "page", "project", "project_access", "token",
             ],
             tables);
     }
 
     /// <summary>
     /// Every index is declared, none is inferred: the list is the one in
-    /// <c>docs/storage.md</c>, plus a primary key per table. The two the model
-    /// cannot express — the expression index on the name and the view — are SQL
-    /// in the migration, and this is what proves they arrived.
+    /// <c>docs/storage.md</c>, plus a primary key per table. The one the model
+    /// cannot express — the expression index on the identity's name — is SQL in
+    /// the migration, and this is what proves it arrived.
     /// </summary>
     [Fact]
     public async Task The_indexes_are_the_ones_storage_md_declares()
@@ -113,19 +113,16 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Equal(
             [
                 "PK___EFMigrationsHistory",
-                "blocker_blocked", "browser_session_hash", "browser_session_user", "comment_issue", "comment_search", "epic_number", "history_epic", "history_issue", "history_page",
-                "identity_email", "identity_metadata_identity", "identity_name", "issue_assignee", "issue_claim", "issue_epic", "issue_next",
-                "issue_number", "issue_parent", "issue_search", "issue_updated", "label_name",
-                "one_live_secret_per_purpose", "one_time_secret_hash", "page_search", "page_slug", "pk_blocker", "pk_browser_session", "pk_comment", "pk_epic", "pk_epic_label", "pk_history", "pk_idempotency",
-                "pk_identity", "pk_identity_metadata", "pk_issue", "pk_issue_label", "pk_label", "pk_one_time_secret", "pk_page", "pk_page_label", "pk_project", "pk_project_access", "pk_question", "pk_release",
-                "pk_release_issue", "pk_token", "project_access_user", "project_key", "question_issue", "question_open", "question_search", "release_issue_issue",
-                "release_name", "release_open", "token_agent", "token_secret_hash",
+                "browser_session_hash", "browser_session_user", "history_page",
+                "identity_email", "identity_metadata_identity", "identity_name",
+                "one_live_secret_per_purpose", "one_time_secret_hash", "page_search", "page_slug",
+                "pk_browser_session", "pk_history", "pk_idempotency",
+                "pk_identity", "pk_identity_metadata", "pk_one_time_secret", "pk_page", "pk_project", "pk_project_access",
+                "pk_token", "project_access_user", "project_key", "token_agent", "token_secret_hash",
             ],
             indexes);
 
-        Assert.Equal(
-            ["issue_read"],
-            await NamesAsync(migrated.ConnectionString, "select viewname from pg_views where schemaname = 'public'"));
+        Assert.Empty(await NamesAsync(migrated.ConnectionString, "select viewname from pg_views where schemaname = 'public'"));
     }
 
     private static async Task<IReadOnlyList<string>> NamesAsync(string connectionString, string sql)

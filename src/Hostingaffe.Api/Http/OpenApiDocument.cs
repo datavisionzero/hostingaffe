@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Hostingaffe.Api.Hosting;
 using Hostingaffe.Domain.Identities;
-using Hostingaffe.Domain.Issues;
 
 namespace Hostingaffe.Api.Http;
 
@@ -42,24 +41,13 @@ public static class OpenApiDocument
 
             options.AddSchemaTransformer((schema, context, _) =>
             {
-                // Priority travels as its number (PriorityAsNumber), which the
-                // generator cannot see through: said here, so that both clients
-                // get an integer from 0 to 4 rather than an untyped value.
-                if (context.JsonTypeInfo.Type == typeof(Priority))
-                {
-                    schema.Type = JsonSchemaType.Integer;
-                    schema.Minimum = "0";
-                    schema.Maximum = "4";
-                    schema.Enum = null;
-                }
-
-                // Every other enum travels as its name (JsonStringEnumConverter),
-                // and every timestamp as RFC 3339 (Rfc3339); the generator sees
+                // Every enum travels as its name (JsonStringEnumConverter), and
+                // every timestamp as RFC 3339 (Rfc3339); the generator sees
                 // neither converter, so the types are said here.
                 var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type) ?? context.JsonTypeInfo.Type;
                 var nullable = type != context.JsonTypeInfo.Type || !type.IsValueType;
 
-                if (type.IsEnum && type != typeof(Priority))
+                if (type.IsEnum)
                 {
                     schema.Type = nullable ? JsonSchemaType.String | JsonSchemaType.Null : JsonSchemaType.String;
                 }

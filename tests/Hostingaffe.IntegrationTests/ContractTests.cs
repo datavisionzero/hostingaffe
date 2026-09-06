@@ -42,21 +42,12 @@ public sealed class ContractTests(PostgresFixture postgres)
             [
                 "/admin/projects", "/admin/smtp", "/admin/smtp/test",
                 "/agents", "/agents/{id}",
-                "/comments/{id}",
                 "/email-changes/confirm",
-                "/epics", "/epics/{key}", "/epics/{key}/close", "/epics/{key}/reopen", "/epics/{key}/restore",
                 "/invitations/accept",
-                "/issues", "/issues/{key}", "/issues/{key}/blocked-by/{blockerKey}", "/issues/{key}/claim", "/issues/{key}/close",
-                "/issues/{key}/comments", "/issues/{key}/history", "/issues/{key}/labels/{name}", "/issues/{key}/questions",
-                "/issues/{key}/release", "/issues/{key}/reopen", "/issues/{key}/restore", "/issues/{key}/review",
                 "/me", "/me/email", "/me/metadata", "/me/password", "/password-recovery", "/password-recovery/complete",
-                "/projects", "/projects/{key}", "/projects/{key}/labels", "/projects/{key}/labels/{name}",
-                "/projects/{key}/labels/{name}/restore", "/projects/{key}/needs-you", "/projects/{key}/next",
+                "/projects", "/projects/{key}",
                 "/projects/{key}/pages", "/projects/{key}/pages/{slug}", "/projects/{key}/pages/{slug}/restore",
-                "/projects/{key}/releases", "/projects/{key}/releases/publish", "/projects/{key}/releases/{name}",
-                "/projects/{key}/releases/{name}/issues/{issue}", "/projects/{key}/releases/{name}/retract", "/projects/{key}/restore",
-                "/projects/{key}/users", "/projects/{key}/users/{id}",
-                "/questions", "/questions/{id}", "/questions/{id}/answer",
+                "/projects/{key}/restore", "/projects/{key}/users", "/projects/{key}/users/{id}",
                 "/session", "/session/bootstrap", "/sessions", "/sessions/{id}",
                 "/tokens", "/tokens/{id}", "/users", "/users/{id}", "/users/{id}/deactivate",
                 "/users/{id}/invitation", "/users/{id}/reactivate", "/version",
@@ -68,8 +59,8 @@ public sealed class ContractTests(PostgresFixture postgres)
         var schemas = document["components"]!["schemas"]!.AsObject().Select(schema => schema.Key).ToHashSet();
         Assert.Contains("IdentityRef", schemas);
         Assert.Contains("Me", schemas);
-        Assert.Contains("NeedsYouPage", schemas);
-        Assert.Contains("Release", schemas);
+        Assert.Contains("Page", schemas);
+        Assert.Contains("Project", schemas);
         Assert.Contains("SmtpStatus", schemas);
         Assert.Contains("VersionResponse", schemas);
         Assert.Contains("ProblemDetails", schemas);

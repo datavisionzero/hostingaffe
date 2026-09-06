@@ -24,7 +24,7 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
 
         using var created = await agent.PostAsJsonAsync(
             "/projects/PLAN/pages",
-            new { slug = "architecture", title = "Architecture", body = "# The four layers", labels = new[] { "feature" } },
+            new { slug = "architecture", title = "Architecture", body = "# The four layers" },
             Ct);
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -35,7 +35,6 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal("# The four layers", page.GetProperty("body").GetString());
         Assert.Equal("one", page.GetProperty("author").GetProperty("name").GetString());
         Assert.Equal("one", page.GetProperty("updated_by").GetProperty("name").GetString());
-        Assert.Equal("feature", Assert.Single(page.GetProperty("labels").EnumerateArray()).GetProperty("name").GetString());
 
         await agent.PostAsJsonAsync("/projects/PLAN/pages", new { slug = "onboarding", title = "Onboarding" }, Ct);
 
@@ -44,12 +43,6 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         var list = await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/pages", Ct);
         Assert.Equal(["architecture", "onboarding"], list.EnumerateArray().Select(p => p.GetProperty("slug").GetString()));
         Assert.False(list[0].TryGetProperty("body", out _));
-        Assert.Equal(["feature"], list[0].GetProperty("labels").EnumerateArray().Select(l => l.GetString()));
-
-        Assert.Equal(
-            ["architecture"],
-            (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/pages?label=feature", Ct))
-                .EnumerateArray().Select(p => p.GetProperty("slug").GetString()));
 
         // The empty page is a page: an absent body is the empty document.
         Assert.Equal(string.Empty, (await admin.GetFromJsonAsync<JsonElement>("/projects/PLAN/pages/onboarding", Ct)).GetProperty("body").GetString());
@@ -84,13 +77,12 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = await Project(instance);
-        await admin.PostAsJsonAsync("/projects/PLAN/labels", new { name = "cut-1" }, Ct);
         using var created = await admin.PostAsJsonAsync("/projects/PLAN/pages", new { slug = "architecture", title = "Architecture", body = "v1" }, Ct);
         var version = (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("updated_at").GetString()!;
 
         using var request = new HttpRequestMessage(HttpMethod.Patch, "/projects/PLAN/pages/architecture")
         {
-            Content = JsonContent.Create(new { title = "The four layers", body = "v2", labels = new[] { "cut-1" } }),
+            Content = JsonContent.Create(new { title = "The four layers", body = "v2" }),
         };
         request.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
         using var changed = await admin.SendAsync(request, Ct);
@@ -121,8 +113,8 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal(string.Empty, (await untouched.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("body").GetString());
 
         await using var reader = Migrated.ContextFor(instance.ConnectionString);
-        var fields = await reader.History.Where(h => h.PageId != null).OrderBy(h => h.Id).Select(h => h.Field).ToListAsync(Ct);
-        Assert.Equal(["created", "title", "body", "label", "body", "body", "title"], fields);
+        var fields = await reader.History.OrderBy(h => h.Id).Select(h => h.Field).ToListAsync(Ct);
+        Assert.Equal(["created", "title", "body", "body", "body", "title"], fields);
         Assert.All(await reader.History.Where(h => h.Field == "body").ToListAsync(Ct), entry => Assert.Null(entry.NewValue));
     }
 
@@ -202,8 +194,7 @@ public sealed class PageEndpointTests(PostgresFixture postgres)
         Assert.Equal(["onboarding"], await Found(admin, "-inward compose"));
         Assert.Empty(await Found(admin, "nothing here"));
 
-        // A filter, not a ranking: the order stays the slug's, and the label
-        // filter still narrows what the words found.
+        // A filter, not a ranking: the order stays the slug's.
         Assert.Equal(["architecture", "onboarding"], await Found(admin, "docker OR inward"));
 
         // A deleted page is not found while it is in its grace period (ADR 0013).

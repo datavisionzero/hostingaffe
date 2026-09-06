@@ -2,7 +2,7 @@ namespace Hostingaffe.Domain;
 
 /// <summary>
 /// The product saying no: a <see cref="RefusalCode"/>, a sentence for a person,
-/// and whatever the code needs beside it — the holder on <c>claim-held</c>, the
+/// and whatever the code needs beside it — the object on <c>stale</c>, the
 /// offending fields on <c>validation</c>.
 /// </summary>
 /// <remarks>

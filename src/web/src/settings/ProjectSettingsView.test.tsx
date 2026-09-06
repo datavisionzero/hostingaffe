@@ -13,8 +13,8 @@ function At() {
   return <span data-testid="at">{useLocation().pathname}</span>;
 }
 
-it("submits the project name and workflow switches", async () => {
-  const changed = { ...aProject, name: "Planning", triage_required: true, review_required: true };
+it("submits the project name", async () => {
+  const changed = { ...aProject, name: "Planning" };
   const instance = installInstance({
     "GET /projects/PLAN": aProject,
     "GET /projects/PLAN/users": [],
@@ -26,13 +26,11 @@ it("submits the project name and workflow switches", async () => {
   const name = await screen.findByLabelText("Name");
   await user.clear(name);
   await user.type(name, "Planning");
-  await user.click(screen.getByLabelText("Require triage before agents take issues"));
-  await user.click(screen.getByLabelText("Require review before issues are done"));
   await user.click(screen.getByRole("button", { name: "Save project" }));
 
   expect(await screen.findByRole("status")).toHaveTextContent("Saved.");
   const request = instance.calls.find((call) => call.method === "PATCH")!;
-  expect(await request.json()).toEqual({ name: "Planning", triage_required: true, review_required: true });
+  expect(await request.json()).toEqual({ name: "Planning" });
 });
 
 // The screen sits under the project, so its own address is not a constant:

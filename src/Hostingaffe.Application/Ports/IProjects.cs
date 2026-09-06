@@ -1,10 +1,9 @@
 using Hostingaffe.Domain.Projects;
-using Hostingaffe.Domain.Releases;
 
 namespace Hostingaffe.Application.Ports;
 
 /// <summary>
-/// The project rows, and the two counters on them every key is drawn from.
+/// The project rows.
 /// </summary>
 public interface IProjects
 {
@@ -23,22 +22,9 @@ public interface IProjects
     Task<IReadOnlyList<Project>> ListAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<Project>> ListAllAsync(CancellationToken cancellationToken);
 
-    /// <summary>The project and its first labels in one transaction.</summary>
+    /// <summary>The project and the creator's access to it in one transaction.</summary>
     /// <exception cref="Domain.Refusal"><c>validation</c> on <c>key</c> when the unique index refuses it.</exception>
-    Task AddAsync(Project project, IEnumerable<Label> labels, Release release, ProjectAccess creatorAccess,
-        CancellationToken cancellationToken);
+    Task AddAsync(Project project, ProjectAccess creatorAccess, CancellationToken cancellationToken);
 
     Task SaveAsync(Project project, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Draws <paramref name="count"/> issue numbers from the project's counter
-    /// in one statement under the row's lock, and returns the first of them
-    /// (<c>docs/storage.md</c>, Keys are allocated from the project row). Inside
-    /// the caller's transaction: a rollback rolls the counter back, so keys are
-    /// dense and never reused.
-    /// </summary>
-    Task<int> AllocateIssueNumbersAsync(Guid projectId, int count, CancellationToken cancellationToken);
-
-    /// <inheritdoc cref="AllocateIssueNumbersAsync"/>
-    Task<int> AllocateEpicNumbersAsync(Guid projectId, int count, CancellationToken cancellationToken);
 }

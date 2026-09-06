@@ -14,9 +14,8 @@ import (
 )
 
 // FileName is the project file: checked in at the root of a repository, it
-// points from that repository at exactly one project and, where one project
-// spans several repositories, names the `repo` label of this one (CONTEXT.md,
-// Project file).
+// points from that repository at exactly one project (CONTEXT.md, Project
+// file).
 const FileName = ".hostingaffe"
 
 // Config is what a command runs with.
@@ -28,8 +27,6 @@ type Config struct {
 	Token string
 	// Project is the project key, from the file or from --project.
 	Project string
-	// Repo is the `repo` label of this repository, from the file, or empty.
-	Repo string
 	// File is where the project file was found, or empty.
 	File string
 }
@@ -63,7 +60,6 @@ func Load(getenv func(string) string, dir string) (Config, error) {
 		}
 		cfg.File = path
 		cfg.Project = file.project
-		cfg.Repo = file.repo
 	}
 
 	return cfg, nil
@@ -71,7 +67,6 @@ func Load(getenv func(string) string, dir string) (Config, error) {
 
 type projectFile struct {
 	project string
-	repo    string
 }
 
 // find walks up from dir to the root, the way git finds its own directory.
@@ -90,10 +85,10 @@ func find(dir string) (string, bool) {
 	}
 }
 
-// parse reads `key = value` lines; `#` starts a comment. Two keys are known,
-// `project` and `repo`, and anything else is a mistake rather than ignored — a
-// misspelt `projekt` that silently did nothing would send every command to the
-// wrong project.
+// parse reads `key = value` lines; `#` starts a comment. One key is known,
+// `project`, and anything else is a mistake rather than ignored — a misspelt
+// `projekt` that silently did nothing would send every command to the wrong
+// project.
 func parse(path string) (projectFile, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -120,10 +115,8 @@ func parse(path string) (projectFile, error) {
 		switch key {
 		case "project":
 			file.project = strings.ToUpper(value)
-		case "repo":
-			file.repo = value
 		default:
-			return projectFile{}, fmt.Errorf("line %d: unknown key %q; the file knows `project` and `repo`", line, key)
+			return projectFile{}, fmt.Errorf("line %d: unknown key %q; the file knows `project`", line, key)
 		}
 	}
 	if err := scanner.Err(); err != nil {

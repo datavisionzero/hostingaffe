@@ -9,7 +9,7 @@ import (
 
 // Problem is application/problem+json as ha reads it. Extension members stay
 // in Extra so that a command can print what its code carries — the holder on
-// claim-held, the path on cycle — without this package knowing every code.
+// stale, the field errors on validation — without this package knowing every code.
 type Problem struct {
 	Type     string
 	Title    string
@@ -55,7 +55,7 @@ func Parse(body []byte) *Problem {
 	return p
 }
 
-// Code is the last segment of `type`: `claim-held` from `/problems/claim-held`.
+// Code is the last segment of `type`: `not-found` from `/problems/not-found`.
 func (p *Problem) Code() string {
 	if p == nil {
 		return ""

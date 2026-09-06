@@ -23,16 +23,6 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
 
         builder.Property(p => p.Name).HasColumnName("name").IsRequired();
 
-        builder.Property(p => p.TriageRequired)
-            .HasColumnName("triage_required")
-            .HasDefaultValue(false)
-            .IsRequired();
-
-        builder.Property(p => p.ReviewRequired)
-            .HasColumnName("review_required")
-            .HasDefaultValue(false)
-            .IsRequired();
-
         // The page every agent is handed with its ticket (CONTEXT.md,
         // Instructions), by id rather than by slug so that a rename leaves it
         // alone. `set null` on delete is the whole of the cleanup: the purge
@@ -44,19 +34,6 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasForeignKey(p => p.InstructionsPageId)
             .HasConstraintName("fk_project_instructions_page")
             .OnDelete(DeleteBehavior.SetNull);
-
-        // The two counters every key in the project is drawn from, incremented
-        // by one statement under the row's lock in the store — never by the
-        // change tracker, which is why nothing in Domain sets them.
-        builder.Property(p => p.LastIssueNumber)
-            .HasColumnName("last_issue_number")
-            .HasDefaultValue(0)
-            .IsRequired();
-
-        builder.Property(p => p.LastEpicNumber)
-            .HasColumnName("last_epic_number")
-            .HasDefaultValue(0)
-            .IsRequired();
 
         builder.Property(p => p.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()

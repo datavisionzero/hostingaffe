@@ -1,9 +1,6 @@
 using Hostingaffe.Domain.Pages;
-using Hostingaffe.Domain.Projects;
 
 namespace Hostingaffe.Application.Ports;
-
-public sealed record PageLabelRow(Guid PageId, Label Label);
 
 /// <summary>
 /// The page rows (<c>docs/storage.md</c>, Pages). A page is found by its slug
@@ -11,9 +8,9 @@ public sealed record PageLabelRow(Guid PageId, Label Label);
 /// </summary>
 /// <remarks>
 /// There is no paged list here and no cursor. The wiki is flat, one project's
-/// pages are few, and the list is slim — slug, title, labels, who touched it
-/// last — for the same reason ADR 0012 makes an issue list slim: the body is
-/// what would make it expensive, and the body is not in it.
+/// pages are few, and the list is slim — slug, title, who touched it last —
+/// for the same reason ADR 0012 keeps a list slim: the body is what would make
+/// it expensive, and the body is not in it.
 /// </remarks>
 public interface IPages
 {
@@ -32,22 +29,15 @@ public interface IPages
     Task<IReadOnlyList<Page>> FindLiveManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Every live page of the project, by slug; every label named has to be on
-    /// it, and <paramref name="search"/> filters by the words in the title and
-    /// the body.
+    /// Every live page of the project, by slug; <paramref name="search"/>
+    /// filters by the words in the title and the body.
     /// </summary>
-    Task<IReadOnlyList<Page>> ListAsync(Guid projectId, IReadOnlyList<string> labelNames, string? search, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Page>> ListAsync(Guid projectId, string? search, CancellationToken cancellationToken);
 
     /// <summary>The row, tracked and locked for the rest of the transaction.</summary>
     Task<Page?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<PageLabelRow>> LabelsOfAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken);
-
     void Add(Page page);
-
-    void Attach(PageLabel attachment);
-
-    Task DetachAsync(Guid pageId, Guid labelId, CancellationToken cancellationToken);
 
     Task SaveAsync(CancellationToken cancellationToken);
 }

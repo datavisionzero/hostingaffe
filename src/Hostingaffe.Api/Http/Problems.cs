@@ -20,7 +20,7 @@ public static class Problems
 
     private const string TypePrefix = "/problems/";
 
-    /// <summary>The wire spelling of a code: <c>ClaimHeld</c> is <c>claim-held</c>.</summary>
+    /// <summary>The wire spelling of a code: <c>NotFound</c> is <c>not-found</c>.</summary>
     public static string CodeOf(RefusalCode code) => JsonNamingPolicy.KebabCaseLower.ConvertName(code.ToString());
 
     public static string TypeOf(RefusalCode code) => TypePrefix + CodeOf(code);
@@ -29,20 +29,13 @@ public static class Problems
     {
         RefusalCode.Validation or RefusalCode.UnknownField or RefusalCode.CursorInvalid => StatusCodes.Status400BadRequest,
         RefusalCode.Unauthenticated => StatusCodes.Status401Unauthorized,
-        RefusalCode.Csrf or RefusalCode.Forbidden or RefusalCode.ClaimProtected =>
-            StatusCodes.Status403Forbidden,
+        RefusalCode.Csrf or RefusalCode.Forbidden => StatusCodes.Status403Forbidden,
         RefusalCode.NotFound or RefusalCode.Deleted => StatusCodes.Status404NotFound,
-        RefusalCode.ClaimHeld or RefusalCode.ClaimLost or RefusalCode.IdempotencyMismatch or RefusalCode.ReleaseExists
-            or RefusalCode.EmailExists or RefusalCode.LastAdministrator =>
+        RefusalCode.IdempotencyMismatch or RefusalCode.EmailExists or RefusalCode.LastAdministrator =>
             StatusCodes.Status409Conflict,
         RefusalCode.SecretExpired => StatusCodes.Status410Gone,
         RefusalCode.Stale => StatusCodes.Status412PreconditionFailed,
-        RefusalCode.Transition or RefusalCode.Cycle or RefusalCode.HasIssues or RefusalCode.OneLevel
-            or RefusalCode.OtherProject or RefusalCode.EpicInherited or RefusalCode.HasSubIssues or RefusalCode.UnknownLabel
-            or RefusalCode.InPublishedRelease =>
-            StatusCodes.Status422UnprocessableEntity,
-        RefusalCode.WaitTooLong or RefusalCode.TooMany => StatusCodes.Status422UnprocessableEntity,
-        RefusalCode.SmtpNotConfigured => StatusCodes.Status422UnprocessableEntity,
+        RefusalCode.Transition or RefusalCode.SmtpNotConfigured => StatusCodes.Status422UnprocessableEntity,
         RefusalCode.Internal => StatusCodes.Status500InternalServerError,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "A refusal code without a status."),
     };
@@ -52,28 +45,14 @@ public static class Problems
         RefusalCode.Validation => "A field is missing, malformed or over its limit",
         RefusalCode.UnknownField => "The request contains a field this object does not define",
         RefusalCode.CursorInvalid => "The cursor does not fit this request",
-        RefusalCode.WaitTooLong => "The requested wait exceeds one hour",
-        RefusalCode.TooMany => "The bulk request contains too many issues",
         RefusalCode.Unauthenticated => "No token, an unknown token, or a revoked one",
         RefusalCode.Csrf => "The browser request failed its CSRF check",
         RefusalCode.Forbidden => "The identity may not do this",
-        RefusalCode.ClaimProtected => "Only a user takes over a user's claim",
         RefusalCode.NotFound => "Nothing by that key or id",
-        RefusalCode.Deleted => "The issue is deleted and can still be restored",
-        RefusalCode.ClaimHeld => "The issue is claimed by somebody else",
-        RefusalCode.ClaimLost => "The claim has expired and somebody else holds the issue now",
+        RefusalCode.Deleted => "The object is deleted and can still be restored",
         RefusalCode.IdempotencyMismatch => "The Idempotency-Key was used for a different request",
         RefusalCode.Stale => "The object has changed since it was read",
-        RefusalCode.Transition => "The status does not allow this act",
-        RefusalCode.Cycle => "The blocker would close a cycle",
-        RefusalCode.HasIssues => "The epic still has issues",
-        RefusalCode.OneLevel => "Sub-issues are exactly one level deep",
-        RefusalCode.OtherProject => "The parent belongs to another project",
-        RefusalCode.EpicInherited => "A sub-issue inherits its epic",
-        RefusalCode.HasSubIssues => "The issue still has sub-issues",
-        RefusalCode.ReleaseExists => "The project already has a release with that name",
-        RefusalCode.InPublishedRelease => "The issue is in a published release",
-        RefusalCode.UnknownLabel => "The project has no such label",
+        RefusalCode.Transition => "The object's state does not allow this act",
         RefusalCode.SmtpNotConfigured => "Transactional email is not configured",
         RefusalCode.EmailExists => "That email address already belongs to a user",
         RefusalCode.SecretExpired => "The one-time link is expired or has already been used",

@@ -105,8 +105,8 @@ public sealed class Page
         Touch(by, at);
     }
 
-    /// <summary>A change to the labels moves the version too, so that a guarded write sees it.</summary>
-    public void Touch(Guid by, DateTimeOffset at)
+    /// <summary>Every edit moves the version and names who made it.</summary>
+    private void Touch(Guid by, DateTimeOffset at)
     {
         UpdatedBy = by;
         UpdatedAt = at;

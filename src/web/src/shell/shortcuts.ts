@@ -10,7 +10,7 @@
  */
 
 /** The contexts the overview groups the keys into, in the order it shows them. */
-export const groups = ["Global", "Issue lists", "Forms", "Command palette"] as const;
+export const groups = ["Global", "Forms", "Command palette"] as const;
 
 export type Group = (typeof groups)[number];
 
@@ -20,11 +20,6 @@ export type ShortcutId =
   | "global:projects"
   | "global:shortcuts"
   | "global:create"
-  | "list:next"
-  | "list:previous"
-  | "list:open"
-  | "list:search"
-  | "list:close"
   | "form:cancel"
   | "form:submit"
   | "palette:next"
@@ -56,15 +51,9 @@ export const shortcuts: Shortcut[] = [
   { id: "global:projects", key: "p", what: "Switch project", group: "Global" },
   { id: "global:sidebar", key: "b", mod: true, what: "Fold the navigation", group: "Global" },
   { id: "global:shortcuts", key: "?", what: "Show this list", group: "Global" },
-  // Creating belongs to the project, not to a list of it: the key answered on
-  // three screens of seven and did nothing on the other four.
-  { id: "global:create", key: "c", what: "New issue in this project", group: "Global" },
-
-  { id: "list:next", key: "j", what: "Next issue", group: "Issue lists" },
-  { id: "list:previous", key: "k", what: "Previous issue", group: "Issue lists" },
-  { id: "list:open", key: "Enter", what: "Open the active issue", group: "Issue lists" },
-  { id: "list:search", key: "/", what: "Search this list", group: "Issue lists" },
-  { id: "list:close", key: "Escape", what: "Close the filters", group: "Issue lists" },
+  // Creating belongs to the project, not to a list of it: the key answers on
+  // every screen the project has.
+  { id: "global:create", key: "c", what: "New page in this project", group: "Global" },
 
   // The same key the button beside it is: one behaviour, two ways to it.
   { id: "form:cancel", key: "Escape", what: "Leave the form, asking first if anything was written", group: "Forms" },

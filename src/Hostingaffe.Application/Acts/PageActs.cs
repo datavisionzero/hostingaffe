@@ -11,30 +11,28 @@ public sealed record PageSummaryShape(
     string Slug,
     string Project,
     string Title,
-    IReadOnlyList<string> Labels,
     IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-/// <summary>The complete page: the summary plus the Markdown, the author and the full labels.</summary>
+/// <summary>The complete page: the summary plus the Markdown and the author.</summary>
 public sealed record PageShape(
     string Slug,
     string Project,
     string Title,
     string Body,
-    IReadOnlyList<LabelShape> Labels,
     IdentityRef Author,
     IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record CreatePageRequest(string? Slug, string? Title, string? Body, IReadOnlyList<string>? Labels);
+public sealed record CreatePageRequest(string? Slug, string? Title, string? Body);
 
 /// <param name="BodyGiven">Present, even as <c>null</c>, which empties the document.</param>
-public sealed record PageChanges(string? Slug, string? Title, bool BodyGiven, string? Body, IReadOnlyList<string>? Labels);
+public sealed record PageChanges(string? Slug, string? Title, bool BodyGiven, string? Body);
 
 /// <summary>Turns page rows into the two shapes, resolving the identities once for the whole list.</summary>
-public sealed class PageAssembler(IPages pages, IIdentities identities)
+public sealed class PageAssembler(IIdentities identities)
 {
     public async Task<IReadOnlyList<PageSummaryShape>> SummariesAsync(
         Project project, IReadOnlyList<Page> rows, CancellationToken cancellationToken)
@@ -46,7 +44,6 @@ public sealed class PageAssembler(IPages pages, IIdentities identities)
             return [];
         }
 
-        var labels = await pages.LabelsOfAsync([.. rows.Select(p => p.Id)], cancellationToken);
         var people = await PeopleAsync(rows.Select(p => p.UpdatedBy), cancellationToken);
 
         return
@@ -55,7 +52,6 @@ public sealed class PageAssembler(IPages pages, IIdentities identities)
                 p.Slug,
                 project.Key,
                 p.Title,
-                [.. labels.Where(l => l.PageId == p.Id).Select(l => l.Label.Name).Order(StringComparer.Ordinal)],
                 people[p.UpdatedBy],
                 p.CreatedAt,
                 p.UpdatedAt)),
@@ -67,7 +63,6 @@ public sealed class PageAssembler(IPages pages, IIdentities identities)
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(page);
 
-        var labels = await pages.LabelsOfAsync([page.Id], cancellationToken);
         var people = await PeopleAsync([page.CreatedBy, page.UpdatedBy], cancellationToken);
 
         return new PageShape(
@@ -75,7 +70,6 @@ public sealed class PageAssembler(IPages pages, IIdentities identities)
             project.Key,
             page.Title,
             page.Body,
-            [.. labels.Select(l => LabelShape.Of(l.Label)).OrderBy(l => l.Name, StringComparer.Ordinal)],
             people[page.CreatedBy],
             people[page.UpdatedBy],
             page.CreatedAt,
@@ -143,10 +137,10 @@ public static class PageLookup
 public sealed class ListPages(IProjects projects, ProjectScope scope, IPages pages, PageAssembler assembler, InstanceSettings settings)
 {
     public async Task<IReadOnlyList<PageSummaryShape>> ExecuteAsync(
-        string projectKey, IReadOnlyList<string> labelNames, string? search, CancellationToken cancellationToken)
+        string projectKey, string? search, CancellationToken cancellationToken)
     {
         var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
-        var rows = await pages.ListAsync(project.Id, labelNames, search, cancellationToken);
+        var rows = await pages.ListAsync(project.Id, search, cancellationToken);
 
         return await assembler.SummariesAsync(project, rows, cancellationToken);
     }
@@ -162,12 +156,11 @@ public sealed class ReadPage(IProjects projects, ProjectScope scope, IPages page
     }
 }
 
-/// <summary>A page of the project's wiki, with its labels, in one transaction.</summary>
+/// <summary>A page of the project's wiki, in one transaction.</summary>
 public sealed class CreatePage(
     ICallerIdentity callerIdentity,
     IProjects projects,
     ProjectScope scope,
-    ILabels labels,
     IPages pages,
     IHistory history,
     ITransactions transactions,
@@ -183,7 +176,6 @@ public sealed class CreatePage(
         var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
         var slug = Validated.Field("slug", () => Slug.Normalize(request.Slug ?? string.Empty));
         var title = Validated.Field("title", () => Page.NormalizeTitle(request.Title!));
-        var resolved = await labels.ResolveLabelsAsync(project, request.Labels ?? [], "labels", cancellationToken);
 
         await PageWrites.TakenAsync(pages, project, slug, settings, cancellationToken);
 
@@ -195,12 +187,6 @@ public sealed class CreatePage(
             pages.Add(created);
             history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Created));
 
-            foreach (var label in resolved)
-            {
-                pages.Attach(PageLabel.Attach(created.Id, label.Id));
-                history.Add(HistoryEntry.OnPage(created.Id, caller.Id, now, HistoryField.Label, newValue: label.Name));
-            }
-
             await pages.SaveAsync(cancellationToken);
             return created;
         }, cancellationToken);
@@ -210,16 +196,15 @@ public sealed class CreatePage(
 }
 
 /// <summary>
-/// Title, the document, the labels and the address, guarded by <c>If-Match</c>
-/// against <c>updated_at</c> — the guard a text a human and an agent both edit
-/// needs. The history records that the body changed, not how; a rename carries
-/// both addresses, because nothing else keeps the old one.
+/// Title, the document and the address, guarded by <c>If-Match</c> against
+/// <c>updated_at</c> — the guard a text a human and an agent both edit needs.
+/// The history records that the body changed, not how; a rename carries both
+/// addresses, because nothing else keeps the old one.
 /// </summary>
 public sealed class ChangePage(
     ICallerIdentity callerIdentity,
     IProjects projects,
     ProjectScope scope,
-    ILabels labels,
     IPages pages,
     IHistory history,
     ITransactions transactions,
@@ -235,8 +220,7 @@ public sealed class ChangePage(
 
         var project = await projects.ProjectAsync(scope, projectKey, settings, cancellationToken);
         var before = await pages.LiveAsync(project, slug, settings, cancellationToken);
-        var expected = ChangeIssue.Expected(ifMatch);
-        var newLabels = changes.Labels is null ? null : await labels.ResolveLabelsAsync(project, changes.Labels, "labels", cancellationToken);
+        var expected = GuardedWrite.Expected(ifMatch);
 
         var renamed = changes.Slug is null ? null : Validated.Field("slug", () => Slug.Normalize(changes.Slug));
         if (renamed is not null && renamed != before.Slug)
@@ -277,24 +261,6 @@ public sealed class ChangePage(
             {
                 row.Rewrite(changes.Body, caller.Id, now);
                 history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Body));
-            }
-
-            if (newLabels is not null)
-            {
-                var current = (await pages.LabelsOfAsync([row.Id], cancellationToken)).Select(l => l.Label).ToList();
-                foreach (var gone in current.Where(c => newLabels.All(n => n.Id != c.Id)))
-                {
-                    await pages.DetachAsync(row.Id, gone.Id, cancellationToken);
-                    history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Label, oldValue: gone.Name));
-                    row.Touch(caller.Id, now);
-                }
-
-                foreach (var added in newLabels.Where(n => current.All(c => c.Id != n.Id)))
-                {
-                    pages.Attach(PageLabel.Attach(row.Id, added.Id));
-                    history.Add(HistoryEntry.OnPage(row.Id, caller.Id, now, HistoryField.Label, newValue: added.Name));
-                    row.Touch(caller.Id, now);
-                }
             }
 
             await pages.SaveAsync(cancellationToken);

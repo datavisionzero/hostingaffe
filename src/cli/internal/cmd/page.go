@@ -31,7 +31,6 @@ func printPage(g *globals, cmd *cobra.Command, page api.Page) error {
 }
 
 func newPageList(g *globals) *cobra.Command {
-	var labels []string
 	var query string
 	cmd := &cobra.Command{
 		Use: "list", Short: "Every page of the project, by slug, without the bodies.", Args: cobra.NoArgs,
@@ -45,9 +44,6 @@ func newPageList(g *globals) *cobra.Command {
 				return err
 			}
 			params := &api.ListPagesParams{Q: optional(query)}
-			if len(labels) > 0 {
-				params.Label = &labels
-			}
 			resp, err := c.ListPagesWithResponse(cmd.Context(), project, params)
 			if err != nil {
 				return client.Transport(err)
@@ -62,7 +58,6 @@ func newPageList(g *globals) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringArrayVar(&labels, "label", nil, "only pages carrying this label; repeatable, all must match")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "full text in the title and the body")
 	return cmd
 }
@@ -95,7 +90,6 @@ func newPageView(g *globals) *cobra.Command {
 
 func newPageCreate(g *globals) *cobra.Command {
 	var title, bodyFile string
-	var labels []string
 	cmd := &cobra.Command{
 		Use: "create SLUG --title TITLE", Short: "Create a page; the slug is the address you give it, never derived from the title.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -115,9 +109,6 @@ func newPageCreate(g *globals) *cobra.Command {
 				return err
 			}
 			request := api.CreatePageRequest{Slug: &args[0], Title: &title, Body: body}
-			if len(labels) > 0 {
-				request.Labels = &labels
-			}
 			resp, err := c.CreatePageWithResponse(cmd.Context(), project, request)
 			if err != nil {
 				return client.Transport(err)
@@ -130,15 +121,13 @@ func newPageCreate(g *globals) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "the one line that says what the page is")
 	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
-	cmd.Flags().StringArrayVar(&labels, "label", nil, "a label; repeatable")
 	return cmd
 }
 
 func newPageEdit(g *globals) *cobra.Command {
 	var title, bodyFile, ifMatch string
-	var labels []string
 	cmd := &cobra.Command{
-		Use: "edit SLUG", Short: "Change the title, the Markdown or the labels; --if-match guards the document.", Args: cobra.ExactArgs(1),
+		Use: "edit SLUG", Short: "Change the title or the Markdown; --if-match guards the document.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			changes := map[string]any{}
 			if title != "" {
@@ -151,18 +140,14 @@ func newPageEdit(g *globals) *cobra.Command {
 			if body != nil {
 				changes["body"] = *body
 			}
-			if cmd.Flags().Changed("label") {
-				changes["labels"] = labels
-			}
 			if len(changes) == 0 {
-				return &config.UsageError{Message: "nothing to change: --title, --body-file or --label. The slug is `ha page rename`."}
+				return &config.UsageError{Message: "nothing to change: --title or --body-file. The slug is `ha page rename`."}
 			}
 			return changePage(g, cmd, args[0], changes, ifMatch)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "the new title")
 	cmd.Flags().StringVar(&bodyFile, "body-file", "", "the Markdown, from a file or `-` for stdin")
-	cmd.Flags().StringArrayVar(&labels, "label", nil, "the whole label set; repeatable, replaces what is there")
 	cmd.Flags().StringVar(&ifMatch, "if-match", "", "the updated_at as last read; refused as stale when it moved")
 	return cmd
 }

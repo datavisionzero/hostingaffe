@@ -16,14 +16,16 @@ const (
 	NotFound = 3
 	// Refused is 400 validation and every 422.
 	Refused = 4
-	// Conflict is 409: claim-held, claim-lost, idempotency-mismatch.
+	// Conflict is 409: idempotency-mismatch, email-exists, last-administrator.
 	Conflict = 5
 	// Stale is 412 stale.
 	Stale = 6
 	// Denied is 401 and 403.
 	Denied = 7
-	// Empty is `next` finding nothing: not an error of the API, but the answer a loop most often branches on.
-	Empty = 8
+	// 8 is not given away: it was `next` finding nothing, and it stays free for
+	// whatever answers "there is nothing" next, so that no script has to relearn
+	// a number.
+	//
 	// Skew is a CLI too old or too new for the instance (ADR 0011).
 	Skew = 9
 	// Unreachable is DNS, connection refused, timeout, TLS: the instance could not be reached.

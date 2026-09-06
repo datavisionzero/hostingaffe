@@ -1,7 +1,7 @@
 import { ArrowRightIcon, SearchIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
-import { api, type IssueSummary, type Project, type Schemas } from "@/api/client";
+import { api, type Project, type Schemas } from "@/api/client";
 import { useTheme } from "@/components/theme-provider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { rememberProject } from "@/projects/useProjects";
@@ -9,7 +9,7 @@ import { useSession } from "@/session/useSession";
 import { cn } from "@/lib/utils";
 import { Keys } from "./ShortcutsDialog";
 import { is } from "./shortcuts";
-import { keyPath, keyPattern, pagePath, viewPath, views } from "./views";
+import { pagePath, viewPath, views } from "./views";
 
 type PageSummary = Schemas["PageSummary"];
 
@@ -30,14 +30,10 @@ const settle = 150;
 
 /**
  * The command palette — ⌘K, or Ctrl+K — over the views, the projects and the
- * few acts the shell itself has. A key typed into it opens that issue or epic,
- * which is the fastest way from a chat to a ticket. Words rather than a key ask
- * the instance: a few full-text matches, and the row that opens all of them as
- * a filtered list.
+ * few acts the shell itself has. Words typed into it ask the instance for a
+ * few full-text matches.
  *
- * It asks about issues and about pages, under headings that say which is
- * which. A hit that does not say what kind of thing it is is a poor hit, and
- * for the wiki this is more than a nicety: the pages are flat because the
+ * For the wiki this is more than a nicety: the pages are flat because the
  * search is what a hierarchy would have been, so this is how one is found at
  * all.
  *
@@ -81,14 +77,14 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
   const { signOut } = useSession();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
-  const [found, setFound] = useState<{ of: string; issues: IssueSummary[]; pages: PageSummary[] }>({ of: "", issues: [], pages: [] });
+  const [found, setFound] = useState<{ of: string; pages: PageSummary[] }>({ of: "", pages: [] });
   const searchId = useId();
 
   const needle = query.trim();
   const projectKey = current?.key;
-  // Words, not a key, and a project to search in. `q` on the issue list is the
-  // same full-text search the list itself uses.
-  const searching = projectKey !== undefined && needle.length >= shortest && !keyPattern.test(needle);
+  // Words, and a project to search in. `q` is the same full-text search the
+  // page list itself uses.
+  const searching = projectKey !== undefined && needle.length >= shortest;
 
   useEffect(() => {
     if (!searching) {
@@ -102,24 +98,12 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          // Two lists, one question. Neither waits for the other to fail: a
-          // wiki that answers while the issue list is slow still shows up.
-          const [issues, pages] = await Promise.all([
-            api.GET("/issues", {
-              params: { query: { project: projectKey, q: needle, limit: matches } },
-              signal: controller.signal,
-            }),
-            api.GET("/projects/{key}/pages", {
-              params: { path: { key: projectKey }, query: { q: needle } },
-              signal: controller.signal,
-            }),
-          ]);
-
-          setFound({
-            of: needle,
-            issues: issues.data?.items ?? [],
-            pages: (pages.data ?? []).slice(0, matches),
+          const pages = await api.GET("/projects/{key}/pages", {
+            params: { path: { key: projectKey }, query: { q: needle } },
+            signal: controller.signal,
           });
+
+          setFound({ of: needle, pages: (pages.data ?? []).slice(0, matches) });
         } catch {
           // Nothing found is what the palette shows; the commands remain.
         }
@@ -139,43 +123,9 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
     };
 
     const list: Command[] = [];
-    const key = needle.match(keyPattern);
-
-    if (key !== null) {
-      const project = key[1]!.toUpperCase();
-      const number = key[2]!.toUpperCase();
-      const isEpic = number.startsWith("E");
-
-      list.push({
-        id: `open:${project}-${number}`,
-        label: `Open ${project}-${number}`,
-        hint: isEpic ? "epic" : "issue",
-        group: "Go to",
-        run: go(keyPath(`${project}-${number}`)),
-      });
-    }
 
     if (searching && projectKey !== undefined) {
-      const hits = found.of === needle ? found : { issues: [], pages: [] };
-
-      for (const issue of hits.issues) {
-        list.push({
-          id: `found:${issue.key}`,
-          label: issue.title,
-          hint: issue.key,
-          group: "Issues",
-          run: go(keyPath(issue.key)),
-          found: true,
-        });
-      }
-
-      list.push({
-        id: "found:all",
-        label: `All issues matching “${needle}”`,
-        group: "Issues",
-        run: go(`/${projectKey}/issues?q=${encodeURIComponent(needle)}`),
-        found: true,
-      });
+      const hits = found.of === needle ? found : { pages: [] };
 
       for (const page of hits.pages) {
         list.push({
@@ -201,14 +151,10 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
       }
     }
 
-    // The palette is the other way to everything the screens offer, so the
-    // four things that can be created are reachable from it too.
+    // The palette is the other way to everything the screens offer, so what
+    // can be created is reachable from it too.
     if (current !== undefined) {
-      list.push(
-        { id: "create:issue", label: "Create issue", hint: current.key, group: "Create", run: go(`/${current.key}/issues/new`) },
-        { id: "create:epic", label: "Create epic", hint: current.key, group: "Create", run: go(`/${current.key}/epics/new`) },
-        { id: "create:page", label: "Create page", hint: current.key, group: "Create", run: go(`/${current.key}/pages/new`) },
-      );
+      list.push({ id: "create:page", label: "Create page", hint: current.key, group: "Create", run: go(`/${current.key}/pages/new`) });
     }
 
     list.push({ id: "create:project", label: "Create project", group: "Create", run: go("/projects/new") });
@@ -222,7 +168,7 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
           group: "Switch project",
           run: () => {
             rememberProject(project.key);
-            go(`/${project.key}/ready`)();
+            go(`/${project.key}/pages`)();
           },
         });
       }
@@ -249,12 +195,12 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
   const matching = useMemo(() => {
     const lowered = needle.toLowerCase();
 
-    if (lowered === "" || keyPattern.test(lowered)) {
+    if (lowered === "") {
       return commands;
     }
 
-    // What the instance found is not filtered again: it matched on a
-    // description or a comment this screen never saw.
+    // What the instance found is not filtered again: it matched on a body this
+    // screen never saw.
     return commands.filter(
       (command) =>
         command.found === true ||
@@ -292,8 +238,8 @@ function PaletteBody({ onOpenChange, projects, current, onShortcuts }: Omit<Pale
             aria-expanded
             aria-controls="palette-commands"
             aria-activedescendant={selected ? `palette-${selected.id}` : undefined}
-            aria-label="Search issues, or type a command"
-            placeholder="Search issues, or type a command"
+            aria-label="Search pages, or type a command"
+            placeholder="Search pages, or type a command"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

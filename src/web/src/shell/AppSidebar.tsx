@@ -10,14 +10,11 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useSession } from "@/session/useSession";
-import type { Attention } from "./attention";
-import { useAttention } from "./useAttention";
 import { viewPath, views } from "./views";
 
 /**
@@ -29,7 +26,6 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
   const { me } = useSession();
   const { setOpenMobile } = useSidebar();
   const { pathname } = useLocation();
-  const attention = useAttention();
 
   const groups = [
     { id: "views", label: "Views" },
@@ -56,7 +52,6 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
                   .filter((view) => view.group === group.id)
                   .map((view) => {
                     const path = project === undefined ? "" : viewPath(project.key, view);
-                    const count = drawn(counted(view.id, attention));
                     return <SidebarMenuItem key={view.id}>
                       {project === undefined ? (
                         <SidebarMenuButton disabled>
@@ -66,10 +61,6 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
                       ) : (
                         <SidebarMenuButton
                           isActive={pathname === path || pathname.startsWith(`${path}/`)}
-                          // The count belongs to the name of the link, not
-                          // beside it: a screen reader says "Needs you, 3"
-                          // rather than reading two fragments in a row.
-                          aria-label={count === null ? undefined : `${view.label}, ${count}`}
                           render={
                             <NavLink
                               to={path}
@@ -81,7 +72,6 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
                           <span>{view.label}</span>
                         </SidebarMenuButton>
                       )}
-                      {count !== null && project !== undefined && <SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>}
                     </SidebarMenuItem>;
                   })}
                 {group.id === "structure" && project !== undefined && <SidebarMenuItem><SidebarMenuButton isActive={pathname === `/${project.key}/settings`} render={<NavLink to={`/${project.key}/settings`} onClick={() => setOpenMobile(false)} />}><SettingsIcon /><span>Project settings</span></SidebarMenuButton></SidebarMenuItem>}
@@ -99,32 +89,4 @@ export function AppSidebar({ project }: { project: Project | undefined }) {
       </SidebarFooter>
     </Sidebar>
   );
-}
-
-/**
- * Which of the frame's numbers a link carries, if any. "Needs you" is the
- * request and "In progress" the observation; the other links carry none —
- * a number that is always there and barely moves is decoration, and it would
- * take the attention away from the two that mean something.
- */
-function counted(id: string, attention: Attention): number | null {
-  if (id === "needs-you") {
-    return attention.needsYou;
-  }
-
-  return id === "in-progress" ? attention.inProgress : null;
-}
-
-/**
- * What the badge says, or nothing at all. Zero is not a signal, and an unknown
- * number is not a zero — in both cases the link carries no badge, and it
- * carries no placeholder while the first answer is on its way either. Past a
- * hundred the exact number stops mattering and the width starts to.
- */
-function drawn(count: number | null): string | null {
-  if (count === null || count <= 0) {
-    return null;
-  }
-
-  return count > 99 ? "99+" : String(count);
 }

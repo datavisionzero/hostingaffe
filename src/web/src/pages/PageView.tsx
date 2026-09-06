@@ -1,13 +1,10 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, describe, type Schemas } from "@/api/client";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LabelPicker } from "@/components/ui/label-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownField } from "@/shared/MarkdownField";
-import { useLabels } from "@/projects/useLabels";
 import { useAbandon } from "@/shared/abandon";
 import { ActionDialog, TextActionDialog } from "@/shared/ActionDialog";
 import { Markdown } from "@/shared/Markdown";
@@ -138,13 +135,6 @@ export function PageView() {
       </PageHeader>
 
       <div className="max-w-3xl flex-1 p-4 md:p-6">
-        {page.labels.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-1">
-            {page.labels.map((label) => (
-              <Badge key={label.name} variant="secondary" className="font-normal">{label.name}</Badge>
-            ))}
-          </div>
-        )}
         {page.body === "" ? (
           <p className="text-sm text-muted-foreground">
             This page is empty. It is the place for what the project knows and no ticket asks for.
@@ -258,7 +248,6 @@ function EditPageForm({ project, page, onSaved, onCancel }: {
 
   return (
     <PageForm
-      project={project}
       initial={page}
       submit="Save changes"
       onCancel={onCancel}
@@ -270,7 +259,7 @@ function EditPageForm({ project, page, onSaved, onCancel }: {
         const answer = await api.PATCH("/projects/{key}/pages/{slug}", {
           params: { path: { key: project, slug: page.slug } },
           headers: { "If-Match": version },
-          body: { title: draft.title, body: draft.body, labels: draft.labels },
+          body: { title: draft.title, body: draft.body },
         });
 
         const current = stale<Page>(answer);
@@ -295,7 +284,6 @@ export function NewPageView() {
     <>
       <PageHeader title="Create page" />
       <PageForm
-        project={project!}
         slugField
         submit="Create page"
         onCancel={() => void navigate(`/${project}/pages`)}
@@ -306,7 +294,7 @@ export function NewPageView() {
   );
 }
 
-type Draft = { slug: string; title: string; body: string; labels: string[] };
+type Draft = { slug: string; title: string; body: string };
 type Written = { data?: Page; error?: unknown; response: Response };
 
 /**
@@ -329,8 +317,7 @@ function Conflict({ page }: { page: Page }) {
   );
 }
 
-function PageForm({ project, initial, slugField, submit, write, onWritten, onCancel, notice }: {
-  project: string;
+function PageForm({ initial, slugField, submit, write, onWritten, onCancel, notice }: {
   initial?: Page;
   /** Only where the address is being decided: renaming is its own act. */
   slugField?: boolean;
@@ -344,19 +331,12 @@ function PageForm({ project, initial, slugField, submit, write, onWritten, onCan
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
-  const [labels, setLabels] = useState(initial?.labels.map((label) => label.name) ?? []);
   const [saving, setSaving] = useState(false);
   const [why, setWhy] = useState<string>();
   const slugId = useId();
   const titleId = useId();
-  const known = useLabels(project);
-  const start = {
-    slug: initial?.slug ?? "",
-    title: initial?.title ?? "",
-    body: initial?.body ?? "",
-    labels: initial?.labels.map((label) => label.name) ?? [],
-  };
-  const { leave, dialog } = useAbandon(JSON.stringify({ slug, title, body, labels }) !== JSON.stringify(start), onCancel);
+  const start = { slug: initial?.slug ?? "", title: initial?.title ?? "", body: initial?.body ?? "" };
+  const { leave, dialog } = useAbandon(JSON.stringify({ slug, title, body }) !== JSON.stringify(start), onCancel);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -364,7 +344,7 @@ function PageForm({ project, initial, slugField, submit, write, onWritten, onCan
     setWhy(undefined);
 
     try {
-      const { data, error, response } = await write({ slug, title, body, labels });
+      const { data, error, response } = await write({ slug, title, body });
 
       if (data === undefined) {
         setWhy(describe(error as Parameters<typeof describe>[0], response.status));
@@ -413,7 +393,6 @@ function PageForm({ project, initial, slugField, submit, write, onWritten, onCan
         />
       </label>
       <MarkdownField label="Body" value={body} onChange={setBody} />
-      <LabelPicker label="Labels" labels={known.labels} value={labels} onChange={setLabels} onCreate={known.create} />
       {/* A conflict says everything the refusal's own sentence says, and says
           what to do about it, so it stands in its place rather than beside it. */}
       {notice ?? (why !== undefined && <p role="alert" className="text-sm text-destructive">{why}</p>)}

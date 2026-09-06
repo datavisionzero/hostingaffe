@@ -101,8 +101,7 @@ func printProject(g *globals, cmd *cobra.Command, project api.Project) error {
 }
 
 func newProjectCreate(g *globals) *cobra.Command {
-	var triage, review bool
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "create KEY NAME",
 		Short: "Create a project: the key that prefixes everything in it, typed by a person and never changed.",
 		Args:  cobra.ExactArgs(2),
@@ -112,14 +111,7 @@ func newProjectCreate(g *globals) *cobra.Command {
 				return err
 			}
 			key := strings.ToUpper(args[0])
-			body := api.CreateProjectRequest{Key: &key, Name: &args[1]}
-			if triage {
-				body.TriageRequired = &triage
-			}
-			if review {
-				body.ReviewRequired = &review
-			}
-			resp, err := c.CreateProjectWithResponse(cmd.Context(), body)
+			resp, err := c.CreateProjectWithResponse(cmd.Context(), api.CreateProjectRequest{Key: &key, Name: &args[1]})
 			if err != nil {
 				return client.Transport(err)
 			}
@@ -129,9 +121,6 @@ func newProjectCreate(g *globals) *cobra.Command {
 			return printProject(g, cmd, *resp.JSON201)
 		},
 	}
-	cmd.Flags().BoolVar(&triage, "triage-required", false, "only flagged issues are handed out by next")
-	cmd.Flags().BoolVar(&review, "review-required", false, "every close by an agent lands in review")
-	return cmd
 }
 
 func newProjectList(g *globals) *cobra.Command {
@@ -217,8 +206,7 @@ func newProjectEdit(g *globals) *cobra.Command {
 					return &config.UsageError{Message: fmt.Sprintf("--%s is true or false.", strings.ReplaceAll(flag, "_", "-"))}
 				}
 			}
-			// `none` takes the designation away, as it does for the issue's
-			// epic, parent and assignee: the slug is on the wire as null, and
+			// `none` takes the designation away: the slug is on the wire as null, and
 			// leaving the flag out leaves the designation alone.
 			switch instructions {
 			case "":

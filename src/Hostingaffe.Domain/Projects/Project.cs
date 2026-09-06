@@ -6,21 +6,8 @@ namespace Hostingaffe.Domain.Projects;
 /// repository.
 /// </summary>
 /// <remarks>
-/// <para>
-/// The two switches are the two places the product asks what an agent's word is
-/// worth: <see cref="TriageRequired"/> guards the entrance (VISION 10),
-/// <see cref="ReviewRequired"/> the exit (VISION 9, ADR 0014). Both are off by
-/// default, because a solo developer who trusts their agents should click
-/// nothing.
-/// </para>
-/// <para>
-/// <see cref="LastIssueNumber"/> and <see cref="LastEpicNumber"/> are the two
-/// counters every key in the project is drawn from, allocated under the row's
-/// lock by the store (<c>docs/storage.md</c>, Keys are allocated from the project
-/// row). They only go up: a key is never reused, not after a deletion either
-/// (ADR 0013). Nothing here increments them — that is one statement in the
-/// transaction that inserts the row, and it lives with the SQL.
-/// </para>
+/// The key is typed by a person and never changes; everything in the project is
+/// prefixed by it.
 /// </remarks>
 public sealed class Project
 {
@@ -48,10 +35,6 @@ public sealed class Project
 
     public string Name { get; private set; } = null!;
 
-    public bool TriageRequired { get; private set; }
-
-    public bool ReviewRequired { get; private set; }
-
     /// <summary>
     /// The one page every agent is handed with every ticket
     /// (<c>CONTEXT.md</c>, Instructions; VISION 15.3), or <c>null</c> where the
@@ -66,10 +49,6 @@ public sealed class Project
     /// restored, and the purge clears this column with the row.
     /// </remarks>
     public Guid? InstructionsPageId { get; private set; }
-
-    public int LastIssueNumber { get; private init; }
-
-    public int LastEpicNumber { get; private init; }
 
     public Guid CreatedBy { get; private init; }
 
@@ -100,20 +79,6 @@ public sealed class Project
     public void Rename(string name, DateTimeOffset at)
     {
         Name = NormalizeName(name);
-        UpdatedAt = at;
-    }
-
-    /// <summary>The entrance guard (VISION 10): on, `ready` is a user's word and binding for `next`.</summary>
-    public void RequireTriage(bool required, DateTimeOffset at)
-    {
-        TriageRequired = required;
-        UpdatedAt = at;
-    }
-
-    /// <summary>The exit guard (VISION 9, ADR 0014): on, an agent's close lands in `review`.</summary>
-    public void RequireReview(bool required, DateTimeOffset at)
-    {
-        ReviewRequired = required;
         UpdatedAt = at;
     }
 

@@ -39,7 +39,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         Assert.Equal(1, outcomes.Count(won => won));
 
         await using var reader = db.Reader();
-        Assert.Equal(1, await reader.Pages.CountAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(1, await reader.Pages.CountAsync(p => p.Slug == "architecture", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         // page that pays for it.
         await using (var context = Migrated.ContextFor(db.ConnectionString))
         {
-            var transactions = new Transactions(context, new InstanceSettings(TimeSpan.FromHours(4), grace));
+            var transactions = new Transactions(context, new InstanceSettings(grace));
             await transactions.RunAsync(async () =>
             {
                 context.Pages.Add(Page.Create(db.Project.Id, "onboarding", "Onboarding", null, db.User.Id, Migrated.Now));
@@ -119,24 +119,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         Assert.Equal("Architecture again", remaining.Title);
 
         // The history went with the row: it dies with its subject (ADR 0013).
-        Assert.Empty(await reader.History.Where(h => h.PageId != null).ToListAsync(TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task A_history_row_names_an_issue_an_epic_or_a_page_and_never_two()
-    {
-        await using var db = await Migrated.SeededAsync(postgres);
-        var page = Page.Create(db.Project.Id, "architecture", "Architecture", null, db.User.Id, Migrated.Now);
-        db.Context.Pages.Add(page);
-        await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var refusal = await Assert.ThrowsAsync<PostgresException>(() =>
-            db.Context.Database.ExecuteSqlRawAsync(
-                "insert into history (issue_id, page_id, actor_id, at, field) values ({0}, {1}, {2}, now(), 'created')",
-                [db.Issue.Id, page.Id, db.User.Id],
-                TestContext.Current.CancellationToken));
-
-        Assert.Equal("ck_history_subject", refusal.ConstraintName);
+        Assert.Empty(await reader.History.ToListAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]

@@ -47,11 +47,7 @@ func Run(ctx context.Context, args []string, env Env) int {
 func report(stderr io.Writer, err error) int {
 	var failure *client.Failure
 	var usage *config.UsageError
-	var empty emptyResult
 	switch {
-	case errors.As(err, &empty):
-		// Not an error: the reasons went to stdout, and the code says it.
-		return exit.Empty
 	case errors.As(err, &failure):
 		fmt.Fprintln(stderr, "ha:", failure.Message)
 		return failure.Code
@@ -89,17 +85,13 @@ func newRoot(env Env) *cobra.Command {
 		return &config.UsageError{Message: err.Error()}
 	})
 
-	root.AddCommand(newInit(g), newNext(g), newNeedsYou(g), newExport(g), newIssue(g), newQuestion(g), newProject(g), newLabel(g), newEpic(g), newPage(g), newRelease(g))
+	root.AddCommand(newInit(g), newProject(g), newPage(g))
 	root.AddCommand(identityCommands(g)...)
 	return root
 }
 
 // load is what every command that talks to the instance starts with.
 func (g *globals) load() (config.Config, *client.Client, error) {
-	return g.loadForWait(0)
-}
-
-func (g *globals) loadForWait(seconds int) (config.Config, *client.Client, error) {
 	getenv := g.env.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
@@ -119,11 +111,7 @@ func (g *globals) loadForWait(seconds int) (config.Config, *client.Client, error
 
 	httpClient := g.env.HTTP
 	if httpClient == nil {
-		if seconds > 0 {
-			httpClient = client.ForWait(seconds)
-		} else {
-			httpClient = client.Default()
-		}
+		httpClient = client.Default()
 	}
 
 	c, err := client.New(cfg, httpClient)

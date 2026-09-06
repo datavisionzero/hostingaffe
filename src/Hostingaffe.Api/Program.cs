@@ -85,14 +85,12 @@ builder.Services.AddScoped<CompletePasswordRecovery>();
 builder.Services.AddScoped<ListBrowserSessions>();
 builder.Services.AddScoped<ChangePassword>();
 
-// The two dials of the instance, read once from the environment; a value that
-// is not a positive number stops the start here, where the message names it.
+// The dial of the instance, read once from the environment; a value that is
+// not a positive number stops the start here, where the message names it.
 builder.Services.AddSingleton(InstanceSettings.FromVariables(
-    builder.Configuration[InstanceSettings.ClaimExpiryVariable],
     builder.Configuration[InstanceSettings.DeletionGraceVariable]));
 
-// Projects and their labels: the bracket everything belongs to, and the one
-// extensibility the product offers.
+// Projects: the bracket everything belongs to.
 builder.Services.AddScoped<CreateProject>();
 builder.Services.AddScoped<ListProjects>();
 builder.Services.AddScoped<ListAdminProjects>();
@@ -104,45 +102,6 @@ builder.Services.AddScoped<ProjectScope>();
 builder.Services.AddScoped<ListProjectUsers>();
 builder.Services.AddScoped<GrantProjectAccess>();
 builder.Services.AddScoped<RevokeProjectAccess>();
-builder.Services.AddScoped<ListLabels>();
-builder.Services.AddScoped<CreateLabel>();
-builder.Services.AddScoped<ChangeLabel>();
-builder.Services.AddScoped<DeleteLabel>();
-builder.Services.AddScoped<RestoreLabel>();
-
-// The issue without its acts: creating several wired-up ones in one transaction
-// (VISION 10), the two shapes (ADR 0012), the guarded change, the edges.
-builder.Services.AddScoped<IssueAssembler>();
-builder.Services.AddScoped<CreateIssues>();
-builder.Services.AddScoped<ListIssues>();
-builder.Services.AddScoped<ReadIssue>();
-builder.Services.AddScoped<ChangeIssue>();
-builder.Services.AddScoped<IssueEdges>();
-
-// The claim, which is the whole reason this product exists (VISION 11).
-builder.Services.AddScoped<ClaimIssue>();
-builder.Services.AddScoped<ReleaseIssue>();
-builder.Services.AddScoped<Next>();
-builder.Services.AddScoped<NeedsYou>();
-builder.Services.AddScoped<MoveIssue>();
-
-// What hangs on an issue beside its fields: comments, questions, the history.
-builder.Services.AddScoped<CommentOnIssue>();
-builder.Services.AddScoped<EditComment>();
-builder.Services.AddScoped<DeleteComment>();
-builder.Services.AddScoped<AskQuestion>();
-builder.Services.AddScoped<AnswerQuestion>();
-builder.Services.AddScoped<ReadQuestion>();
-builder.Services.AddScoped<ListQuestions>();
-builder.Services.AddScoped<ReadHistory>();
-
-// The bracket: a theme with a living document, whose status gates nothing (VISION 7).
-builder.Services.AddScoped<EpicAssembler>();
-builder.Services.AddScoped<CreateEpic>();
-builder.Services.AddScoped<ListEpics>();
-builder.Services.AddScoped<ReadEpic>();
-builder.Services.AddScoped<ChangeEpic>();
-builder.Services.AddScoped<MoveEpic>();
 
 // The flat wiki (VISION 7, ADR 0021): a project's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
@@ -151,18 +110,6 @@ builder.Services.AddScoped<ReadPage>();
 builder.Services.AddScoped<CreatePage>();
 builder.Services.AddScoped<ChangePage>();
 builder.Services.AddScoped<MovePage>();
-
-builder.Services.AddScoped<ReleaseAssembler>();
-builder.Services.AddScoped<ListReleases>();
-builder.Services.AddScoped<ReadRelease>();
-builder.Services.AddScoped<ChangeRelease>();
-builder.Services.AddScoped<PublishRelease>();
-builder.Services.AddScoped<RetractRelease>();
-builder.Services.AddScoped<ChangeReleaseIssues>();
-
-// Deleting is a soft delete with a floor (ADR 0013); the purge runs at the end of every write transaction.
-builder.Services.AddScoped<DeleteIssue>();
-builder.Services.AddScoped<RestoreIssue>();
 
 // Order is start order. The schema first, because the bootstrap reads a table
 // the migration may be about to create; both before anything is served, so
@@ -182,7 +129,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     options.SerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.SerializerOptions.Converters.Add(new PriorityAsNumber());
     options.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false));
     options.SerializerOptions.Converters.Add(new Rfc3339());
@@ -230,12 +176,7 @@ app.MapInstance();
 app.MapIdentities();
 app.MapBrowserIdentity();
 app.MapProjects();
-app.MapLabels();
-app.MapIssues();
-app.MapConversation();
-app.MapEpics();
 app.MapPages();
-app.MapReleases();
 app.MapSmtp();
 
 // The web application: built by its own toolchain into wwwroot at image build

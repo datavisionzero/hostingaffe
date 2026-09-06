@@ -51,10 +51,10 @@ type Client struct {
 }
 
 // New builds the client for cfg. The idempotency key is one per invocation,
-// numbered per write: a command that writes several times — closing an epic
-// and parking what was open — sends `<key>-1`, `<key>-2`, …, so that no two of
-// its requests share a key and a retry of the whole command replays every one
-// of them in order. Two invocations never share a key.
+// numbered per write: a command that writes several times sends `<key>-1`,
+// `<key>-2`, …, so that no two of its requests share a key and a retry of the
+// whole command replays every one of them in order. Two invocations never
+// share a key.
 func New(cfg config.Config, httpClient *http.Client) (*Client, error) {
 	key := make([]byte, 16)
 	if _, err := rand.Read(key); err != nil {
@@ -88,15 +88,9 @@ func UserAgent() string {
 }
 
 // Default is the HTTP client ha uses: a timeout, because an agent must never
-// hang on a request that is not a `--wait`.
+// hang on a request.
 func Default() *http.Client {
 	return &http.Client{Timeout: 30 * time.Second}
-}
-
-// ForWait leaves room for the server-held request while retaining a transport
-// deadline if the instance never answers. Server rounds are at most one hour.
-func ForWait(seconds int) *http.Client {
-	return &http.Client{Timeout: time.Duration(seconds)*time.Second + 30*time.Second}
 }
 
 // Check turns a response into a Failure when it is one: the version skew first,

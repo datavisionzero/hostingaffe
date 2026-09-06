@@ -25,7 +25,7 @@ func TestLoadNeedsBothVariables(t *testing.T) {
 
 func TestProjectFileIsFoundUpwardsAndParsed(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, FileName), []byte("# the project of this repository\nproject = plan\nrepo = repo/api\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, FileName), []byte("# the project of this repository\nproject = plan\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	nested := filepath.Join(root, "src", "deep")
@@ -37,7 +37,7 @@ func TestProjectFileIsFoundUpwardsAndParsed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Project != "PLAN" || cfg.Repo != "repo/api" || cfg.File != filepath.Join(root, FileName) {
+	if cfg.Project != "PLAN" || cfg.File != filepath.Join(root, FileName) {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 }
@@ -52,7 +52,7 @@ func TestProjectFileRefusesWhatItDoesNotKnow(t *testing.T) {
 		t.Fatalf("expected an unknown-key error, got %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, FileName), []byte("repo = x\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, FileName), []byte("projekt = x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Load(env(map[string]string{"HOSTINGAFFE_URL": "https://x.example", "HOSTINGAFFE_TOKEN": "t"}), dir); err == nil {

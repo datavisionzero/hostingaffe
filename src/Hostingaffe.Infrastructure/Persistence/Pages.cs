@@ -19,7 +19,7 @@ public sealed class Pages(HostingaffeDbContext context) : IPages
             ? []
             : await context.Pages.Where(p => ids.Contains(p.Id) && p.DeletedAt == null).ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Page>> ListAsync(Guid projectId, IReadOnlyList<string> labelNames, string? search, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Page>> ListAsync(Guid projectId, string? search, CancellationToken cancellationToken)
     {
         var rows = context.Pages.Where(p => p.ProjectId == projectId && p.DeletedAt == null);
 
@@ -29,12 +29,6 @@ public sealed class Pages(HostingaffeDbContext context) : IPages
         if (!string.IsNullOrWhiteSpace(search))
         {
             rows = rows.Where(p => EF.Property<NpgsqlTsVector>(p, "Search").Matches(EF.Functions.WebSearchToTsQuery("simple", search)));
-        }
-
-        foreach (var name in labelNames)
-        {
-            rows = rows.Where(p => context.PageLabels.Any(pl =>
-                pl.PageId == p.Id && context.Labels.Any(l => l.Id == pl.LabelId && l.Name == name && l.DeletedAt == null)));
         }
 
         return await rows.OrderBy(p => p.Slug).ToListAsync(cancellationToken);
@@ -51,19 +45,7 @@ public sealed class Pages(HostingaffeDbContext context) : IPages
         return await context.Pages.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<PageLabelRow>> LabelsOfAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken) =>
-        await (
-            from pl in context.PageLabels
-            join l in context.Labels on pl.LabelId equals l.Id
-            where pageIds.Contains(pl.PageId) && l.DeletedAt == null
-            select new PageLabelRow(pl.PageId, l)).ToListAsync(cancellationToken);
-
     public void Add(Page page) => context.Pages.Add(page);
-
-    public void Attach(PageLabel attachment) => context.PageLabels.Add(attachment);
-
-    public Task DetachAsync(Guid pageId, Guid labelId, CancellationToken cancellationToken) =>
-        context.PageLabels.Where(pl => pl.PageId == pageId && pl.LabelId == labelId).ExecuteDeleteAsync(cancellationToken);
 
     public Task SaveAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
 }

@@ -13,7 +13,6 @@ const page = {
   project: "PLAN",
   title: "Architecture",
   body: "# The four layers\n\nDependencies point inward and only inward.",
-  labels: [{ name: "reference", group: null, description: null }],
   author: { id: "0199a000-0000-7000-8000-000000000001", kind: "user", name: "maintainer" },
   updated_by: { id: "0199a000-0000-7000-8000-000000000002", kind: "agent", name: "quiet-otter-42" },
   created_at: "2026-09-05T10:00:00Z",
@@ -24,7 +23,6 @@ const summary = {
   slug: "architecture",
   project: "PLAN",
   title: "Architecture",
-  labels: ["reference"],
   updated_by: { id: "0199a000-0000-7000-8000-000000000002", kind: "agent", name: "quiet-otter-42" },
   created_at: "2026-09-05T10:00:00Z",
   updated_at: "2026-09-05T12:00:00Z",
@@ -37,7 +35,7 @@ function renderPage(routes: Parameters<typeof installInstance>[0] = {}) {
 }
 
 it("lists the wiki flat, by slug, and says who touched what last", async () => {
-  installInstance({ "GET /projects/PLAN/pages": [summary], "GET /projects/PLAN/labels": [] });
+  installInstance({ "GET /projects/PLAN/pages": [summary] });
   renderAt("/PLAN/pages", <Routes><Route path="/:project/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByRole("link", { name: /architecture/ })).toHaveAttribute("href", "/PLAN/pages/architecture");
@@ -45,25 +43,24 @@ it("lists the wiki flat, by slug, and says who touched what last", async () => {
   expect(screen.getByRole("link", { name: "New page" })).toHaveAttribute("href", "/PLAN/pages/new");
 });
 
-// The filter lives in the URL, as every other list's does, and a filter that
-// matched nothing is a different state from a wiki nobody has written in yet.
-it("filters by label out of the URL and says which empty it is", async () => {
+// The filter lives in the URL, and a filter that matched nothing is a
+// different state from a wiki nobody has written in yet.
+it("filters out of the URL and says which empty it is", async () => {
   const instance = installInstance({
-    "GET /projects/PLAN/labels": [{ name: "reference", group: null, description: null }],
     "GET /projects/PLAN/pages": (request) =>
-      new URL(request.url).searchParams.getAll("label").includes("reference") ? [] : [summary],
+      new URL(request.url).searchParams.get("q") === "nothing" ? [] : [summary],
   });
-  renderAt("/PLAN/pages?label=reference", <Routes><Route path="/:project/pages" element={<PagesView />} /></Routes>);
+  renderAt("/PLAN/pages?q=nothing", <Routes><Route path="/:project/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
   const asked = instance.calls.find((call) => new URL(call.url).pathname === "/projects/PLAN/pages")!;
-  expect(new URL(asked.url).searchParams.getAll("label")).toEqual(["reference"]);
+  expect(new URL(asked.url).searchParams.get("q")).toBe("nothing");
 });
 
 // The wiki is flat, so an empty one has to say what a page is for; a list that
 // is simply empty teaches nobody what the screen is.
 it("says what a page is for while there are none", async () => {
-  installInstance({ "GET /projects/PLAN/pages": [], "GET /projects/PLAN/labels": [] });
+  installInstance({ "GET /projects/PLAN/pages": [] });
   renderAt("/PLAN/pages", <Routes><Route path="/:project/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByText("No pages yet.")).toBeInTheDocument();
@@ -73,7 +70,6 @@ it("says what a page is for while there are none", async () => {
 // have been, so the search stands over the list rather than behind a sheet.
 it("searches the wiki out of the URL, and says when nothing matched", async () => {
   const instance = installInstance({
-    "GET /projects/PLAN/labels": [],
     "GET /projects/PLAN/pages": (request) =>
       new URL(request.url).searchParams.get("q") === "inward" ? [summary] : [],
   });
@@ -94,12 +90,11 @@ it("searches the wiki out of the URL, and says when nothing matched", async () =
   expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
 });
 
-it("opens the page itself: the Markdown, the labels and who changed it last", async () => {
+it("opens the page itself: the Markdown and who changed it last", async () => {
   renderPage();
 
   expect(await screen.findByRole("heading", { name: "The four layers" })).toBeInTheDocument();
   expect(screen.getByText("Dependencies point inward and only inward.")).toBeInTheDocument();
-  expect(screen.getByText("reference")).toBeInTheDocument();
   expect(screen.getByText("maintainer")).toBeInTheDocument();
 });
 
@@ -196,7 +191,6 @@ it("says the slug is held while a deleted page can come back", async () => {
 /** The slug is given, never derived from the title (ADR 0021). */
 it("asks for the slug when a page is created", async () => {
   const instance = installInstance({
-    "GET /projects/PLAN/labels": [],
     "POST /projects/PLAN/pages": { status: 201, body: page },
   });
   renderAt("/PLAN/pages/new", <Routes><Route path="/:project/pages/new" element={<NewPageView />} /></Routes>);

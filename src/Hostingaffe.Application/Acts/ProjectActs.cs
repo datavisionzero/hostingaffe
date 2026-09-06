@@ -2,7 +2,6 @@ using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Pages;
 using Hostingaffe.Domain.Projects;
-using Hostingaffe.Domain.Releases;
 
 namespace Hostingaffe.Application.Acts;
 
@@ -16,15 +15,12 @@ namespace Hostingaffe.Application.Acts;
 public sealed record ProjectShape(
     string Key,
     string Name,
-    bool TriageRequired,
-    bool ReviewRequired,
     string? InstructionsPage,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
     public static ProjectShape Of(Project project, string? instructionsPage) =>
-        new(project.Key, project.Name, project.TriageRequired, project.ReviewRequired,
-            instructionsPage, project.CreatedAt, project.UpdatedAt);
+        new(project.Key, project.Name, instructionsPage, project.CreatedAt, project.UpdatedAt);
 }
 
 /// <summary>
@@ -97,32 +93,15 @@ public static class ProjectLookup
                 new Dictionary<string, object?> { ["restorable_until"] = project.DeletedAt.Value + settings.DeletionGrace })
             : project;
     }
-
-    /// <summary>The same live lookup as <see cref="LiveAsync"/>, as a fresh read for a long poll.</summary>
-    public static async Task<Project> LiveForReadAsync(
-        this IProjects projects, string key, InstanceSettings settings, CancellationToken cancellationToken)
-    {
-        var project = await projects.FindByKeyForReadAsync(key.Trim().ToUpperInvariant(), cancellationToken)
-            ?? throw new Refusal(RefusalCode.NotFound, $"No project {key}.");
-
-        return project.Deleted
-            ? throw new Refusal(
-                RefusalCode.Deleted,
-                $"Project {project.Key} is deleted and can be restored until at least {project.DeletedAt!.Value + settings.DeletionGrace:u}.",
-                new Dictionary<string, object?> { ["restorable_until"] = project.DeletedAt.Value + settings.DeletionGrace })
-            : project;
-    }
 }
 
 /// <summary>
 /// A user creates a project: the key that will prefix everything in it, typed
-/// by a person and never changed (ADR 0015), the two switches, and the
-/// <c>kind</c> group with its three labels (VISION 8).
+/// by a person and never changed (ADR 0015).
 /// </summary>
 public sealed class CreateProject(ICallerIdentity callerIdentity, IProjects projects, TimeProvider clock)
 {
-    public async Task<ProjectShape> ExecuteAsync(
-        string? key, string? name, bool triageRequired, bool reviewRequired, CancellationToken cancellationToken)
+    public async Task<ProjectShape> ExecuteAsync(string? key, string? name, CancellationToken cancellationToken)
     {
         var caller = callerIdentity.Caller.RequireUser("create a project");
 
@@ -136,11 +115,8 @@ public sealed class CreateProject(ICallerIdentity callerIdentity, IProjects proj
 
         var now = clock.GetUtcNow();
         var project = Project.Create(normalizedKey, normalizedName, caller.Id, now);
-        project.RequireTriage(triageRequired, now);
-        project.RequireReview(reviewRequired, now);
 
-        await projects.AddAsync(project, Label.Kind(project.Id, now), Release.Open(project.Id, now),
-            ProjectAccess.Grant(project.Id, caller.Id, caller.Id, now), cancellationToken);
+        await projects.AddAsync(project, ProjectAccess.Grant(project.Id, caller.Id, caller.Id, now), cancellationToken);
 
         // A project is born designating no page: there is none yet.
         return ProjectShape.Of(project, null);
@@ -176,13 +152,13 @@ public sealed class ReadProject(IProjects projects, IPages pages, ProjectScope s
 /// present as <c>null</c>, which is how the designation is taken away.
 /// </summary>
 public sealed record ProjectChanges(
-    string? Name, bool? TriageRequired, bool? ReviewRequired, bool InstructionsPageGiven = false, string? InstructionsPage = null);
+    string? Name, bool InstructionsPageGiven = false, string? InstructionsPage = null);
 
 /// <summary>
-/// A user changes the name, the switches or the page every agent is handed with
-/// its ticket; the key is immutable. The designation is a user's to make and not
-/// an agent's, like everything else here: an agent that could point the project
-/// at a page would be writing its own instructions.
+/// A user changes the name or the page every agent is handed with its ticket;
+/// the key is immutable. The designation is a user's to make and not an
+/// agent's, like everything else here: an agent that could point the project at
+/// a page would be writing its own instructions.
 /// </summary>
 public sealed class ChangeProject(
     ICallerIdentity callerIdentity, IProjects projects, IPages pages, ProjectScope scope, InstanceSettings settings, TimeProvider clock)
@@ -199,16 +175,6 @@ public sealed class ChangeProject(
         if (changes.Name is not null)
         {
             Validated.Field("name", () => { project.Rename(changes.Name, now); return true; });
-        }
-
-        if (changes.TriageRequired is { } triage)
-        {
-            project.RequireTriage(triage, now);
-        }
-
-        if (changes.ReviewRequired is { } review)
-        {
-            project.RequireReview(review, now);
         }
 
         if (changes.InstructionsPageGiven)

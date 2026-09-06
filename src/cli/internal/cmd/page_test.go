@@ -11,7 +11,6 @@ import (
 )
 
 const page = `{"slug":"architecture","project":"PLAN","title":"Architecture","body":"# The four layers\n\nDependencies point inward.",
-"labels":[{"name":"reference","group":null,"description":null}],
 "author":{"id":"0198e0c0-0000-7000-8000-000000000002","kind":"user","name":"maintainer"},
 "updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 "created_at":"2026-09-05T10:00:00.000000Z","updated_at":"2026-09-05T12:00:00.000000Z"}`
@@ -19,7 +18,7 @@ const page = `{"slug":"architecture","project":"PLAN","title":"Architecture","bo
 func TestPageVerbsReachTheRightAddresses(t *testing.T) {
 	f := &fake{t: t, version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
 		if r.Method == http.MethodGet && r.URL.Path == "/projects/PLAN/pages" {
-			return 200, `[{"slug":"architecture","project":"PLAN","title":"Architecture","labels":["reference"],
+			return 200, `[{"slug":"architecture","project":"PLAN","title":"Architecture",
 			"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 			"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"}]`
 		}
@@ -76,7 +75,7 @@ func TestPageViewPrintsTheStoredMarkdown(t *testing.T) {
 	if !strings.HasPrefix(out, "PLAN/architecture  Architecture\n") {
 		t.Fatalf("the head names the address and the title:\n%s", out)
 	}
-	if !strings.Contains(out, "updated: 2026-09-05T12:00:00Z by quiet-otter-42") || !strings.Contains(out, "labels: reference") {
+	if !strings.Contains(out, "updated: 2026-09-05T12:00:00Z by quiet-otter-42") {
 		t.Fatalf("the head says when and by whom:\n%s", out)
 	}
 	if !strings.HasSuffix(out, "# The four layers\n\nDependencies point inward.\n") {
@@ -100,7 +99,7 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 	dir := repository(t, "project = PLAN\n")
 
 	// The Markdown arrives over stdin, because an agent has it as Markdown already.
-	code, _, stderr := run(t, server, dir, "page", "create", "architecture", "--title", "Architecture", "--body-file", "-", "--label", "reference")
+	code, _, stderr := run(t, server, dir, "page", "create", "architecture", "--title", "Architecture", "--body-file", "-")
 	if code != exit.OK || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
@@ -109,10 +108,6 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 	if created["slug"] != "architecture" || created["title"] != "Architecture" || created["body"] != "" {
 		t.Errorf("create body = %v", created)
 	}
-	if labels, ok := created["labels"].([]any); !ok || len(labels) != 1 || labels[0] != "reference" {
-		t.Errorf("create labels = %v", created["labels"])
-	}
-
 	// The guard is sent only when it is given, and quoted as the header wants it.
 	code, _, stderr = run(t, server, dir, "page", "edit", "architecture", "--title", "New", "--if-match", "2026-09-05T12:00:00.000000Z")
 	if code != exit.OK || stderr != "" {
@@ -136,15 +131,11 @@ func TestPageWritesSendWhatTheFlagsSay(t *testing.T) {
 		t.Error("no --if-match, no header")
 	}
 
-	// The label filter is repeated on the list, as everywhere, and `-q` is the
-	// same full-text filter the issue list has.
-	if code, _, _ = run(t, server, dir, "page", "list", "--label", "reference", "--label", "cut-1", "-q", `"four layers"`); code != exit.OK {
+	// `-q` is the full-text filter over title and body.
+	if code, _, _ = run(t, server, dir, "page", "list", "-q", `"four layers"`); code != exit.OK {
 		t.Fatalf("code %d", code)
 	}
 	query := f.requests[len(f.requests)-1].URL.Query()
-	if got := query["label"]; len(got) != 2 || got[0] != "reference" {
-		t.Errorf("label = %v", got)
-	}
 	if got := query.Get("q"); got != `"four layers"` {
 		t.Errorf("q = %q", got)
 	}
