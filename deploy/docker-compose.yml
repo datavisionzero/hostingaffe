@@ -1,14 +1,15 @@
-# The way an instance is run. From `git clone` to the first issue in under five
-# minutes, with one command (VISION 16):
+# The way an instance is run. From `git clone` to an instance you can sign in
+# to in under five minutes, with one command (VISION 16):
 #
-#   cp deploy/.env.example deploy/.env   # and set the three values in it
+#   cp deploy/.env.example deploy/.env   # and set the four values in it
 #   docker compose -f deploy/docker-compose.yml up -d
 #
 # Upgrading is `docker compose pull` followed by `docker compose up -d`:
 # migrations apply themselves on startup, only ever forward, so take a
 # `pg_dump` before it — that is the way back (ADR 0011).
 #
-# Every variable is documented in docs/operations.md.
+# Every variable is documented in docs/operations.md; installing one from
+# nothing is docs/install.md.
 
 name: hostingaffe
 

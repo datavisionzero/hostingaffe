@@ -8,7 +8,8 @@ with planaffe's domain cut out — and this product's own domain is not built
 yet.
 
 Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
-conventions, [`docs/cli.md`](docs/cli.md) and [`deploy/`](deploy/) exist;
+conventions, [`docs/cli.md`](docs/cli.md), [`docs/install.md`](docs/install.md),
+[`docs/operations.md`](docs/operations.md) and [`deploy/`](deploy/) exist;
 `CONTEXT.md`, `docs/adr/`, `docs/codebase.md`, `docs/storage.md` and
 `docs/api.md` are still to be written. Until each exists, this file says what
 stands in for it. Add the link here when you create one.

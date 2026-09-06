@@ -1,8 +1,13 @@
-# Postgres for working on hostingaffe, and nothing else: `dotnet run --project
-# src/Hostingaffe.Api` runs the server against it, with the connection string in
-# appsettings.Development.json.
+# Postgres and a mail catcher for working on hostingaffe, and nothing else:
+# `dotnet run --project src/Hostingaffe.Api` runs the server against them, with
+# the connection string in appsettings.Development.json.
 #
 #   docker compose -f deploy/docker-compose.dev.yml up -d
+#
+# The published ports are this product's own. planaffe, logaffe and vaultaffe
+# are developed on the same machines and their development stacks publish
+# theirs; two products that cannot be up at once would be a tax on every day of
+# work, and the products are deliberately separate (VISION 12).
 
 name: hostingaffe-dev
 
@@ -15,7 +20,7 @@ services:
       POSTGRES_PASSWORD: hostingaffe
       POSTGRES_INITDB_ARGS: "--data-checksums"
     ports:
-      - "55432:5432"
+      - "55632:5432"
     volumes:
       - hostingaffe-dev-db:/var/lib/postgresql
     healthcheck:
@@ -27,8 +32,8 @@ services:
   mailpit:
     image: axllent/mailpit:v1.31.0
     ports:
-      - "51025:1025"
-      - "58025:8025"
+      - "51625:1025"
+      - "58625:8025"
 
 volumes:
   hostingaffe-dev-db:

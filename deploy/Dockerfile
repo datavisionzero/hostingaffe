@@ -92,7 +92,7 @@ USER $APP_UID
 ARG VERSION=0.0.0-dev
 ARG REVISION=
 LABEL org.opencontainers.image.title="hostingaffe" \
-      org.opencontainers.image.description="A lean, self-hosted issue tracker for software development in the agentic age." \
+      org.opencontainers.image.description="A self-hosted record of the machines a team rents or owns, and what runs on them." \
       org.opencontainers.image.source="https://github.com/datavisionzero/hostingaffe" \
       org.opencontainers.image.documentation="https://github.com/datavisionzero/hostingaffe/blob/main/docs/operations.md" \
       org.opencontainers.image.licenses="MIT" \
