@@ -279,3 +279,46 @@ func or(value *string) string {
 	}
 	return *value
 }
+
+// Deployment prints the complete record: the version it put there, the one
+// before it, when it happened and who recorded it, and the file revisions that
+// were current when it went live. `previous` and `files` are derived by `at`,
+// never by the order of recording (CONTEXT.md, Deployment).
+func Deployment(w io.Writer, d api.Deployment) {
+	fmt.Fprintf(w, "%s #%d  %s\n", d.Installation, d.Number, d.Version)
+	fmt.Fprintf(w, "at: %s by %s\n", d.At.Format(time.RFC3339), d.By.Name)
+	line(w, maybe("previous", d.Previous), maybe("ticket", d.Ticket))
+	line(w, maybe("ref", d.Ref))
+	line(w, said("files", revisions(d.Files)))
+
+	fmt.Fprintf(w, "recorded: %s", d.CreatedAt.Format(time.RFC3339))
+	// A deployment is corrected, not edited, so the second timestamp is said
+	// only where there was a correction to say it about.
+	if d.UpdatedAt.After(d.CreatedAt) {
+		fmt.Fprintf(w, "  corrected: %s by %s", d.UpdatedAt.Format(time.RFC3339), d.UpdatedBy.Name)
+	}
+	fmt.Fprintln(w)
+
+	body(w, d.Note)
+}
+
+// DeploymentSummaries prints the history of an installation, newest by `at`
+// first — the order everything derived uses, so the list and the version agree.
+func DeploymentSummaries(w io.Writer, items []api.DeploymentSummary) {
+	for _, d := range items {
+		fmt.Fprintf(w, "%-5s %-14s %-14s %-17s %-16s %-10s %s\n",
+			fmt.Sprintf("#%d", d.Number), d.Version, or(d.Previous),
+			d.At.Format("2006-01-02 15:04"), d.By.Name, or(d.Ticket), or(d.Ref))
+	}
+}
+
+// revisions spells the file revisions a deployment went live with as
+// `compose.yml@4`: the path and the revision that was current, which is what a
+// `ha files get --revision` asks for.
+func revisions(files []api.DeploymentFile) string {
+	spelled := make([]string, 0, len(files))
+	for _, f := range files {
+		spelled = append(spelled, fmt.Sprintf("%s@%d", f.Path, f.Revision))
+	}
+	return strings.Join(spelled, ", ")
+}

@@ -61,5 +61,8 @@ why a record changed, and this product's rule is already that no secret is ever
 in the record (VISION 10). A note that would not belong in a log does not belong
 in the history either.
 
-**Every later write gets it the same way.** Files, deployments and pages take
-`?note=` when their tickets arrive; nothing has to be re-decided per object.
+**Every later write gets it the same way.** Files and pages take `?note=` when
+their tickets arrive; nothing has to be re-decided per object. A deployment is
+the exception, and not by omission: it carries a `note` of its own — a field of
+the record, the why of that deployment — and a second one beside it would be two
+things called the same word on one command.

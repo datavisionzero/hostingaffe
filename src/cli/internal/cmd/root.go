@@ -86,6 +86,7 @@ func newRoot(env Env) *cobra.Command {
 	root.AddCommand(newMachine(g))
 	root.AddCommand(newSoftware(g))
 	root.AddCommand(newInstallation(g))
+	root.AddCommand(newDeployment(g))
 	root.AddCommand(newPage(g))
 	root.AddCommand(identityCommands(g)...)
 	return root

@@ -94,13 +94,14 @@ says whether this binary and that instance fit.
 | `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha page` | `list`, `view`, `create`, `edit`, `rename`, `delete`, `restore` |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
-`ha inst` is `ha installation`; the object keeps the glossary's word and the
-short form is only a short form. There is no `ha softwares`: the word is
-uncountable (`CONTEXT.md`, Software). Deployment and file are their own tickets
-and are not here yet.
+`ha inst` is `ha installation` and `ha deploy` is `ha deployment`; the objects
+keep the glossary's words and the short forms are only short forms. There is no
+`ha softwares`: the word is uncountable (`CONTEXT.md`, Software). The file is
+its own ticket and is not here yet.
 
 **`add` and `set` take the same flags**, so that what a record can be created
 with is what it can be corrected with. A flag left off leaves the field alone;
@@ -138,6 +139,40 @@ everything and only leaves the default list; `--retired` on `list` puts them
 back and `--status retired` asks for exactly them. `delete` is for mistakes, is
 undone by `restore` for the grace period, and a key it burns is never given out
 again.
+
+## Deployments
+
+Recording one is the **bare verb**, because that is what an agent types after
+the work:
+
+```sh
+ha deploy logaffe-prod --version 1.4.0 \
+   --ref ghcr.io/datavisionzero/logaffe@sha256:… --ticket LOG-42 --note-file -
+```
+
+Only `--version` is required. `--note` is the deployment's own field — why, what
+was checked, what went wrong — and `--note-file` reads it from a file or from
+`-`. It is not the history note of ADR 0004: a deployment already carries the
+why, and one word would not mean two things on one command.
+
+**`--at` is what makes history backfillable**, and everything derived is ordered
+by it, never by the order of recording. An installation's `version` is the one
+of its latest deployment by `at`, so recording an old deployment with an `--at`
+in the past leaves the running version where it is, and only fills in what came
+before. It takes a day or a full RFC 3339 timestamp, like `--measured-at`.
+
+`ha deploy list --inst KEY` gives the history of one installation, newest by
+`at` first. The installation is named by a flag here rather than by a position,
+because the position belongs to the recording verb. `ha deploy view KEY NUMBER`
+is the complete deployment, with `previous` and the file revisions that were
+current when it went live, spelled `compose.yml@4`.
+
+**`ha deploy set` is narrow, and the border is the instance's**: `--ref`,
+`--at`, `--ticket` and `--note`. The version and the installation are what the
+record *is* — a deployment with the wrong version is `ha deploy delete`d and
+recorded again, and its number is not handed out a second time. `--version` is
+on `set` all the same, and it is sent: the instance's refusal says the rule,
+which an unknown flag would not.
 
 A page carries the two fields the record gives it. `--kind` is `runbook`,
 `decision` or `note` on `create` and `edit`; left off at creation it is the
