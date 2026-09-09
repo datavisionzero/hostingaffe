@@ -45,12 +45,17 @@ and the message names it.
 
 ## Start it
 
-Before the first release there is no `:latest` to pull. Set
-`HOSTINGAFFE_IMAGE=ghcr.io/datavisionzero/hostingaffe:main` in `deploy/.env`
-until there is one.
-
 ```sh
 docker compose -f deploy/docker-compose.yml up -d
+```
+
+Nothing has to be set for this to find an image: until the first release, the
+Compose file names `:main`, the build of the trunk. `HOSTINGAFFE_IMAGE` is
+where an installation says otherwise — a version to stand still on, or an image
+it built itself:
+
+```sh
+docker build -f deploy/Dockerfile -t hostingaffe:local .   # HOSTINGAFFE_IMAGE=hostingaffe:local
 ```
 
 The instance migrates its own schema, creates the first administrator, and
