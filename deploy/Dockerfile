@@ -68,9 +68,14 @@ RUN apk add --no-cache krb5-libs
 COPY --from=build /app ./
 COPY --from=web /web/dist ./wwwroot
 
-# The operational verbs the CLI deliberately does not have — the ones that
-# need the connection string — run as `docker compose exec hostingaffe hostingaffe …`
-# (docs/codebase.md), so the binary has to be found by name.
+# On the path because the entrypoint below names the binary rather than a path.
+#
+# It serves the instance and has no verbs: the record is `ha`, against the API
+# (ADR 0003), and the one thing that needs the connection string — the backup —
+# is taken beside this container rather than through it, with `pg_dump` in the
+# database's own image (docs/operations.md). The purge needs no verb either; it
+# rides along on writes (docs/storage.md). A word handed to this binary anyway
+# is answered with the sentence that says so.
 ENV PATH="/app:${PATH}" \
     ASPNETCORE_HTTP_PORTS=8080
 

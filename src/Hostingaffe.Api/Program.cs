@@ -19,6 +19,28 @@ using Serilog;
 // a file that cannot be opened costs a line on standard error, never a request.
 Serilog.Debugging.SelfLog.Enable(Console.Error);
 
+// This binary serves the instance and has no verbs. A word handed to it is
+// somebody looking for one — `hostingaffe purge`, `hostingaffe backup` — and
+// the host would otherwise ignore it, start a second server beside the one
+// already running and die on a port that is taken. What that person is looking
+// for is `ha` or the database, so the answer says which, here, rather than
+// twenty lines of stack trace later.
+//
+// A `--switch` is not a verb: that is the configuration the host itself reads,
+// and it is left alone.
+if (Array.Find(args, argument => !argument.StartsWith('-')) is { } verb)
+{
+    Console.Error.WriteLine($"""
+        hostingaffe: `{verb}` is not a command. This image serves the instance and takes no verbs.
+
+        The record is reached with the CLI, over the API, from anywhere:
+            ha machine list                     (docs/cli.md)
+        The database is reached beside this container, not through it:
+            docker compose exec db pg_dump -U hostingaffe hostingaffe > backup.sql   (docs/operations.md)
+        """);
+    return 2;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Everything read from the environment is read here, in one block, so that a
