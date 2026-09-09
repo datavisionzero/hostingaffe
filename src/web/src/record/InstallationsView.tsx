@@ -3,7 +3,7 @@ import { api, type Schemas } from "@/api/client";
 import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { installationPath, machinePath, softwarePath } from "./addresses";
-import { Filters, type Filter } from "./Filters";
+import { Filters, type Filter } from "@/shared/Filters";
 import { StatusBadge } from "./Parts";
 
 type InstallationSummary = Schemas["InstallationSummary"];

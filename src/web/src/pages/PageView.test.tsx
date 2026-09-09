@@ -21,9 +21,21 @@ const page = {
 const summary = {
   slug: "architecture",
   title: "Architecture",
+  kind: "note",
+  attached_to: null,
   updated_by: { id: "0199a000-0000-7000-8000-000000000002", kind: "agent", name: "quiet-otter-42" },
   created_at: "2026-09-05T10:00:00Z",
   updated_at: "2026-09-05T12:00:00Z",
+};
+
+// A page that hangs on a machine, which is what most pages do and what a flat
+// list would have said nothing about.
+const attached = {
+  ...summary,
+  slug: "backup-restore",
+  title: "Restoring a backup",
+  kind: "runbook",
+  attached_to: { kind: "machine", key: "caddy" },
 };
 
 function renderPage(routes: Parameters<typeof installInstance>[0] = {}) {
@@ -32,13 +44,70 @@ function renderPage(routes: Parameters<typeof installInstance>[0] = {}) {
   return instance;
 }
 
-it("lists the wiki flat, by slug, and says who touched what last", async () => {
+it("lists the wiki by slug, and says who touched what last", async () => {
   installInstance({ "GET /api/pages": [summary] });
   renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
 
   expect(await screen.findByRole("link", { name: /architecture/ })).toHaveAttribute("href", "/pages/architecture");
   expect(screen.getByText("quiet-otter-42", { exact: false })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "New page" })).toHaveAttribute("href", "/pages/new");
+});
+
+// One flat list reads as though every page held for every machine. Most of them
+// hang on one machine, and the screen has to show that or it lies.
+it("groups the pages under what they hang on, the instance first", async () => {
+  installInstance({
+    "GET /api/pages": [attached, summary],
+    "GET /api/machines": [{ key: "caddy", name: "The reverse proxy", kind: "vps", status: "active" }],
+  });
+  renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
+
+  // The anchor carries the key, so the name is read from the machines and the
+  // heading says both — the same way the machine's own screen names it.
+  const heading = await screen.findByRole("heading", { level: 2, name: /caddy/ });
+  expect(within(heading).getByRole("link", { name: "caddy The reverse proxy" }))
+    .toHaveAttribute("href", "/machines/caddy");
+
+  const headings = screen.getAllByRole("heading", { level: 2 });
+  expect(headings.map((each) => each.textContent)).toEqual([
+    "The instancepages of no single machine1",
+    "caddy The reverse proxymachine1",
+  ]);
+
+  expect(within(headings[0]!.nextElementSibling as HTMLElement).getByRole("link", { name: /Architecture/ }))
+    .toBeInTheDocument();
+  expect(within(headings[1]!.nextElementSibling as HTMLElement).getByRole("link", { name: /Restoring a backup/ }))
+    .toBeInTheDocument();
+});
+
+// The names are decoration on a list that is already there: a machine the
+// instance would not name still gets a heading, addressed by its key.
+it("falls back to the key when no name is to be had", async () => {
+  installInstance({ "GET /api/pages": [attached] });
+  renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
+
+  const heading = await screen.findByRole("heading", { level: 2, name: /caddy/ });
+  expect(within(heading).getByRole("link", { name: "caddy" })).toHaveAttribute("href", "/machines/caddy");
+  expect(screen.getByRole("link", { name: /Restoring a backup/ })).toBeInTheDocument();
+});
+
+// The kind is a closed set, so it is a row of switches and not a search term,
+// and like every other narrowing on this screen it lives in the URL.
+it("narrows the wiki by kind, out of the URL", async () => {
+  const instance = installInstance({
+    "GET /api/pages": (request) =>
+      new URL(request.url).searchParams.get("kind") === "runbook" ? [attached] : [attached, summary],
+  });
+  renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: "runbook" }));
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole("link", { name: /Architecture/ })).not.toBeInTheDocument();
+  });
+  const asked = instance.calls.map((call) => new URL(call.url)).find((url) => url.searchParams.get("kind") === "runbook");
+  expect(asked?.pathname).toBe("/api/pages");
 });
 
 // The filter lives in the URL, and a filter that matched nothing is a

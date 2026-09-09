@@ -11,6 +11,8 @@ function aPage(slug: string, title: string) {
   return {
     slug,
     title,
+    kind: "note",
+    attached_to: null,
     updated_by: { id: aUser.id, kind: "user", name: aUser.name },
     created_at: "2026-09-02T10:00:00Z",
     updated_at: "2026-09-02T10:00:00Z",

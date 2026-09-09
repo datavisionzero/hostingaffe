@@ -4,7 +4,7 @@ import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { day } from "@/shared/when";
 import { machinePath } from "./addresses";
-import { Filters, type Filter } from "./Filters";
+import { Filters, type Filter } from "@/shared/Filters";
 import { StatusBadge } from "./Parts";
 
 type MachineSummary = Schemas["MachineSummary"];

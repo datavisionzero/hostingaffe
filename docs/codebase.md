@@ -116,7 +116,7 @@ src/record      the machines, the software, the installations and the files
 src/pages       the wiki
 src/session     sign-in, activation, recovery, and approving a `ha login`
 src/settings    personal settings and instance administration
-src/shared      Markdown, dialogs, the editor, loading, test helpers
+src/shared      Markdown, dialogs, the editor, the filters, loading, test helpers
 src/components  the owned UI primitives
 src/api         the generated client and its wrapper
 ```
