@@ -111,19 +111,37 @@ ADRs 0004, 0007, 0017). Its API layer is generated from the same
 
 ```
 src/shell       the frame: sidebar, palette, shortcuts, routing
+src/record      the machines, the software, the installations and the files
 src/pages       the wiki
 src/session     sign-in, activation, recovery
 src/settings    personal settings and instance administration
-src/shared      Markdown, dialogs, the editor, test helpers
+src/shared      Markdown, dialogs, the editor, loading, test helpers
 src/components  the owned UI primitives
 src/api         the generated client and its wrapper
 ```
 
+`src/record` is the product's own screens (VISION 6.2): a list and a detail for
+each of the machines, the software and the installations, and one file screen
+serving both of the things a file can hang on. `Parts.tsx` holds the sections
+they share — a file list, the pages attached to something, the history, the
+guarded description — because those screens are the same screen several times
+over and a section that drifted on one of them would read like another product.
+`addresses.ts` is where every address of the record is spelled, so that a key
+is escaped the same way everywhere.
+
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/pages`, `/settings`, `/admin` — because the API is out of the way under
-`/api`; in development Vite forwards that one prefix to the API and serves
-everything else itself.
+`/machines`, `/software`, `/installations`, `/pages`, `/settings`, `/admin` —
+because the API is out of the way under `/api`; in development Vite forwards
+that one prefix to the API and serves everything else itself. A detail screen
+arrives in a chunk of its own; the lists come with the frame.
+
+A screen asks the instance through `useAsk` (`src/shared/ask.ts`), which is the
+one place the rule lives that an answer belongs to the address it was asked
+for: walking from one machine to the next never shows the previous one's
+answer, and a slow answer that arrives after the walk is dropped rather than
+rendered. Each section asks on its own, so the fields are readable while the
+history is still coming and a section that fails says so in its own place.
 
 ## Storage
 

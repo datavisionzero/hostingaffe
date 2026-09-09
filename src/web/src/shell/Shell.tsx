@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { PagesView } from "@/pages/PagesView";
+import { MachinesView } from "@/record/MachinesView";
+import { InstallationsView } from "@/record/InstallationsView";
+import { SoftwareListView } from "@/record/SoftwareListView";
 import { SettingsView } from "@/settings/SettingsView";
 import { AdminView } from "@/settings/AdminView";
 import { AccountMenu } from "./AccountMenu";
@@ -17,6 +20,14 @@ import { is, overlaid, typing } from "./shortcuts";
 // with the first page opened, not with the frame.
 const PageView = lazy(() => import("@/pages/PageView").then((module) => ({ default: module.PageView })));
 const NewPageView = lazy(() => import("@/pages/PageView").then((module) => ({ default: module.NewPageView })));
+
+// The detail screens of the record carry the same Markdown pipeline, and the
+// file screen its own comparison; the three lists are the frame's neighbours
+// and stay with it.
+const MachineView = lazy(() => import("@/record/MachineView").then((module) => ({ default: module.MachineView })));
+const SoftwareView = lazy(() => import("@/record/SoftwareView").then((module) => ({ default: module.SoftwareView })));
+const InstallationView = lazy(() => import("@/record/InstallationView").then((module) => ({ default: module.InstallationView })));
+const FileView = lazy(() => import("@/record/FileView").then((module) => ({ default: module.FileView })));
 
 /**
  * The application shell of ADR 0006: the frame every screen sits in, rendered
@@ -95,16 +106,26 @@ export function Shell() {
         </header>
 
         <Routes>
-          <Route path="/" element={<Navigate to="/pages" replace />} />
+          <Route path="/" element={<Navigate to="/machines" replace />} />
           <Route path="/settings/*" element={<SettingsView />} />
           <Route path="/admin/*" element={<AdminView />} />
+          <Route path="/machines" element={<MachinesView />} />
+          <Route path="/machines/:key" element={<Screen><MachineView /></Screen>} />
+          {/* The path of a file carries slashes, so it is the rest of the
+              address and not one segment of it. */}
+          <Route path="/machines/:key/files/*" element={<Screen><FileView owner="machine" /></Screen>} />
+          <Route path="/software" element={<SoftwareListView />} />
+          <Route path="/software/:key" element={<Screen><SoftwareView /></Screen>} />
+          <Route path="/installations" element={<InstallationsView />} />
+          <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
+          <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />
           <Route path="/pages" element={<PagesView />} />
           <Route path="/pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
           <Route path="/pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />
           {/* A typed or stale address is answered inside the frame rather than
               redirected away: silently landing somewhere else hides the typo,
               and a blank page is what `docs/human-interface.md` refuses. */}
-          <Route path="*" element={<Empty title="Nothing at this address."><Link className="text-brand underline-offset-4 hover:underline" to="/pages">Go to the wiki</Link></Empty>} />
+          <Route path="*" element={<Empty title="Nothing at this address."><Link className="text-brand underline-offset-4 hover:underline" to="/machines">Go to the machines</Link></Empty>} />
         </Routes>
       </SidebarInset>
 
@@ -116,6 +137,11 @@ export function Shell() {
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </SidebarProvider>
   );
+}
+
+/** A screen that arrives in a chunk of its own, with the frame's own waiting under it. */
+function Screen({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<Busy title="Loading the screen…" />}>{children}</Suspense>;
 }
 
 /**

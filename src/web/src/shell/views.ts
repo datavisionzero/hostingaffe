@@ -1,4 +1,4 @@
-import { FileTextIcon, type LucideIcon } from "lucide-react";
+import { BoxIcon, FileTextIcon, PackageIcon, ServerIcon, type LucideIcon } from "lucide-react";
 
 /**
  * The views of the instance, as ADR 0006 lists them, in the order the
@@ -16,6 +16,30 @@ export type View = {
 };
 
 export const views: View[] = [
+  {
+    id: "machines",
+    label: "Machines",
+    path: "/machines",
+    icon: ServerIcon,
+    group: "views",
+    hint: "The computers the team rents or owns.",
+  },
+  {
+    id: "installations",
+    label: "Installations",
+    path: "/installations",
+    icon: BoxIcon,
+    group: "views",
+    hint: "One software on one machine, and the version on it.",
+  },
+  {
+    id: "software",
+    label: "Software",
+    path: "/software",
+    icon: PackageIcon,
+    group: "views",
+    hint: "What the installations are installations of.",
+  },
   {
     id: "pages",
     label: "Pages",

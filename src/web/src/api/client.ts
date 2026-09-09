@@ -1,5 +1,28 @@
-import createClient from "openapi-fetch";
+import createClient, { defaultPathSerializer } from "openapi-fetch";
 import type { components, paths } from "./schema";
+
+/**
+ * How a path parameter reaches the instance.
+ *
+ * Every one of them is a single segment and is escaped whole — a key, a slug,
+ * an id — except one: a file's `path` is the last thing in its address and
+ * carries the slashes of the directories it sits in (`docs/api.md`, Files). The
+ * endpoint behind it is a catch-all, so `etc/caddy/Caddyfile` is three segments
+ * and `etc%2Fcaddy%2FCaddyfile` is a file the instance does not have — it
+ * answers `404`. The generated client cannot know that from the document, so it
+ * is said here, once, rather than at every call that touches a file.
+ *
+ * Each segment is still escaped on its own: a space or a `#` in a file name is
+ * part of the name and not part of the address.
+ */
+function pathSerializer(pathname: string, params: Record<string, unknown>): string {
+  const { path, ...rest } = params;
+  const serialized = defaultPathSerializer(pathname, rest);
+
+  return path === undefined
+    ? serialized
+    : serialized.replace("{path}", String(path).split("/").map(encodeURIComponent).join("/"));
+}
 
 /**
  * The one way this application reaches the instance.
@@ -15,6 +38,7 @@ import type { components, paths } from "./schema";
 export const api = createClient<paths>({
   baseUrl: window.location.origin,
   credentials: "same-origin",
+  pathSerializer,
 
   // Reached through `globalThis` when a request is made rather than captured
   // when this module loads, so that a test can stand an instance in front of

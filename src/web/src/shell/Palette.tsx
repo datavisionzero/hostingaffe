@@ -8,9 +8,10 @@ import { useSession } from "@/session/useSession";
 import { cn } from "@/lib/utils";
 import { Keys } from "./ShortcutsDialog";
 import { is } from "./shortcuts";
+import { anchorPath, installationPath, machinePath, softwarePath } from "@/record/addresses";
 import { pagePath, viewPath, views } from "./views";
 
-type PageSummary = Schemas["PageSummary"];
+type SearchHit = Schemas["SearchHit"];
 
 type Command = {
   id: string;
@@ -52,7 +53,7 @@ export function Palette({ open, onOpenChange, onShortcuts }: PaletteProps) {
       <DialogContent className="top-[20%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
         <DialogHeader className="sr-only">
           <DialogTitle>Command palette</DialogTitle>
-          <DialogDescription>Search pages, views and commands.</DialogDescription>
+          <DialogDescription>Search the record, the views and the commands.</DialogDescription>
         </DialogHeader>
         {open && (
           <PaletteBody onOpenChange={onOpenChange} onShortcuts={onShortcuts} />
@@ -69,11 +70,13 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
   const { me, signOut } = useSession();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
-  const [found, setFound] = useState<{ of: string; pages: PageSummary[] }>({ of: "", pages: [] });
+  const [found, setFound] = useState<{ of: string; hits: SearchHit[] }>({ of: "", hits: [] });
   const searchId = useId();
 
   const needle = query.trim();
-  // `q` is the same full-text search the page list itself uses.
+  // The instance's one search: every field, every Markdown body and every file
+  // (`docs/api.md`, Searching). "Where was that again" is the question a host
+  // record is asked most often, and this is where it is asked.
   const searching = needle.length >= shortest;
 
   useEffect(() => {
@@ -88,12 +91,12 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const pages = await api.GET("/api/pages", {
-            params: { query: { q: needle } },
+          const hits = await api.GET("/api/search", {
+            params: { query: { q: needle, limit: matches } },
             signal: controller.signal,
           });
 
-          setFound({ of: needle, pages: (pages.data ?? []).slice(0, matches) });
+          setFound({ of: needle, hits: hits.data ?? [] });
         } catch {
           // Nothing found is what the palette shows; the commands remain.
         }
@@ -115,15 +118,23 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
     const list: Command[] = [];
 
     if (searching) {
-      const hits = found.of === needle ? found : { pages: [] };
+      for (const hit of found.of === needle ? found.hits : []) {
+        const to = where(hit);
 
-      for (const page of hits.pages) {
+        // A deployment is the one hit with no screen of its own: it is read
+        // under its installation, which is where this sends whoever found it.
+        if (to === undefined) {
+          continue;
+        }
+
         list.push({
-          id: `found:page:${page.slug}`,
-          label: page.title,
-          hint: page.slug,
-          group: "Pages",
-          run: go(pagePath(page.slug)),
+          id: `found:${hit.kind}:${hit.key}:${hit.number ?? ""}`,
+          label: hit.name ?? hit.key,
+          // What matched, not what it is called: the row is already the name,
+          // and the surface is why this row is here at all.
+          hint: `${hit.kind} · ${hit.where}`,
+          group: "Found",
+          run: go(to),
           found: true,
         });
       }
@@ -220,8 +231,8 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
             aria-expanded
             aria-controls="palette-commands"
             aria-activedescendant={selected ? `palette-${selected.id}` : undefined}
-            aria-label="Search pages, or type a command"
-            placeholder="Search pages, or type a command"
+            aria-label="Search the record, or type a command"
+            placeholder="Search the record, or type a command"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -271,4 +282,24 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
         </ul>
     </>
   );
+}
+
+/**
+ * Where a hit leads. `key` is the address of what was found — a key, a slug, or
+ * the path of a file under its owner — and `owner` is what a file belongs to
+ * (`docs/api.md`, Searching).
+ */
+function where(hit: SearchHit): string | undefined {
+  switch (hit.kind) {
+    case "machine": return machinePath(hit.key);
+    case "software": return softwarePath(hit.key);
+    case "installation": return installationPath(hit.key);
+    case "page": return pagePath(hit.key);
+    case "file": return hit.owner === null || hit.owner === undefined
+      ? undefined
+      : `${anchorPath(hit.owner)}/files/${hit.key.split("/").map(encodeURIComponent).join("/")}`;
+    // A deployment is read under its installation, which `key` names.
+    case "deployment": return installationPath(hit.key);
+    default: return undefined;
+  }
 }
