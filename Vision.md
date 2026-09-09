@@ -5,7 +5,11 @@
 > runs, and how all of that changed over time — written mostly by AI agents
 > through a CLI, read and corrected by humans in a small web application.
 
-**License:** MIT · **Status:** pre-MVP — no implementation yet. The prior-art
+**License:** MIT · **Status:** released — `v0.1.0`: the record through the
+API, the web application and `ha`, self-hostable from one Compose file. Of
+section 16, what is still outstanding is the one that decides whether this
+works — our own machines moved out of their Markdown repositories into an
+instance. The prior-art
 research behind sections 2 and 7 is in
 [`docs/research/product-category-and-prior-art.md`](docs/research/product-category-and-prior-art.md).
 Section 17 lists what is still open.

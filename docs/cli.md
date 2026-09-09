@@ -5,6 +5,35 @@ console-minded humans (VISION 6.1), a client of the public API and nothing else
 (planaffe ADR 0003), built as one static binary from `src/cli/`. Its shape is
 `ha <object> <verb>`, like `gh` and `glab`.
 
+## Getting it
+
+One static binary per platform, on the
+[release page](https://github.com/datavisionzero/hostingaffe/releases/latest).
+It links against nothing and needs no runtime, so installing it is putting the
+file on the `PATH`:
+
+```sh
+curl -fsSLo ha https://github.com/datavisionzero/hostingaffe/releases/latest/download/ha_linux_amd64
+chmod +x ha && sudo mv ha /usr/local/bin/ha
+```
+
+The name is `ha_<os>_<arch>` — `linux` and `darwin` in both `amd64` and
+`arm64`, and `windows` in `amd64` as `ha_windows_amd64.exe`. There is no
+version in it, so the URL above keeps working; `latest/download/` resolves to
+the newest stable release and never to a prerelease, and an installation that
+wants a version that stands still names the tag instead of `latest`.
+
+`checksums.txt` is beside them, because a download nobody can verify is a
+download nobody should run:
+
+```sh
+curl -fsSLO https://github.com/datavisionzero/hostingaffe/releases/latest/download/checksums.txt
+sha256sum --ignore-missing -c checksums.txt   # shasum -a 256 on macOS
+```
+
+`ha --version` says which version this binary is, and `ha version` says whether
+it and the instance fit.
+
 ## Signing in
 
 A person signs in once per machine, and never types a token into a shell

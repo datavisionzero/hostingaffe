@@ -51,10 +51,10 @@ and the message names it.
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-Nothing has to be set for this to find an image: until the first release, the
-Compose file names `:main`, the build of the trunk. `HOSTINGAFFE_IMAGE` is
-where an installation says otherwise — a version to stand still on, or an image
-it built itself:
+Nothing has to be set for this to find an image: the Compose file names
+`:latest`, which is the newest stable release and never a prerelease.
+`HOSTINGAFFE_IMAGE` is where an installation says otherwise — `:main` to follow
+the trunk, a version to stand still on, or an image it built itself:
 
 ```sh
 docker build -f deploy/Dockerfile -t hostingaffe:local .   # HOSTINGAFFE_IMAGE=hostingaffe:local

@@ -3,9 +3,12 @@
 Instructions for coding agents working in this repository. See
 [Vision.md](Vision.md) for what hostingaffe is and what it deliberately is not.
 
-The repository is **pre-MVP**: the foundation stands — a copy of planaffe
-with planaffe's domain cut out — and this product's own domain is not built
-yet.
+The repository is **released**: `v0.1.0` is out, and the domain — machine,
+software, installation, deployment, file, page, history, identity — stands
+behind the API, the web application and `ha`. What that changes for work here
+is that `main` is now something strangers pull: an image tagged `:latest` is
+what a `docker compose up` reaches for, and the release is cut from a tag by
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 Of the files [Vision.md §12](Vision.md#12-technical-guard-rails) names as
 conventions, [`CONTEXT.md`](CONTEXT.md), [`docs/codebase.md`](docs/codebase.md),
@@ -91,6 +94,39 @@ product's subject matter makes the first one sharper than usual.
 
 When something has to be written down that fails either check, it belongs in
 `scratchpad/`, which is ignored by git.
+
+## Releasing
+
+A **tag is the only thing that makes a version**. Every build nobody tagged
+calls itself `0.0.0-dev` — the .NET side from `Directory.Build.props`, `ha`
+from `internal/version` — and
+[`.github/workflows/release.yml`](.github/workflows/release.yml) is the one
+place either is told otherwise.
+
+```sh
+git tag -a v1.2.3 -m "..."   # annotated, and the message is the release's
+git push origin v1.2.3
+```
+
+- **The shape is `v1.2.3`**, or `v1.2.3-rc.1` for a prerelease. Anything else
+  the workflow refuses, because a typo must not become `:latest`.
+- **CI has to be green on the commit the tag names.** The workflow checks that
+  rather than re-testing, and refuses a commit the gate never passed. Tag the
+  trunk after its run went green, not before.
+- **A stable release moves `:latest` and `:1.2`; a prerelease moves neither**
+  and is not what `releases/latest/download/` resolves to. That is what lets
+  [`docs/install.md`](docs/install.md) and [`docs/cli.md`](docs/cli.md) print
+  URLs with no version in them.
+- What goes out is one multi-architecture image on GHCR, `ha` for five
+  platforms with a `checksums.txt`, and a GitHub release. A run that failed
+  halfway is repeated with `workflow_dispatch` and the same tag — the tag is
+  not deleted and re-pushed, because people may already hold it.
+
+Since the first release, `main` is something strangers pull. A change to the
+Compose file, to `deploy/.env.example` or to the variables the instance reads
+is a change to an installation somebody already runs: it either keeps working
+untouched on `docker compose pull && up -d`, or the release notes say what to
+do, and migrations only ever run forward.
 
 ## The scratchpad
 

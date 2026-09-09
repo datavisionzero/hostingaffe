@@ -15,17 +15,15 @@ name: hostingaffe
 
 services:
   hostingaffe:
-    # `:latest` moves on a stable release and never on a prerelease. An
-    # installation that would rather follow the trunk names `:main`, and one
-    # that wants to stand still names a `sha-<commit>` or a version.
+    # `:latest` moves on a stable release and never on a prerelease, which is
+    # what makes it the default: a `git clone` and `up -d` by somebody who set
+    # nothing gets the newest thing that was released on purpose, and stays on
+    # that line when they pull again.
     #
-    # The default is `:main` and not `:latest` because there has been no
-    # release yet: `:latest` is a tag the release workflow writes, and until it
-    # has run once, a default naming it would answer `git clone` and `up -d`
-    # with a pull error rather than an instance. **At the first release this
-    # flips to `:latest`**, and an installation that wants to keep following the
-    # trunk says so in `deploy/.env` from then on.
-    image: ${HOSTINGAFFE_IMAGE:-ghcr.io/datavisionzero/hostingaffe:main}
+    # An installation that would rather follow the trunk names `:main` in
+    # `deploy/.env`, and one that wants to stand still names a `sha-<commit>`
+    # or a version.
+    image: ${HOSTINGAFFE_IMAGE:-ghcr.io/datavisionzero/hostingaffe:latest}
     restart: unless-stopped
     depends_on:
       db:
