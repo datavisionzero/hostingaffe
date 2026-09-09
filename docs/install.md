@@ -72,6 +72,13 @@ sign-in is the one that uses the bootstrap token: it exchanges the token for a
 session and sets the administrator's password. Every sign-in after that is the
 **email address** and that password — the name is a handle, not a login.
 
+Over plain HTTP the session cookie is set without the `secure` flag, because a
+browser stores no other kind there — which also means the session travels in
+the clear, readable by anything on the way. That is a trial, not an
+installation: put TLS in front of it before the second person signs in, and the
+instance sets the strict cookie by itself the moment the request reaches it as
+HTTPS.
+
 From the console instead:
 
 ```sh

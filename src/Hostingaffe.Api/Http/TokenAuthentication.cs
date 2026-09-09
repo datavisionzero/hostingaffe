@@ -44,7 +44,6 @@ public sealed class TokenAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    BrowserCookie cookie,
     IBrowserSessions sessions,
     TimeProvider clock) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
@@ -58,7 +57,7 @@ public sealed class TokenAuthenticationHandler(
                 .GetRequiredService<AuthenticateToken>()
                 .ExecuteAsync(presented, Context.RequestAborted);
         }
-        else if (Request.Cookies.TryGetValue(cookie.Name, out var sessionSecret))
+        else if (Request.Cookies.TryGetValue(BrowserCookie.For(Request).Name, out var sessionSecret))
         {
             try
             {

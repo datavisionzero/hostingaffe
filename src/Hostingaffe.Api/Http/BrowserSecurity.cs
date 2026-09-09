@@ -2,11 +2,43 @@ using System.Collections.Concurrent;
 
 namespace Hostingaffe.Api.Http;
 
+/// <summary>The cookie a browser session travels in, as the request's own scheme allows.</summary>
+/// <remarks>
+/// Derived from the request rather than from the environment, because the two
+/// disagree in the case that matters: an instance is in production the moment it
+/// is installed, and <c>docs/install.md</c> has the first sign-in happen over
+/// <c>http://&lt;host&gt;:8080/</c>, before any proxy is in front of it. A
+/// <c>__Host-</c> cookie is refused outright there and a <c>secure</c> one is
+/// dropped, so the instance answered <c>204</c>, the browser kept nothing, and
+/// the application came back to sign-in with nothing to say — the one failure a
+/// person cannot debug from the screen.
+///
+/// So: over HTTPS the strict cookie, with the prefix that binds it to this host
+/// and this path; over plain HTTP a cookie without the prefix and without the
+/// flag, which is the only kind that can work there. What that costs is written
+/// down where the choice is made — a session over plain HTTP travels in the
+/// clear, and <c>docs/install.md</c> says to put TLS in front of anything that
+/// is not a trial.
+///
+/// The scheme is the caller's, which is why <see cref="TrustedProxies"/> stands
+/// in front of this: behind a proxy that terminates TLS and is trusted to say
+/// so, the request is HTTPS and the strict cookie is the one that is set.
+/// </remarks>
 public sealed record BrowserCookie(string Name, bool Secure)
 {
-    public const string ProductionName = "__Host-hostingaffe_session";
-    public const string DevelopmentName = "hostingaffe_session";
-    public static BrowserCookie For(bool development) => development ? new(DevelopmentName, false) : new(ProductionName, true);
+    /// <summary>Over HTTPS. `__Host-` binds the cookie to this host and `/`, and requires `secure`.</summary>
+    public const string SecureName = "__Host-hostingaffe_session";
+
+    /// <summary>Over plain HTTP, where a prefixed or `secure` cookie is not stored at all.</summary>
+    public const string PlainName = "hostingaffe_session";
+
+    public static BrowserCookie For(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return request.IsHttps ? new(SecureName, true) : new(PlainName, false);
+    }
+
     public CookieOptions Options(DateTimeOffset expires) => new() { HttpOnly = true, Secure = Secure, SameSite = SameSiteMode.Lax, Path = "/", Expires = expires };
 }
 

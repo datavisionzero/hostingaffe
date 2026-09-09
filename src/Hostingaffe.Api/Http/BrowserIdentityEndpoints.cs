@@ -16,7 +16,7 @@ public static class BrowserIdentityEndpoints
     public static IEndpointRouteBuilder MapBrowserIdentity(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/session", async (PasswordSignInRequest? request, HttpContext http,
-            SignInWithPassword signIn, LoginThrottle throttle, BrowserCookie cookie, CancellationToken ct) =>
+            SignInWithPassword signIn, LoginThrottle throttle, CancellationToken ct) =>
         {
             string normalized;
             try { normalized = Domain.Identities.User.NormalizeEmailForComparison(request?.Email!); }
@@ -25,20 +25,20 @@ public static class BrowserIdentityEndpoints
             if (throttle.IsBlocked(normalized, source)) return Problems.Result(RefusalCode.Unauthenticated, "The email or password is not correct.");
             var issued = await signIn.ExecuteAsync(request?.Email, request?.Password, ct);
             if (issued is null) { throttle.Failed(normalized, source); return Problems.Result(RefusalCode.Unauthenticated, "The email or password is not correct."); }
-            throttle.Succeeded(normalized); SetCookie(http, cookie, issued.Value); return Results.NoContent();
+            throttle.Succeeded(normalized); SetCookie(http, issued.Value); return Results.NoContent();
         }).AllowAnonymous().WithName("SignIn").Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status401Unauthorized);
 
         endpoints.MapPost("/session/bootstrap", async (BootstrapExchangeRequest? request, HttpContext http,
-            ExchangeBootstrapToken exchange, BrowserCookie cookie, CancellationToken ct) =>
+            ExchangeBootstrapToken exchange, CancellationToken ct) =>
         {
             var issued = await exchange.ExecuteAsync(request?.Token, request?.Password, ct);
             if (issued is null) return Problems.Result(RefusalCode.Unauthenticated, "The bootstrap token cannot be exchanged.");
-            SetCookie(http, cookie, issued.Value); return Results.NoContent();
+            SetCookie(http, issued.Value); return Results.NoContent();
         }).AllowAnonymous().WithName("ExchangeBootstrapToken").Produces(StatusCodes.Status204NoContent);
 
         endpoints.MapPost("/invitations/accept", async (SecretPasswordRequest? request, HttpContext http,
-            AcceptInvitation accept, BrowserCookie cookie, CancellationToken ct) =>
-        { var issued = await accept.ExecuteAsync(request?.Secret, request?.Password, ct); SetCookie(http, cookie, issued); return Results.NoContent(); })
+            AcceptInvitation accept, CancellationToken ct) =>
+        { var issued = await accept.ExecuteAsync(request?.Secret, request?.Password, ct); SetCookie(http, issued); return Results.NoContent(); })
             .AllowAnonymous().WithName("AcceptInvitation").Produces(StatusCodes.Status204NoContent);
 
         endpoints.MapPost("/password-recovery", async (RecoveryRequest? request, RequestPasswordRecovery recover, CancellationToken ct) =>
@@ -51,8 +51,8 @@ public static class BrowserIdentityEndpoints
 
         var door = endpoints.MapGroup(string.Empty).RequireAuthorization();
         door.MapDelete("/session", async (HttpContext http, ICallerIdentity caller, IBrowserSessions sessions,
-            BrowserCookie cookie, TimeProvider clock, CancellationToken ct) =>
-        { var who = caller.Caller.RequireUser("sign out"); if (who.SessionId is { } id) await sessions.RevokeAsync(id, who.Id, clock.GetUtcNow(), ct); http.Response.Cookies.Delete(cookie.Name, cookie.Options(DateTimeOffset.UnixEpoch)); return Results.NoContent(); })
+            TimeProvider clock, CancellationToken ct) =>
+        { var who = caller.Caller.RequireUser("sign out"); if (who.SessionId is { } id) await sessions.RevokeAsync(id, who.Id, clock.GetUtcNow(), ct); Forget(http); return Results.NoContent(); })
             .WithName("SignOut").Produces(StatusCodes.Status204NoContent);
         door.MapGet("/sessions", (ListBrowserSessions list, CancellationToken ct) => list.ExecuteAsync(ct)).WithName("ListBrowserSessions");
         door.MapDelete("/sessions/{id:guid}", async (Guid id, ICallerIdentity caller, IBrowserSessions sessions, TimeProvider clock, CancellationToken ct) =>
@@ -67,8 +67,25 @@ public static class BrowserIdentityEndpoints
         return endpoints;
     }
 
-    private static void SetCookie(HttpContext http, BrowserCookie cookie, (Domain.Identities.BrowserSession Session, string Secret) issued) =>
+    private static void SetCookie(HttpContext http, (Domain.Identities.BrowserSession Session, string Secret) issued)
+    {
+        var cookie = BrowserCookie.For(http.Request);
         http.Response.Cookies.Append(cookie.Name, issued.Secret, cookie.Options(issued.Session.ExpiresAt));
+    }
+
+    /// <summary>
+    /// Signing out takes both names, not just the one this scheme would set. An
+    /// instance that gained a TLS proxy after somebody signed in over plain HTTP
+    /// has the other cookie still in that browser, and a sign-out that left it
+    /// there would leave a secret behind that the screen says is gone.
+    /// </summary>
+    private static void Forget(HttpContext http)
+    {
+        foreach (var name in new[] { BrowserCookie.SecureName, BrowserCookie.PlainName })
+        {
+            http.Response.Cookies.Delete(name, new BrowserCookie(name, name == BrowserCookie.SecureName).Options(DateTimeOffset.UnixEpoch));
+        }
+    }
 }
 
 public sealed class BrowserCsrfMiddleware(RequestDelegate next)

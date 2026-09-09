@@ -67,7 +67,6 @@ catch (ArgumentException refusal)
 // container they are resolved from. The clock is the base class library's.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LoginThrottle>();
-builder.Services.AddSingleton(BrowserCookie.For(builder.Environment.IsDevelopment()));
 builder.Services.AddScoped<AuthenticateToken>();
 builder.Services.AddScoped<BootstrapTheInstance>();
 builder.Services.AddScoped<ReadMe>();

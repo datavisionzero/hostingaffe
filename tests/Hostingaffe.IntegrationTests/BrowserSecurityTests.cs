@@ -207,3 +207,64 @@ public sealed class LoginThrottleAddressTests(PostgresFixture postgres)
         return await client.SendAsync(request, Ct);
     }
 }
+
+/// <summary>
+/// Which cookie a session travels in, which is decided by the scheme the request
+/// arrived under and not by the environment the instance runs in.
+/// </summary>
+/// <remarks>
+/// <c>docs/install.md</c> has the first sign-in happen over
+/// <c>http://&lt;host&gt;:8080/</c>, and a production instance that answered it
+/// with a <c>__Host-</c> cookie was answering with a cookie the browser stores
+/// nowhere: the exchange returned <c>204</c> and the browser kept nothing.
+/// </remarks>
+[Collection(nameof(PostgresCollection))]
+public sealed class SessionCookieTests(PostgresFixture postgres)
+{
+    private static readonly CancellationToken Ct = TestContext.Current.CancellationToken;
+
+    [Theory]
+    [InlineData("http://localhost", BrowserCookie.PlainName, false)]
+    [InlineData("https://localhost", BrowserCookie.SecureName, true)]
+    public async Task The_scheme_of_the_request_decides_the_cookie(string origin, string name, bool secure)
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var client = instance.CreateClient(new() { BaseAddress = new Uri(origin) });
+
+        using var exchange = await client.PostAsJsonAsync("/api/session/bootstrap",
+            new { token = AnInstance.BootstrapToken, password = "a long first password" }, Ct);
+
+        var set = exchange.Headers.GetValues("Set-Cookie").Single();
+        Assert.StartsWith($"{name}=", set, StringComparison.Ordinal);
+        Assert.Equal(secure, set.Contains("secure", StringComparison.OrdinalIgnoreCase));
+
+        // And the cookie it set is the one it reads back: a name the door does
+        // not look under admits nobody, which is the failure this guards.
+        using var me = new HttpRequestMessage(HttpMethod.Get, "/api/me");
+        me.Headers.Add("Cookie", set.Split(';')[0]);
+        using var admitted = await client.SendAsync(me, Ct);
+        Assert.Equal(HttpStatusCode.OK, admitted.StatusCode);
+    }
+
+    /// <summary>Signing out takes the other scheme's cookie with it.</summary>
+    [Fact]
+    public async Task Signing_out_forgets_both_names()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var client = instance.CreateClient(new() { BaseAddress = new Uri("http://localhost") });
+        using var exchange = await client.PostAsJsonAsync("/api/session/bootstrap",
+            new { token = AnInstance.BootstrapToken, password = "a long first password" }, Ct);
+
+        using var out_ = new HttpRequestMessage(HttpMethod.Delete, "/api/session");
+        out_.Headers.Add("Cookie", exchange.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
+        // The origin the development environment's public URL names, which is what the CSRF guard compares against.
+        out_.Headers.Add("Origin", "http://localhost:5173");
+        out_.Headers.Add(CsrfProtection.Header, "1");
+        using var signedOut = await client.SendAsync(out_, Ct);
+
+        Assert.Equal(HttpStatusCode.NoContent, signedOut.StatusCode);
+        var cleared = signedOut.Headers.GetValues("Set-Cookie").ToList();
+        Assert.Contains(cleared, value => value.StartsWith($"{BrowserCookie.PlainName}=", StringComparison.Ordinal));
+        Assert.Contains(cleared, value => value.StartsWith($"{BrowserCookie.SecureName}=", StringComparison.Ordinal));
+    }
+}
