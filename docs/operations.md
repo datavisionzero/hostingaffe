@@ -137,6 +137,11 @@ directory.
 stop deliberately say so in one line: a migration that failed, and a bootstrap
 secret the instance will not accept. Both leave the database untouched.
 
+**It answers, but the form will not take the bootstrap token.** The form on `/`
+is the ordinary sign-in and asks for an address and a password that do not exist
+yet. The token belongs on `/activate`, which is a separate screen and is not
+linked from the other one.
+
 **It answers, but nobody can sign in.** The bootstrap runs once, and the log of
 the first start says whether it created the administrator or found identities
 already there. If the token was lost, a second administrator cannot be made

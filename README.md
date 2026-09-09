@@ -66,9 +66,10 @@ docker compose -f deploy/docker-compose.yml up -d
 
 The instance migrates its own schema, creates the first administrator from
 `deploy/.env`, and serves the API and the web application on `8080`. The first
-sign-in is the one that uses the bootstrap token; every one after that is an
-email address and a password. It speaks plain HTTP and terminates no TLS — put
-a reverse proxy in front of it before the second person signs in.
+sign-in is the one that uses the bootstrap token, on `/activate`; every one
+after that is `/`, with an email address and a password. It speaks plain HTTP
+and terminates no TLS — put a reverse proxy in front of it before the second
+person signs in.
 [`docs/install.md`](docs/install.md) is the whole path from nothing, written
 for an agent to execute.
 

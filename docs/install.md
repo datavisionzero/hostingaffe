@@ -69,10 +69,25 @@ curl -s localhost:8080/api/version
 
 ## Sign in
 
-The web application is on the same port. Open `http://<host>:8080/`. The first
-sign-in is the one that uses the bootstrap token: it exchanges the token for a
-session and sets the administrator's password. Every sign-in after that is the
-**email address** and that password — the name is a handle, not a login.
+The web application is on the same port. The first sign-in is the one that
+uses the bootstrap token, and it has its own address:
+
+```
+http://<host>:8080/activate
+```
+
+That screen takes the token and a password, exchanges the one for a session and
+sets the other as the administrator's. It is the only screen that accepts the
+token: `/` is the ordinary sign-in form, which asks for an address and a
+password the instance does not have yet, and it does not link here. Type the
+address.
+
+Every sign-in after that is `/`, with the **email address** and that password —
+the name is a handle, not a login.
+
+The exchange happens once. The token itself stays an ordinary user token
+afterwards, which is what `HOSTINGAFFE_TOKEN` holds for the CLI; it is listed
+and revoked like any other.
 
 Over plain HTTP the session cookie is set without the `secure` flag, because a
 browser stores no other kind there — which also means the session travels in
