@@ -420,7 +420,11 @@ always there:
   because the directory is not what the record says and a script has to be able
   to tell.
 - A file sync wrote that was changed on the host is `restored` and says so: the
-  record is what the machine runs.
+  record is what the machine runs. **The mode counts as part of it** — the
+  record has one mode bit, executable or not, and it is put on the file on every
+  run, so a script the record calls executable is executable after every sync
+  and not only after the first. A run that says `unchanged` changed nothing,
+  mode included.
 
 `--dry-run` prints the same lines and touches nothing. A directory holding one
 owner's files is not another owner's to sync into, and that is said before a

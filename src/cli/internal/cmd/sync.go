@@ -159,8 +159,12 @@ func planned(dir string, owner anchor, held manifest, wanted []api.File) (*plan,
 			steps = append(steps, step{Path: file.Path, Does: unchanged, Revision: file.Revision})
 		case sha256Of(onDisk) != was.Sha256:
 			steps = append(steps, putting(file, restored, "it had been changed on the host"))
-		default:
+		case sha256Of(onDisk) != digest:
 			steps = append(steps, putting(file, changed, fmt.Sprintf("revision %d, was %d", file.Revision, was.Revision)))
+		default:
+			// The bytes are the ones sync wrote and the ones the record has;
+			// only the mode is not. The record has one mode bit, and it wins.
+			steps = append(steps, putting(file, restored, "its mode had been changed on the host"))
 		}
 	}
 
@@ -213,7 +217,9 @@ func apply(dir string, p *plan) error {
 			if err := os.WriteFile(at, []byte(one.Content), modeOf(one.Executable)); err != nil {
 				return &config.UsageError{Message: fmt.Sprintf("cannot write %s: %v", at, err)}
 			}
-		case unchanged:
+			// WriteFile gives the mode only to a file it creates, and the umask
+			// takes bits off that one. The mode is the record's, so it is said
+			// again, on every path that writes.
 			if err := os.Chmod(at, modeOf(one.Executable)); err != nil {
 				return &config.UsageError{Message: fmt.Sprintf("cannot set the mode of %s: %v", at, err)}
 			}

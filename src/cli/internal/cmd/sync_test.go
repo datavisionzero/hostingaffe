@@ -14,12 +14,24 @@ import (
 
 // syncing answers an installation's files: whatever the test says it has.
 func syncing(files map[string]string) *fake {
+	return syncingExecutable(files, nil)
+}
+
+// syncingExecutable is the same, for a record where some of the files are the
+// ones whose whole purpose is to be executed.
+func syncingExecutable(files map[string]string, executable map[string]bool) *fake {
+	is := func(path string) string {
+		if executable[path] {
+			return "true"
+		}
+		return "false"
+	}
 	return &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
 		if strings.HasSuffix(r.URL.Path, "/files") {
 			summaries := make([]string, 0, len(files))
 			for path := range files {
 				summaries = append(summaries, `{"owner":{"kind":"installation","key":"logaffe-prod"},"path":`+
-					quoted(path)+`,"executable":false,"revision":1,
+					quoted(path)+`,"executable":`+is(path)+`,"revision":1,
 					"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 					"updated_at":"2026-09-05T12:00:00Z"}`)
 			}
@@ -32,7 +44,7 @@ func syncing(files map[string]string) *fake {
 			return 404, `{"type":"/problems/not-found","title":"not-found","status":404,"detail":"No file."}`
 		}
 		return 200, `{"owner":{"kind":"installation","key":"logaffe-prod"},"path":` + quoted(path) + `,
-		"executable":false,"content":` + quoted(content) + `,"revision":1,
+		"executable":` + is(path) + `,"content":` + quoted(content) + `,"revision":1,
 		"created_by":{"id":"0198e0c0-0000-7000-8000-000000000002","kind":"user","name":"maintainer"},
 		"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
 		"created_at":"2026-09-05T10:00:00Z","updated_at":"2026-09-05T12:00:00Z"}`
@@ -275,4 +287,71 @@ func TestSyncUsageMistakesAreExitTwo(t *testing.T) {
 			t.Errorf("%v: code %d, stderr %q", args, code, stderr)
 		}
 	}
+}
+
+// The bit the record has is the bit on disk, on the first run and on every one
+// after it: a run that says "unchanged" leaves the file executable. A sync that
+// quietly disarms a script breaks the job it drives, and the first sign of that
+// is the job not having run.
+func TestTheExecutableBitSurvivesEveryRun(t *testing.T) {
+	f := syncingExecutable(
+		map[string]string{"bin/backup.sh": "#!/bin/sh\nexit 0\n", "compose.yml": "one\n"},
+		map[string]bool{"bin/backup.sh": true})
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	dir := t.TempDir()
+	for nth := 1; nth <= 3; nth++ {
+		code, out, stderr := run(t, server, "files", "sync", dir, "--inst", "logaffe-prod")
+		if code != exit.OK || stderr != "" {
+			t.Fatalf("run %d: code %d, stderr %q", nth, code, stderr)
+		}
+		if nth > 1 && out != "unchanged  bin/backup.sh\nunchanged  compose.yml\n" {
+			t.Fatalf("run %d does something:\n%q", nth, out)
+		}
+		if mode := modeAt(t, filepath.Join(dir, "bin/backup.sh")); mode != 0o755 {
+			t.Fatalf("run %d left the script %04o", nth, mode)
+		}
+		if mode := modeAt(t, filepath.Join(dir, "compose.yml")); mode != 0o644 {
+			t.Fatalf("run %d left compose.yml %04o", nth, mode)
+		}
+	}
+}
+
+// The mode is the record's the same way the bytes are: one taken off on the
+// host is put back, and sync says so.
+func TestAModeChangedOnTheHostIsPutBack(t *testing.T) {
+	f := syncingExecutable(
+		map[string]string{"bin/backup.sh": "#!/bin/sh\nexit 0\n"},
+		map[string]bool{"bin/backup.sh": true})
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	dir := t.TempDir()
+	if code, _, _ := run(t, server, "files", "sync", dir, "--inst", "logaffe-prod"); code != exit.OK {
+		t.Fatal("code")
+	}
+	if err := os.Chmod(filepath.Join(dir, "bin/backup.sh"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, _ := run(t, server, "files", "sync", dir, "--inst", "logaffe-prod")
+	if code != exit.OK {
+		t.Fatalf("code %d", code)
+	}
+	if out != "restored   bin/backup.sh  (its mode had been changed on the host)\n" {
+		t.Fatalf("what it did:\n%q", out)
+	}
+	if mode := modeAt(t, filepath.Join(dir, "bin/backup.sh")); mode != 0o755 {
+		t.Fatalf("the script is %04o", mode)
+	}
+}
+
+func modeAt(t *testing.T, at string) os.FileMode {
+	t.Helper()
+	info, err := os.Stat(at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info.Mode().Perm()
 }
