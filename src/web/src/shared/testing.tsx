@@ -70,7 +70,7 @@ export const aUser = {
   administrator: true,
   email: "maintainer@example.test",
   owner: null,
-  token: { prefix: "ha_abcd", created_at: "2026-09-02T10:00:00Z" },
+  token: { id: "0199a000-0000-7000-8000-000000000010", prefix: "ha_abcd", created_at: "2026-09-02T10:00:00Z" },
   metadata: null,
   metadata_reported_at: null,
 };

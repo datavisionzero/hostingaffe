@@ -145,7 +145,7 @@ public sealed class ReportAgentMetadata(ICallerIdentity callerIdentity, IIdentit
         var owner = await identities.FindAsync(agent.OwnerId, cancellationToken)
             ?? throw new InvalidOperationException($"Agent {agent.Id} has no owner; the schema does not allow that.");
         return new Me(agent.Id, agent.Kind, agent.Name, false, null, IdentityRef.Of(owner),
-            new TokenRef(caller.TokenPrefix, caller.TokenCreatedAt), agent.Metadata, agent.MetadataReportedAt);
+            new TokenRef(caller.TokenId, caller.TokenPrefix, caller.TokenCreatedAt), agent.Metadata, agent.MetadataReportedAt);
     }
 }
 

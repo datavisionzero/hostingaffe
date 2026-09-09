@@ -5,23 +5,87 @@ console-minded humans (VISION 6.1), a client of the public API and nothing else
 (planaffe ADR 0003), built as one static binary from `src/cli/`. Its shape is
 `ha <object> <verb>`, like `gh` and `glab`.
 
-## Configuration
+## Signing in
 
-Two environment variables, and nothing else — no file, nothing to log into:
+A person signs in once per machine, and never types a token into a shell
+profile again ([ADR 0005](./adr/0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)):
+
+```sh
+ha login --url https://hosting.example.com
+```
+
+`ha` prints a short code — `BCDF-GHJK`, eight consonants so that it is never a
+word and carries no digit anybody retypes — and the address to enter it at. A
+person opens that address in a browser **on whatever machine has one**, signs in
+if they are not already, and approves. `ha` collects the token and puts it in
+the operating system's keychain. That is the only sign-in that works over SSH,
+in CI, in a container and in an agent's sandbox, where there is no browser on
+the machine doing the asking.
+
+What comes back is an ordinary **user token**: it appears in `ha token list` and
+in the browser's settings, and is revoked in either. `ha logout` revokes the one
+this machine holds and takes it out of the keychain.
+
+**Where there is no keychain** — a headless Linux without a Secret Service,
+most often — `ha` says so, writes nothing, and names the two ways on: a token in
+`HOSTINGAFFE_TOKEN`, or `ha login --token-file <path>`, which writes it `0600`
+and records the path. A token file others can read is refused on the way back
+in, with the `chmod` that fixes it.
+
+**An agent never runs `ha login`.** Its token arrives in `HOSTINGAFFE_TOKEN`,
+set by whatever harness started it, and `ha logout` refuses to revoke a token it
+did not put there.
+
+## Which instance, and as whom
+
+Two questions, each answered through a ladder, and `ha status` prints both with
+the rung each answer came from.
+
+**The instance** — `--url`, then `HOSTINGAFFE_URL`, then the instance this
+machine signed in to.
+
+**The token** — `HOSTINGAFFE_TOKEN`, then the token file if one was chosen, then
+the keychain. The environment wins because that is how an agent receives its own
+token and how CI holds one. `ha` never says which kind it holds: the server
+tells a user token from an agent token (planaffe ADR 0015).
+
+```
+$ ha status
+instance   https://hosting.example.com
+version    ha 1.2.0, instance 1.2.0
+token      user, from the keychain
+acting as  maintainer, administrator
+```
+
+Everything on disk is one file — `$HOSTINGAFFE_CONFIG`, else
+`$XDG_CONFIG_HOME/hostingaffe/config.json`, else
+`~/.config/hostingaffe/config.json`, written `0600`. It holds the instance and,
+where one was chosen, the *path* of the token file. **It holds no credential.**
+
+There is still no project file, because there are no projects: one instance
+holds one team's infrastructure and every token reads all of it (VISION 9). A
+machine is named on the command line where a command needs one, and never
+inferred from the directory `ha` happens to run in.
 
 | | |
 |---|---|
 | `HOSTINGAFFE_URL` | the instance, scheme and host |
-| `HOSTINGAFFE_TOKEN` | a user token or an agent token; the server tells them apart, `ha` never says which it holds (planaffe ADR 0015) |
+| `HOSTINGAFFE_TOKEN` | a user token or an agent token |
+| `HOSTINGAFFE_INSECURE_HTTP` | `1` allows plain HTTP off loopback, like `--insecure-http` |
+| `HOSTINGAFFE_CONFIG` | where the configuration file lives |
 
-There is no project file, because there are no projects: one instance holds one
-team's infrastructure and every token reads all of it (VISION 9). A machine is
-named on the command line where a command needs one, and never inferred from
-the directory `ha` happens to run in.
+No instance at all is exit 2, and the message names both ways to say which one.
+So is an address that is not an absolute `http` or `https` one, said before any
+request goes out.
 
-Either variable unset is exit 2, and the message names the one that is missing.
-A `HOSTINGAFFE_URL` that is not an absolute `http` or `https` address is exit 2
-as well, said before any request goes out.
+### Plain HTTP is refused off loopback
+
+A token over plain HTTP is a token in somebody's network log
+([ADR 0006](./adr/0006-a-token-never-travels-over-plain-http-off-loopback.md)).
+`https://` is always fine, and `http://` to a loopback host — `localhost`,
+`127.0.0.1`, `::1` — is always fine, so a development instance works out of the
+box. Anything else is refused before the first request, and the override is
+explicit: `--insecure-http`, or `HOSTINGAFFE_INSECURE_HTTP=1`.
 
 ## Commitments to agents
 
@@ -29,7 +93,9 @@ as well, said before any request goes out.
   the API answered it, and nothing else on stdout.
 - **Never interactive.** No prompt, no editor, no pager; stdin is read only
   where a flag says so — `--body-file -` and its like. There is nothing to
-  answer, so a command in a pipeline behaves as it does at a terminal.
+  answer, so a command in a pipeline behaves as it does at a terminal. `ha
+  login` waits, which is not the same thing: it prints a code and polls, and
+  reads nothing from stdin.
 - **Every write carries an `Idempotency-Key`** `ha` generates itself, one per
   invocation and numbered per write — `<key>-1`, `<key>-2` — so a retry after a
   lost connection replays every request of the command rather than repeating
@@ -59,12 +125,12 @@ a number rather than on a sentence:
 |---|---|
 | 0 | success |
 | 1 | unexpected: a 500, an answer `ha` cannot parse, a bug in `ha` |
-| 2 | usage: bad arguments, `HOSTINGAFFE_URL` or `HOSTINGAFFE_TOKEN` unset or malformed |
+| 2 | usage: bad arguments, no instance, no token, a malformed address, a token file others can read |
 | 3 | not found, deleted included |
 | 4 | refused: validation, and every 422 |
 | 5 | conflict: `idempotency-mismatch`, `email-exists`, `last-administrator` |
 | 6 | stale: `If-Match` did not match |
-| 7 | denied: 401, 403 |
+| 7 | denied: 401, 403, and a device login somebody refused or let expire |
 | 9 | version skew |
 | 10 | unreachable: DNS, connection refused, timeout, TLS |
 
@@ -104,6 +170,7 @@ user's own repository.
 | `ha search` | one call over every field, every Markdown body and every file |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
+| `ha login`, `ha logout`, `ha status` | signing this machine in, out, and what it holds (ADR 0005) |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
 `ha inst` is `ha installation` and `ha deploy` is `ha deployment`; the objects

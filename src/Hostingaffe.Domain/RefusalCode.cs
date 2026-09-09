@@ -58,6 +58,15 @@ public enum RefusalCode
     /// <summary>A one-time identity secret is unknown, replaced, used or expired.</summary>
     SecretExpired,
 
+    /// <summary>Nobody has approved that device login yet; <c>ha login</c> keeps polling.</summary>
+    DevicePending,
+
+    /// <summary>A user refused that device login.</summary>
+    DeviceDenied,
+
+    /// <summary>The device login expired before it was approved, or its token has already been collected.</summary>
+    DeviceExpired,
+
     /// <summary>Deactivation or demotion would leave no active administrator.</summary>
     LastAdministrator,
 

@@ -48,3 +48,42 @@ public sealed class BrowserSessionConfiguration : IEntityTypeConfiguration<Brows
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).HasConstraintName("fk_browser_session_user").OnDelete(DeleteBehavior.NoAction);
     }
 }
+
+/// <summary>
+/// The device logins of ADR 0005. Short-lived rows: one is worth nothing ten
+/// minutes after it was made, and the purge takes them the way it takes a spent
+/// one-time secret.
+/// </summary>
+public sealed class DeviceLoginConfiguration : IEntityTypeConfiguration<DeviceLogin>
+{
+    public void Configure(EntityTypeBuilder<DeviceLogin> builder)
+    {
+        builder.ToTable("device_login");
+        builder.HasKey(x => x.Id).HasName("pk_device_login");
+        builder.Property(x => x.Id).HasColumnName("id");
+
+        // The credential is found by its hash, and the row keeps no code.
+        builder.Property(x => x.DeviceCodeHash).HasColumnName("device_code_hash");
+        builder.HasIndex(x => x.DeviceCodeHash).IsUnique().HasDatabaseName("device_login_code_hash");
+
+        // What a person types, stored without its dash. Unique among the ones
+        // still waiting: two live logins under one code would be a person
+        // approving whichever the lookup happened to find.
+        builder.Property(x => x.UserCode).HasColumnName("user_code").HasMaxLength(UserCode.Length);
+        builder.HasIndex(x => x.UserCode).IsUnique().HasDatabaseName("device_login_user_code")
+            .HasFilter("approved_at is null and denied_at is null");
+
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+        builder.Property(x => x.ApprovedAt).HasColumnName("approved_at");
+        builder.Property(x => x.ApprovedByUserId).HasColumnName("approved_by_user_id");
+        builder.Property(x => x.DeniedAt).HasColumnName("denied_at");
+        builder.Property(x => x.RedeemedAt).HasColumnName("redeemed_at");
+        builder.Property(x => x.IssuedTokenId).HasColumnName("issued_token_id");
+
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ApprovedByUserId)
+            .HasConstraintName("fk_device_login_user").OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne<Token>().WithMany().HasForeignKey(x => x.IssuedTokenId)
+            .HasConstraintName("fk_device_login_token").OnDelete(DeleteBehavior.NoAction);
+    }
+}

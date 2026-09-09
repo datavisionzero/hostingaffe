@@ -39,6 +39,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
     public DbSet<BrowserSession> BrowserSessions => Set<BrowserSession>();
 
+    /// <summary>The <c>ha login</c>s in flight, none of them older than ten minutes (ADR 0005).</summary>
+    public DbSet<DeviceLogin> DeviceLogins => Set<DeviceLogin>();
+
     /// <summary>The computers the instance is a record of (VISION 7).</summary>
     public DbSet<Machine> Machines => Set<Machine>();
 

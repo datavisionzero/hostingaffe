@@ -13,7 +13,14 @@ public sealed record IdentityRef(Guid Id, IdentityKind Kind, string Name)
 }
 
 /// <summary>The token a caller came in under, as <c>GET /me</c> shows it.</summary>
-public sealed record TokenRef(string Prefix, DateTimeOffset CreatedAt);
+/// <remarks>
+/// The id is here so that a holder can revoke the token it is holding without
+/// having to recognise it in a list — which is what <c>ha logout</c> does with
+/// the session <c>ha login</c> put in the keychain (ADR 0005). An id admits
+/// nobody; the secret is the prefix's other 38 characters and is in no answer
+/// but the one that issued it.
+/// </remarks>
+public sealed record TokenRef(Guid Id, string Prefix, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// The caller, as <c>GET /me</c> answers: an <see cref="IdentityRef"/> plus
@@ -57,7 +64,7 @@ public sealed class ReadMe(ICallerIdentity callerIdentity, IIdentities identitie
             caller.Administrator,
             user?.Email,
             owner is null ? null : IdentityRef.Of(owner),
-            caller.SessionId is null ? new TokenRef(caller.TokenPrefix, caller.TokenCreatedAt) : null,
+            caller.SessionId is null ? new TokenRef(caller.TokenId, caller.TokenPrefix, caller.TokenCreatedAt) : null,
             agent?.Metadata,
             agent?.MetadataReportedAt);
     }

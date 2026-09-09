@@ -44,6 +44,11 @@ func FromResponse(status int, p *problem.Problem) int {
 		return NotFound
 	case status == 400 && p.Code() == "cursor-invalid":
 		return Refused
+	// A login somebody refused, and one nobody answered in time, are both a
+	// door that stayed shut — the same answer 401 and 403 are, and not the
+	// "your request was wrong" that 400 usually is (ADR 0005).
+	case status == 400 && (p.Code() == "device-denied" || p.Code() == "device-expired"):
+		return Denied
 	case status == 400 || status == 422:
 		return Refused
 	case status == 409:

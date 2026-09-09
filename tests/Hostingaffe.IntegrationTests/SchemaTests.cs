@@ -89,7 +89,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Equal(
             [
                 "__EFMigrationsHistory",
-                "assigned_key", "browser_session", "deployment", "file", "file_revision",
+                "assigned_key", "browser_session", "deployment", "device_login", "file", "file_revision",
                 "history", "idempotency",
                 "identity", "identity_metadata", "installation", "installation_port",
                 "machine", "one_time_secret", "page", "software", "token",
@@ -117,6 +117,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "PK___EFMigrationsHistory",
                 "browser_session_hash", "browser_session_user",
                 "deployment_number", "deployment_search", "deployment_when",
+                "device_login_code_hash", "device_login_user_code",
                 "file_on_installation", "file_on_machine", "file_revision_search", "file_search",
                 "history_subject",
                 "identity_email", "identity_metadata_identity", "identity_name",
@@ -124,8 +125,8 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "machine_host", "machine_key", "machine_search",
                 "one_live_secret_per_purpose", "one_time_secret_hash",
                 "page_on_installation", "page_on_machine", "page_search", "page_slug",
-                "pk_assigned_key", "pk_browser_session", "pk_deployment", "pk_file",
-                "pk_file_revision", "pk_history", "pk_idempotency",
+                "pk_assigned_key", "pk_browser_session", "pk_deployment", "pk_device_login",
+                "pk_file", "pk_file_revision", "pk_history", "pk_idempotency",
                 "pk_identity", "pk_identity_metadata", "pk_installation", "pk_installation_port",
                 "pk_machine", "pk_one_time_secret", "pk_page", "pk_software", "pk_token",
                 "software_key", "software_search", "token_agent", "token_secret_hash",

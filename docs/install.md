@@ -28,7 +28,9 @@ be set; everything else in the file has a default and can stay commented out.
 | `HOSTINGAFFE_BOOTSTRAP_EMAIL` | their email address |
 | `HOSTINGAFFE_BOOTSTRAP_TOKEN` | their first user token, at least 32 characters |
 
-The bootstrap token is what the CLI carries as `HOSTINGAFFE_TOKEN`. It is read
+The bootstrap token is the first user token: it is what the browser exchanges
+for a session on the first sign-in, and what the CLI can carry as
+`HOSTINGAFFE_TOKEN` before anybody has signed in. It is read
 on the first start only, when the instance has no identity yet, and ignored on
 every start after that — so it can be rotated like any other token
 afterwards, and the variable left where it is.
@@ -82,10 +84,22 @@ HTTPS.
 From the console instead:
 
 ```sh
-export HOSTINGAFFE_URL=http://<host>:8080
-export HOSTINGAFFE_TOKEN=<the bootstrap token>
-ha me
+ha login --url http://<host>:8080
 ```
+
+`ha` prints a short code and the address to enter it at; open that in the
+browser you just signed in with, approve, and the token lands in this machine's
+keychain (ADR 0005). Nothing goes into a shell profile. `ha status` then says
+which instance this is and as whom.
+
+The bootstrap token is the other way in, and the one that works before anybody
+has a password — `HOSTINGAFFE_TOKEN=<the bootstrap token> ha me`. It is also how
+an agent always holds a token: from the environment, set by whatever started it.
+
+Over plain HTTP `ha` talks to a loopback host and refuses anything else, because
+a token over plain HTTP is a token in the network log (ADR 0006). Reaching a
+trial instance on another host by its address is `--insecure-http`, said out
+loud — or TLS in front of it, which is the answer anyway.
 
 `ha` is one static binary; the release page carries one per platform
 (`docs/cli.md`).

@@ -4,6 +4,7 @@ import { SignIn } from "@/session/SignIn";
 import { SessionProvider } from "@/session/Session";
 import { Activate } from "@/session/Activate";
 import { Recover } from "@/session/Recover";
+import { Device } from "@/session/Device";
 import { Shell } from "@/shell/Shell";
 import { useLocation, useNavigate } from "react-router";
 
@@ -101,9 +102,17 @@ export function App() {
       );
 
     case "stranger":
-      return <SignIn onSignedIn={(me) => { setStanding({ at: "known", me }); navigate("/"); }} />;
+      // Signing in lands where the browser already was, so that a `/device`
+      // link a person followed out of a terminal is not lost by the sign-in
+      // that page needed (ADR 0005).
+      return <SignIn onSignedIn={(me) => { setStanding({ at: "known", me }); navigate(location.pathname === "/device" ? location.pathname + location.search : "/"); }} />;
 
     case "known":
+      // The one screen a signed-in person reaches without the shell: it is the
+      // other half of a `ha login` and is opened from a terminal, not from the
+      // navigation.
+      if (location.pathname === "/device") return <Device name={standing.me.name} />;
+
       return (
         <SessionProvider
           value={{

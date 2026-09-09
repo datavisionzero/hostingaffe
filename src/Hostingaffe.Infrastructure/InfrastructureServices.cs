@@ -48,6 +48,7 @@ public static class InfrastructureServices
         services.AddScoped<IIdempotency, Idempotency>();
         services.AddScoped<IOneTimeSecrets, OneTimeSecrets>();
         services.AddScoped<IBrowserSessions, BrowserSessions>();
+        services.AddScoped<IDeviceLogins, DeviceLogins>();
         services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
         services.AddTransient<IEmailSender, SmtpEmailSender>();
 

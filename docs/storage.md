@@ -139,6 +139,39 @@ The cookie carries the secret and nothing else; the session list a person sees
 is read by `browser_session_user`, newest first.
 
 ```sql
+create table device_login (
+    id                  uuid        not null primary key,
+    device_code_hash    bytea       not null,
+    user_code           varchar(8)  not null,
+    created_at          timestamptz not null,
+    expires_at          timestamptz not null,
+    approved_at         timestamptz,
+    approved_by_user_id uuid        references identity (id),
+    denied_at           timestamptz,
+    redeemed_at         timestamptz,
+    issued_token_id     uuid        references token (id)
+);
+
+create unique index device_login_code_hash on device_login (device_code_hash);
+create unique index device_login_user_code on device_login (user_code)
+    where approved_at is null and denied_at is null;
+```
+
+One `ha login` in flight (ADR 0005). The row keeps the **hash** of the long
+device code the CLI polls with and never the code, the way a token row does;
+what it can read back is the short user code a person types, which admits
+nobody on its own. The unique index is on the ones still waiting, so that a code
+a person types names exactly one login.
+
+Where a login has got to is read from the four moments rather than stored as a
+state: redeemed, then denied, then expired by `expires_at`, then approved, then
+pending. That order is the order of what already happened — an approval nobody
+collected in time reads as expired, so a device code left behind in a CI log is
+worth nothing an hour later. `issued_token_id` says which token it produced, and
+the poll that collects it claims the row in the same transaction: a device code
+works once.
+
+```sql
 create table identity_metadata (
     id          uuid        not null primary key,
     identity_id uuid        not null references identity (id),
@@ -705,6 +738,11 @@ installation into deletion — that is what keeps a restore able to bring the
 whole picture back — but it cannot name one that is gone for good either, so the
 purge sets `machine_id` and `installation_id` to null and the page becomes a
 page of the instance.
+
+**A device login is purged a day after it expired**, whatever became of it:
+approved, refused or never answered, it is worth nothing ten minutes after it
+was made, and the day's grace is so that somebody who ran `ha login` and walked
+away still reads why it failed.
 
 **The history is not purged, and neither are the assigned keys.** That is what
 VISION 7 asks for twice over: the history of a deleted machine still says that

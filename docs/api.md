@@ -26,8 +26,9 @@ written out, prefix and all, because that is what an instance answers.
 - **A closed request object refuses a field it does not define** —
   `unknown-field`, rather than silently ignoring what somebody meant.
 - **Authentication is a bearer token or the browser's session cookie.** The
-  server tells a user token from an agent token; nothing else does. Only
-  `GET /api/version` is outside the door.
+  server tells a user token from an agent token; nothing else does. Three
+  endpoints are outside the door: `GET /api/version`, and the two halves of the
+  device login, which exist to turn no credential into one.
 
 ## Errors
 
@@ -60,6 +61,9 @@ to message on `validation`.
 | `idempotency-mismatch` | 409 | the key was used for a different request |
 | `email-exists` | 409 | the address already belongs to a user |
 | `last-administrator` | 409 | this would leave the instance with none |
+| `device-pending` | 400 | nobody has approved that device login yet; keep polling |
+| `device-denied` | 400 | a user refused that device login |
+| `device-expired` | 400 | nobody approved it in time, or its token was already collected |
 | `secret-expired` | 410 | a one-time link, spent or expired |
 | `stale` | 412 | `If-Match` did not match; `current` carries the object |
 | `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many) |
@@ -216,6 +220,48 @@ and the message says why.
 | `POST /api/session/bootstrap` | exchange the bootstrap token for a session, once |
 | `DELETE /api/session` | sign out |
 | `GET /api/sessions`, `DELETE /api/sessions/{id}` | your browser sessions, and ending one |
+
+### The device login
+
+How `ha login` signs a person in on a machine with no browser
+([ADR 0005](./adr/0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)):
+an SSH session on a rented box, a CI job, a container, an agent's sandbox.
+
+| | |
+|---|---|
+| `POST /api/device/logins` | begin one; no token. A device code for the client, a user code for the person |
+| `POST /api/device/tokens` | poll; no token. The user token once somebody approved, a code that says why not until then |
+| `GET /api/device/logins/{code}` | what is waiting behind a code, for the screen about to approve it |
+| `POST /api/device/approvals`, `/api/device/refusals` | a signed-in user approves one, or says they did not start it |
+
+1. `POST /api/device/logins` answers a **device code** the client keeps and a
+   **user code** it prints, with `verification_uri`, `expires_in_seconds` and
+   `interval_seconds`. The user code is eight consonants as `XXXX-XXXX`: no
+   vowel, so it is never a word, and no digit, so none of `0/O`, `1/I`, `5/S`
+   or `2/Z` has a second half to be confused with. The credential is the device
+   code and it is 256 bits; the row keeps its hash and never the code.
+
+   **`verification_uri` and `verification_uri_complete` are relative to the
+   instance** — `/device` and `/device?code=XXXX-XXXX`. A client resolves them
+   against the address it just called, which it has; the instance does not,
+   because it stands behind a proxy and would have to be told its own public
+   name to build one. A client that prints one to a person joins the two halves
+   first: a path with no host is not something anybody can open.
+
+2. A user opens `/device` in a browser on any machine, types the code and
+   approves. That is a write under the browser's session, so the token the
+   waiting machine collects is that user's own — and an agent is `forbidden`
+   there, because an agent administers no identities (planaffe ADR 0015).
+
+3. `POST /api/device/tokens` answers the token once somebody has approved.
+   Until then it refuses, and **which refusal it is, is the whole protocol**:
+   `device-pending` means keep polling; `device-denied`, `device-expired` and
+   `not-found` mean stop.
+
+A device code hands over one token and never a second: the poll that collects it
+claims the row in the same transaction, so one left behind in a CI log is worth
+nothing to whoever finds it. A login lives ten minutes, and an approval nobody
+collected in time is expired rather than approved.
 
 ### Users, agents and tokens
 

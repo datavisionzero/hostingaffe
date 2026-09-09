@@ -27,7 +27,9 @@ public static class Problems
 
     public static int StatusOf(RefusalCode code) => code switch
     {
-        RefusalCode.Validation or RefusalCode.UnknownField or RefusalCode.CursorInvalid => StatusCodes.Status400BadRequest,
+        RefusalCode.Validation or RefusalCode.UnknownField or RefusalCode.CursorInvalid
+            or RefusalCode.DevicePending or RefusalCode.DeviceDenied or RefusalCode.DeviceExpired =>
+            StatusCodes.Status400BadRequest,
         RefusalCode.Unauthenticated => StatusCodes.Status401Unauthorized,
         RefusalCode.Csrf or RefusalCode.Forbidden => StatusCodes.Status403Forbidden,
         RefusalCode.NotFound or RefusalCode.Deleted => StatusCodes.Status404NotFound,
@@ -56,6 +58,9 @@ public static class Problems
         RefusalCode.SmtpNotConfigured => "Transactional email is not configured",
         RefusalCode.EmailExists => "That email address already belongs to a user",
         RefusalCode.SecretExpired => "The one-time link is expired or has already been used",
+        RefusalCode.DevicePending => "Nobody has approved this login yet",
+        RefusalCode.DeviceDenied => "A user refused this login",
+        RefusalCode.DeviceExpired => "This login is no longer waiting to be approved",
         RefusalCode.LastAdministrator => "The instance must keep one active administrator",
         RefusalCode.Internal => "Something went wrong on the server",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "A refusal code without a title."),

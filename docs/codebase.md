@@ -32,9 +32,9 @@ Api ──────► Application ──────► Domain
 ```
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
-browser session, one-time secret), `Machines`, `Installations` (with the port
-and its two closed sets), `Files` (with the one list of refused paths),
-`Deployments` (with `Derived`, which says what "latest" means), `Pages`,
+browser session, one-time secret, device login), `Machines`, `Installations`
+(with the port and its two closed sets), `Files` (with the one list of refused
+paths), `Deployments` (with `Derived`, which says what "latest" means), `Pages`,
 `History`, and at the root what belongs to more than one of them — `Key`, the
 handle an operator chooses; `AssignedKey`, the register that makes a key never
 reusable; `Status`, the lifecycle a machine and an installation share; `Anchor`,
@@ -60,9 +60,9 @@ what it does — `CreatePage`, `CreateUser`, `AuthenticateToken` — plus the
 shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
 `IMachines`, `ISoftware`, `IInstallations`, `IFiles`, `IDeployments`, `IKeys`,
-`IPages`, `IIdentities`, `ITokens`, `IHistory`, `ITransactions`,
-`IIdempotency`, `IEmailSender`, and the settings records read from the
-environment.
+`IPages`, `IIdentities`, `ITokens`, `IDeviceLogins`, `IHistory`,
+`ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
+from the environment.
 
 **Infrastructure** implements them. `Persistence/` is EF Core: the
 `HostingaffeDbContext`, one `IEntityTypeConfiguration` per table under
@@ -93,7 +93,8 @@ generated from `docs/api/openapi.json` (planaffe ADR 0003, 0005).
 cmd/ha              the binary
 internal/cmd        the command tree, one file per object
 internal/client     the HTTP client, idempotency keys, version skew
-internal/config     the two environment variables
+internal/config     which instance, and as whom: the two ladders (ADR 0005)
+internal/keychain   where a person's session lives, and nowhere else quietly
 internal/exit       the exit codes
 internal/problem    the problem document as `ha` reads it
 internal/render     how it prints for a person
@@ -113,7 +114,7 @@ ADRs 0004, 0007, 0017). Its API layer is generated from the same
 src/shell       the frame: sidebar, palette, shortcuts, routing
 src/record      the machines, the software, the installations and the files
 src/pages       the wiki
-src/session     sign-in, activation, recovery
+src/session     sign-in, activation, recovery, and approving a `ha login`
 src/settings    personal settings and instance administration
 src/shared      Markdown, dialogs, the editor, loading, test helpers
 src/components  the owned UI primitives

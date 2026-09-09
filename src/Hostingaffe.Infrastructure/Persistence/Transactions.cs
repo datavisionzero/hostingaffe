@@ -159,6 +159,18 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
             """,
             [settings.DeletionGrace, Batch], cancellationToken);
 
+        // A device login is worth nothing ten minutes after it was made, whether
+        // it was approved, refused or never answered. A day's grace, so that a
+        // person who ran `ha login` and walked away still reads why it failed.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from device_login where id in (
+                select id from device_login
+                 where expires_at <= now() - interval '24 hours'
+                 limit {0})
+            """,
+            [Batch], cancellationToken);
+
         await context.Database.ExecuteSqlRawAsync(
             """
             delete from idempotency where (identity_id, key) in (

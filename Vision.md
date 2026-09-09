@@ -216,11 +216,29 @@ exception:
 - **Errors go to stderr, data to stdout.** Always.
 - **Speaking exit codes.** Not found, refused, conflict, stale revision and
   unreachable are different numbers, so an agent can tell whether to retry.
-- **Configuration through environment variables** (`HOSTINGAFFE_URL`,
-  `HOSTINGAFFE_TOKEN`), nothing else. There is no per-repository project file,
+- **An agent is configured by two environment variables** (`HOSTINGAFFE_URL`,
+  `HOSTINGAFFE_TOKEN`) and nothing else, because that is how a harness hands a
+  token to the thing it started. There is no per-repository project file,
   because there are no projects (9.).
+- **A person signs in with `ha login`** and never puts a token in a shell
+  profile. `ha` prints a short code, a person approves it in a browser on
+  whatever machine has one, and the user token that comes back goes into the
+  operating system's keychain — the only sign-in that works over SSH, in CI, in
+  a container and in an agent's sandbox, where there is no browser on the
+  machine doing the asking. Which instance and which token a command runs with
+  are two ladders, and `ha status` prints both with the rung each came from:
+  the instance is `--url`, then `HOSTINGAFFE_URL`, then the one this machine
+  signed in to; the token is `HOSTINGAFFE_TOKEN`, then a token file chosen out
+  loud, then the keychain. Where there is no keychain, `ha` says so and names
+  the two ways on rather than quietly writing a credential to disk
+  ([ADR 0005](docs/adr/0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)).
+- **A token never travels over plain HTTP off loopback.** `https://` always,
+  `http://` to localhost for a development instance, and anything else refused
+  before the request goes out unless somebody said `--insecure-http`
+  ([ADR 0006](docs/adr/0006-a-token-never-travels-over-plain-http-off-loopback.md)).
 - **Never interactive when stdin is not a terminal.** No editor, no prompt, no
-  pager. Markdown and files arrive on stdin or from a path.
+  pager. Markdown and files arrive on stdin or from a path. `ha login` waits
+  for an approval that happens elsewhere; it reads nothing.
 - **Bulk writes in one call.** `ha machine add --file batch.json` creates a
   machine with its installations, software entries, files and first
   deployments in one transaction, because documenting a host is one act, not
@@ -276,6 +294,9 @@ already know it. Its screens:
   a file is guarded by a version so that two writers do not overwrite each
   other silently.
 - Administration: users, agents and their tokens, personal settings.
+- **Approving a `ha login`**: the one screen opened from a terminal rather than
+  from the navigation. A person types the code `ha` printed and approves, and
+  the machine at the other end collects a token of theirs (6.1).
 
 There is no dashboard, no diagram, no chart.
 
@@ -609,7 +630,12 @@ The identity model is planaffe's, minus the project dimension:
   read-only token would not change that — it still reads everything. A token
   scoped to one machine is the roadmap answer (17.).
 - Sign-in, browser sessions, invitation and password recovery are what planaffe
-  has, built the same way. A user is invited by e-mail rather than created with
+  has, built the same way. What is this product's own is the **device login**:
+  `ha login` prints a code, a user approves it at `/device` in a browser, and
+  the machine that asked collects an ordinary user token — revocable in
+  `ha token list` and in the browser like any other (ADR 0005). A person's
+  token then lives in that machine's keychain and not in a file; an agent's
+  still arrives in `HOSTINGAFFE_TOKEN` and nowhere else. A user is invited by e-mail rather than created with
   a password somebody has to hand over, so no password ever travels through a
   third person.
 - **Transactional e-mail is an optional instance capability** (planaffe

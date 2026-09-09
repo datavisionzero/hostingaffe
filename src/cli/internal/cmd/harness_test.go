@@ -5,8 +5,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/keychain"
 )
 
 // fake is an instance as far as a command test needs one: it records what it
@@ -58,15 +61,65 @@ func run(t *testing.T, server *httptest.Server, args ...string) (code int, stdou
 	t.Helper()
 	var out, errOut bytes.Buffer
 	code = Run(context.Background(), args, Env{
-		Getenv: func(k string) string {
-			return map[string]string{"HOSTINGAFFE_URL": server.URL, "HOSTINGAFFE_TOKEN": "ha_test-token-of-thirty-two-characters-or-more"}[k]
-		},
-		Stdin:  strings.NewReader(""),
-		Stdout: &out,
-		Stderr: &errOut,
-		HTTP:   server.Client(),
+		Getenv: environment(t, map[string]string{
+			"HOSTINGAFFE_URL":   server.URL,
+			"HOSTINGAFFE_TOKEN": "ha_test-token-of-thirty-two-characters-or-more",
+		}),
+		Stdin:    strings.NewReader(""),
+		Stdout:   &out,
+		Stderr:   &errOut,
+		HTTP:     server.Client(),
+		Keychain: &memory{},
 	})
 	return code, out.String(), errOut.String()
+}
+
+// environment is what a test's ha runs in: the values the test names, plus a
+// configuration of its own, so that nothing reaches around into the
+// configuration of whoever is running the tests.
+func environment(t *testing.T, values map[string]string) func(string) string {
+	t.Helper()
+	full := map[string]string{"HOSTINGAFFE_CONFIG": filepath.Join(t.TempDir(), "config.json")}
+	for key, value := range values {
+		full[key] = value
+	}
+	return func(key string) string { return full[key] }
+}
+
+// memory is a keychain that is one map, so that a test never touches the
+// machine's own store and CI needs no Secret Service (ADR 0005).
+type memory struct {
+	entries map[string]string
+	broken  bool
+}
+
+func (m *memory) Store(instance, token string) error {
+	if m.broken {
+		return keychain.ErrUnavailable
+	}
+	if m.entries == nil {
+		m.entries = map[string]string{}
+	}
+	m.entries[instance] = token
+	return nil
+}
+
+func (m *memory) Read(instance string) (string, error) {
+	if m.broken {
+		return "", keychain.ErrUnavailable
+	}
+	if token, held := m.entries[instance]; held {
+		return token, nil
+	}
+	return "", keychain.ErrNotFound
+}
+
+func (m *memory) Forget(instance string) error {
+	if m.broken {
+		return keychain.ErrUnavailable
+	}
+	delete(m.entries, instance)
+	return nil
 }
 
 // An argument mistake is exit 2 wherever it happens, like a flag mistake:

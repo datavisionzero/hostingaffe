@@ -25,10 +25,11 @@ truth: the machines, what is installed on them, which versions run, which files
 each installation runs with, and the runbooks and decisions that go with them.
 
 `ha` needs `HOSTINGAFFE_URL` and `HOSTINGAFFE_TOKEN` in the environment and
-nothing else — no configuration file, nothing to log into. It is never
-interactive, writes data to stdout and errors to stderr, and `--json` prints the
-object as the API answered it. Exit codes say what happened: 2 usage, 3 not
-found, 4 refused, 5 conflict, 6 stale, 7 denied, 10 unreachable.
+nothing else. That token is yours, handed in by whatever started you; there is
+nothing to log into and nothing to store. It is never interactive, writes data
+to stdout and errors to stderr, and `--json` prints the object as the API
+answered it. Exit codes say what happened: 2 usage, 3 not found, 4 refused,
+5 conflict, 6 stale, 7 denied, 10 unreachable.
 
 ### Before touching a host
 

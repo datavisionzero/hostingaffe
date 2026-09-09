@@ -34,6 +34,8 @@ material value to understanding the decision.
 - [0002 – The API lives under /api](./0002-the-api-lives-under-api.md)
 - [0003 – A page's slug is one segment, not a path](./0003-a-pages-slug-is-one-segment-not-a-path.md)
 - [0004 – A write's note is a query parameter, not a field](./0004-a-writes-note-is-a-query-parameter-not-a-field.md)
+- [0005 – `ha login` is the device-code flow, and the session lives in the keychain](./0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)
+- [0006 – A token never travels over plain HTTP off loopback](./0006-a-token-never-travels-over-plain-http-off-loopback.md)
 
 ## Adopted from planaffe
 

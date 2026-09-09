@@ -287,6 +287,78 @@
         }
       }
     },
+    "/api/device/logins": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Begin a login: a short code for the person, a long one for the client.",
+        "operationId": "BeginDeviceLogin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BegunDeviceLogin"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/device/tokens": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Poll: the user token once somebody has approved, a code that says why not until then.",
+        "operationId": "RedeemDeviceLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemDeviceLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemedDeviceLogin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -1314,6 +1386,209 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/device/logins/{code}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "What is waiting behind a code, for the screen that is about to approve it.",
+        "operationId": "ReadDeviceLogin",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitingDeviceLogin"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/device/approvals": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Approve a waiting login: the machine that began it collects the caller's own token.",
+        "operationId": "ApproveDeviceLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceLoginDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitingDeviceLogin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/device/refusals": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Refuse a waiting login: nobody at this terminal started it.",
+        "operationId": "DenyDeviceLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceLoginDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitingDeviceLogin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -5037,6 +5312,39 @@
         ],
         "type": "string"
       },
+      "BegunDeviceLogin": {
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri",
+          "verification_uri_complete",
+          "expires_in_seconds",
+          "interval_seconds"
+        ],
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string"
+          },
+          "user_code": {
+            "type": "string"
+          },
+          "verification_uri": {
+            "type": "string"
+          },
+          "verification_uri_complete": {
+            "type": "string"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "BootstrapExchangeRequest": {
         "required": [
           "token",
@@ -6048,6 +6356,30 @@
             "format": "date-time"
           }
         }
+      },
+      "DeviceLoginDecisionRequest": {
+        "required": [
+          "user_code"
+        ],
+        "type": "object",
+        "properties": {
+          "user_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DeviceLoginState": {
+        "enum": [
+          "pending",
+          "approved",
+          "denied",
+          "expired",
+          "redeemed"
+        ],
+        "type": "string"
       },
       "EmailChangeRequest": {
         "required": [
@@ -7550,6 +7882,35 @@
           }
         }
       },
+      "RedeemDeviceLoginRequest": {
+        "required": [
+          "device_code"
+        ],
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RedeemedDeviceLogin": {
+        "required": [
+          "user",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "token": {
+            "$ref": "#/components/schemas/IssuedToken"
+          }
+        }
+      },
       "RenameAgentRequest": {
         "required": [
           "name"
@@ -7826,11 +8187,16 @@
       },
       "TokenRef": {
         "required": [
+          "id",
           "prefix",
           "created_at"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "prefix": {
             "type": "string"
           },
@@ -7922,6 +8288,31 @@
         "properties": {
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "WaitingDeviceLogin": {
+        "required": [
+          "user_code",
+          "requested_at",
+          "expires_at",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "user_code": {
+            "type": "string"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/DeviceLoginState"
           }
         }
       },

@@ -178,6 +178,14 @@ reads everything and writes what it is told to: one instance holds one team's
 infrastructure, and there is no role beyond the administrator who manages
 users, agents and tokens.
 
+A **device login** is one `ha login` in flight: the machine with no browser
+holds a **device code** and polls with it, and the person reads out a **user
+code** and approves it in a browser somewhere else
+([ADR 0005](docs/adr/0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)).
+It is not a third kind of identity and produces no new kind of key: what it
+hands over is the approving user's own token. "Session" stays the browser's —
+the cookie a person signs in with — and is never what `ha` holds.
+
 ## Retired, and deleted
 
 **Retired** is the normal end of a machine or an installation. A retired thing

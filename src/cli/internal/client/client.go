@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/api"
-	"github.com/datavisionzero/hostingaffe/src/cli/internal/config"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/exit"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/problem"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/version"
@@ -50,12 +49,16 @@ type Client struct {
 	writes int
 }
 
-// New builds the client for cfg. The idempotency key is one per invocation,
+// New builds the client for one instance. An empty token is the two anonymous
+// endpoints of the device login (ADR 0005) and nothing else: no header is sent
+// rather than an empty one, which would be a token the instance has to refuse.
+//
+// The idempotency key is one per invocation,
 // numbered per write: a command that writes several times sends `<key>-1`,
 // `<key>-2`, …, so that no two of its requests share a key and a retry of the
 // whole command replays every one of them in order. Two invocations never
 // share a key.
-func New(cfg config.Config, httpClient *http.Client) (*Client, error) {
+func New(address, token string, httpClient *http.Client) (*Client, error) {
 	key := make([]byte, 16)
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
@@ -63,7 +66,7 @@ func New(cfg config.Config, httpClient *http.Client) (*Client, error) {
 
 	c := &Client{key: hex.EncodeToString(key)}
 	generated, err := api.NewClientWithResponses(
-		cfg.URL,
+		address,
 		api.WithHTTPClient(httpClient),
 		api.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			// A file's path is the last thing in its address and has slashes
@@ -76,7 +79,9 @@ func New(cfg config.Config, httpClient *http.Client) (*Client, error) {
 			// segment, so it is done once here rather than at each of the file
 			// calls (docs/api.md, Files).
 			req.URL.RawPath = ""
-			req.Header.Set("Authorization", "Bearer "+cfg.Token)
+			if token != "" {
+				req.Header.Set("Authorization", "Bearer "+token)
+			}
 			req.Header.Set("User-Agent", UserAgent())
 			if req.Method != http.MethodGet && req.Method != http.MethodHead {
 				c.writes++

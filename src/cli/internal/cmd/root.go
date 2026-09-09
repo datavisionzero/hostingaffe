@@ -17,6 +17,7 @@ import (
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/client"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/config"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/exit"
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/keychain"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/version"
 )
 
@@ -28,6 +29,18 @@ type Env struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	HTTP   *http.Client
+	// Keychain is the operating system's own store, reached through three
+	// functions so that a test never touches the machine's (ADR 0005). Absent,
+	// it is the machine's own.
+	Keychain Keychain
+}
+
+// Keychain is where `ha login` leaves a session and where `ha logout` takes it
+// from: one entry per instance, keyed by the address.
+type Keychain interface {
+	Store(instance, token string) error
+	Read(instance string) (string, error)
+	Forget(instance string) error
 }
 
 // Run executes args and returns the exit code. Nothing here is ever
@@ -75,8 +88,15 @@ func report(stderr io.Writer, err error) int {
 }
 
 type globals struct {
-	env  Env
+	env Env
+	// json prints the object as the API answered it.
 	json bool
+	// address is --url: the first rung of the ladder that answers which
+	// instance this is (ADR 0005).
+	address string
+	// insecureHTTP is --insecure-http: a token over plain HTTP to a host that
+	// is not loopback, said out loud (ADR 0006).
+	insecureHTTP bool
 }
 
 func newRoot(env Env) *cobra.Command {
@@ -89,6 +109,10 @@ func newRoot(env Env) *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().BoolVar(&g.json, "json", false, "print the object as the API answered it")
+	root.PersistentFlags().StringVar(&g.address, "url", "",
+		"the instance, scheme and host; before "+config.EnvURL+" and before the one this machine signed in to")
+	root.PersistentFlags().BoolVar(&g.insecureHTTP, "insecure-http", false,
+		"allow plain HTTP to a host that is not loopback; a token then travels in the clear")
 	root.SetVersionTemplate("ha {{.Version}}\n")
 
 	// `--inst` is `--installation` wherever the flag exists. The object keeps
@@ -115,6 +139,7 @@ func newRoot(env Env) *cobra.Command {
 	root.AddCommand(newPage(g))
 	root.AddCommand(newSearch(g))
 	root.AddCommand(newExport(g))
+	root.AddCommand(newLogin(g), newLogout(g), newStatus(g))
 	root.AddCommand(identityCommands(g)...)
 
 	usageMistakes(root)
@@ -161,23 +186,108 @@ func usageMistakes(cmd *cobra.Command) {
 	}
 }
 
-// load is what every command that talks to the instance starts with.
-func (g *globals) load() (config.Config, *client.Client, error) {
-	getenv := g.env.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-
-	cfg, err := config.Load(getenv)
+// input is everything the ladders read, gathered in one place: the
+// environment, the flags and what is on disk (ADR 0005).
+func (g *globals) input() (config.Input, error) {
+	file, err := g.readConfig()
 	if err != nil {
-		return cfg, nil, err
+		return config.Input{}, err
 	}
 
-	httpClient := g.env.HTTP
-	if httpClient == nil {
-		httpClient = client.Default()
+	return config.Input{
+		Getenv:         g.getenv,
+		File:           file,
+		Address:        g.address,
+		AllowPlainHTTP: g.insecureHTTP,
+		ReadKeychain:   g.keychain().Read,
+	}, nil
+}
+
+// load is what every command that talks to the instance as somebody starts
+// with: which instance, as whom, and a client that carries the answer.
+func (g *globals) load() (config.Resolved, *client.Client, error) {
+	in, err := g.input()
+	if err != nil {
+		return config.Resolved{}, nil, err
 	}
 
-	c, err := client.New(cfg, httpClient)
-	return cfg, c, err
+	resolved, err := config.Resolve(in)
+	if err != nil {
+		return resolved, nil, err
+	}
+
+	c, err := client.New(resolved.Address, resolved.Token, g.httpClient())
+	return resolved, c, err
+}
+
+// anonymous is the instance without a token: the two endpoints of the device
+// login that exist to turn no credential into one.
+func (g *globals) anonymous() (string, *client.Client, error) {
+	in, err := g.input()
+	if err != nil {
+		return "", nil, err
+	}
+
+	address, err := in.ResolveAddress()
+	if err != nil {
+		return "", nil, err
+	}
+
+	c, err := client.New(address, "", g.httpClient())
+	return address, c, err
+}
+
+func (g *globals) getenv(name string) string {
+	if g.env.Getenv == nil {
+		return os.Getenv(name)
+	}
+	return g.env.Getenv(name)
+}
+
+func (g *globals) httpClient() *http.Client {
+	if g.env.HTTP == nil {
+		return client.Default()
+	}
+	return g.env.HTTP
+}
+
+func (g *globals) keychain() Keychain {
+	if g.env.Keychain == nil {
+		return keychain.System{}
+	}
+	return g.env.Keychain
+}
+
+func (g *globals) configPath() (string, error) { return config.Path(g.getenv) }
+
+func (g *globals) readConfig() (config.File, error) {
+	path, err := g.configPath()
+	if err != nil {
+		return config.File{}, err
+	}
+	return config.Load(path)
+}
+
+func (g *globals) writeConfig(file config.File) error {
+	path, err := g.configPath()
+	if err != nil {
+		return err
+	}
+	return config.Save(path, file)
+}
+
+// msg is where a sentence for a person goes: stderr, so that stdout stays the
+// data a pipeline reads (docs/cli.md).
+func (g *globals) msg() io.Writer {
+	if g.env.Stderr == nil {
+		return os.Stderr
+	}
+	return g.env.Stderr
+}
+
+func (g *globals) out() io.Writer {
+	if g.env.Stdout == nil {
+		return os.Stdout
+	}
+	return g.env.Stdout
 }

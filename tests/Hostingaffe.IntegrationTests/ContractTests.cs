@@ -42,6 +42,8 @@ public sealed class ContractTests(PostgresFixture postgres)
             [
                 "/api/admin/smtp", "/api/admin/smtp/test",
                 "/api/agents", "/api/agents/{id}",
+                "/api/device/approvals", "/api/device/logins", "/api/device/logins/{code}",
+                "/api/device/refusals", "/api/device/tokens",
                 "/api/email-changes/confirm",
                 "/api/import",
                 "/api/installations", "/api/installations/{key}",
@@ -76,6 +78,9 @@ public sealed class ContractTests(PostgresFixture postgres)
         var schemas = document["components"]!["schemas"]!.AsObject().Select(schema => schema.Key).ToHashSet();
         Assert.Contains("IdentityRef", schemas);
         Assert.Contains("Me", schemas);
+        Assert.Contains("BegunDeviceLogin", schemas);
+        Assert.Contains("WaitingDeviceLogin", schemas);
+        Assert.Contains("RedeemedDeviceLogin", schemas);
         Assert.Contains("Machine", schemas);
         Assert.Contains("MachineSummary", schemas);
         Assert.Contains("MachineContext", schemas);

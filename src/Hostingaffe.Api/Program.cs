@@ -120,6 +120,13 @@ builder.Services.AddScoped<CompletePasswordRecovery>();
 builder.Services.AddScoped<ListBrowserSessions>();
 builder.Services.AddScoped<ChangePassword>();
 
+// How a person signs `ha` in on a machine with no browser (ADR 0005). Two of
+// the four are anonymous: the flow turns no credential into one.
+builder.Services.AddScoped<BeginDeviceLogin>();
+builder.Services.AddScoped<ReadDeviceLogin>();
+builder.Services.AddScoped<DecideDeviceLogin>();
+builder.Services.AddScoped<RedeemDeviceLogin>();
+
 // The dial of the instance, read once from the environment; a value that is
 // not a positive number stops the start here, where the message names it.
 builder.Services.AddSingleton(InstanceSettings.FromVariables(
@@ -262,6 +269,7 @@ app.MapOpenApi($"{Routes.Api}/openapi/{{documentName}}.json");
 api.MapInstance();
 api.MapIdentities();
 api.MapBrowserIdentity();
+api.MapDeviceLogin();
 api.MapMachines();
 api.MapSoftware();
 api.MapInstallations();

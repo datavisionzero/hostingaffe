@@ -3,6 +3,7 @@ using System;
 using Hostingaffe.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace Hostingaffe.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(HostingaffeDbContext))]
-    partial class HostingaffeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909091527_TheDeviceLogin")]
+    partial class TheDeviceLogin
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
