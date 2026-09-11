@@ -18,7 +18,7 @@ const installation = {
   ports: [{ port: 18502, protocol: "tcp", scope: "private" }],
   path: "/opt/compose/logaffe",
   data: "/srv/services/logaffe",
-  secrets: ["logaffe/postgres-password"],
+  secrets: [{ name: "logaffe/postgres-password", path: "/opt/compose/logaffe/.env.runtime" }],
   backup: "active",
   monitoring: "external",
   logging: "central",
@@ -83,13 +83,14 @@ describe("an installation (VISION 6.2)", () => {
     expect(screen.getByText("/srv/services/logaffe")).toBeInTheDocument();
   });
 
-  it("shows the ports and the names of the secrets", async () => {
+  it("shows the ports, and every secret beside the file it lies in", async () => {
     view();
 
     expect(await screen.findByText("18502/tcp private")).toBeInTheDocument();
-    // The name of the secret, never the secret: this instance records where one
-    // lives, and vaultaffe holds it (VISION 11).
+    // The name of the secret and where it lies, never the secret: this instance
+    // records the place, and vaultaffe holds the value (VISION 11, ADR 0011).
     expect(screen.getByText("logaffe/postgres-password")).toBeInTheDocument();
+    expect(screen.getByText("/opt/compose/logaffe/.env.runtime")).toBeInTheDocument();
   });
 
   // The version on an installation is the newest deployment's, so the newest

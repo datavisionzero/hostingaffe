@@ -105,14 +105,20 @@ export function InstallationView() {
                   ))}
                 </span>
               )],
-              // The names of the secrets, never the secrets: this instance holds
-              // where a secret lives, and vaultaffe holds the secret (VISION 11).
+              // The name of each secret and the file it lies in, never the
+              // secret itself: this instance records where one lives, and
+              // vaultaffe holds it (VISION 11, ADR 0011).
               ["Secrets", installation.secrets.length === 0 ? null : (
-                <span className="flex flex-wrap gap-1">
+                <ul className="grid gap-0.5">
                   {installation.secrets.map((secret) => (
-                    <Badge key={secret} variant="outline"><code className="font-mono">{secret}</code></Badge>
+                    <li key={secret.name} className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline"><code className="font-mono">{secret.name}</code></Badge>
+                      {secret.path === null ? null : (
+                        <code className="font-mono text-xs text-muted-foreground">{secret.path}</code>
+                      )}
+                    </li>
                   ))}
-                </span>
+                </ul>
               )],
             ]}
           />

@@ -77,7 +77,7 @@ public sealed record ImportInstallation(
     IReadOnlyList<PortShape>? Ports,
     string? Path,
     string? Data,
-    IReadOnlyList<string>? Secrets,
+    IReadOnlyList<SecretShape>? Secrets,
     string? Backup,
     string? Monitoring,
     string? Logging,

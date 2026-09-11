@@ -28,6 +28,13 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// well. That is what makes VISION 5's own example answer.
 /// </para>
 /// <para>
+/// <strong>A secret is one hit, and not one per secret.</strong> Its name and
+/// the file it lies in are a vector on its own row, and an installation whose
+/// own fields already answered is not listed a second time for them: somebody
+/// asked where something was, and the same installation twice is not two
+/// answers.
+/// </para>
+/// <para>
 /// <strong>A file is searched at the revision it is at.</strong> What an older
 /// revision said stopped being true when the next one was written, and a search
 /// that answered with it would send somebody to a line that is not there.
@@ -61,6 +68,14 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
             from installation i
             join installation_port p on p.installation_id = i.id
             where i.deleted_at is null and @port is not null and p.port = @port
+
+            union all
+            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, 'secrets'
+            from installation i, q
+            where i.deleted_at is null
+              and not (i.search @@ q.words)
+              and exists (select 1 from installation_secret s
+                          where s.installation_id = i.id and s.search @@ q.words)
 
             union all
             select 4, 'deployment', i.key, d.version, d.number, 'installation'::text, i.key,

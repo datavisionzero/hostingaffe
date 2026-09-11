@@ -23,6 +23,9 @@ public static class Fields
     /// <summary>What the note beside a change fits in.</summary>
     public const int NoteMaxLength = 500;
 
+    /// <summary>What a path on a machine fits in, wherever one is stored.</summary>
+    public const int PathMaxLength = 500;
+
     /// <summary>
     /// The note a write carries into the history: why, said beside what
     /// changed (VISION 6.1). One line, trimmed, and nothing at all where there
@@ -200,6 +203,28 @@ public static class Fields
         value is null || value.Length > maxLength || value.Contains('\n')
             ? throw new ArgumentException($"{what} is one line of at most {maxLength} characters.")
             : value;
+
+    /// <summary>
+    /// A place on the machine: absolute, one line, and it does not climb. What
+    /// the place <em>is</em> stays the field's own business — the directory an
+    /// installation lives in, the directory its data lies in, the file a
+    /// secret's value lies in — and <paramref name="said"/> is how that field
+    /// says what it wanted.
+    /// </summary>
+    /// <exception cref="ArgumentException">It is not an absolute path, or it climbs.</exception>
+    public static string Absolute(string? path, string said)
+    {
+        // One trailing slash is what a person types and means nothing; the root
+        // is the one path that is a slash.
+        var trimmed = path?.Trim() ?? string.Empty;
+        Line(trimmed, PathMaxLength, "A path");
+
+        return !trimmed.StartsWith('/')
+            ? throw new ArgumentException(said)
+            : trimmed.Split('/').Any(segment => segment is "..")
+                ? throw new ArgumentException("A path does not climb; .. is not part of one.")
+                : trimmed.Length > 1 ? trimmed.TrimEnd('/') : trimmed;
+    }
 
     /// <summary>
     /// An absolute <c>http</c> or <c>https</c> address. Nothing else is a

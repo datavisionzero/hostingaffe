@@ -5498,7 +5498,7 @@
               "array"
             ],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Secret"
             }
           },
           "backup": {
@@ -5899,7 +5899,7 @@
               "array"
             ],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Secret"
             }
           },
           "backup": {
@@ -6796,7 +6796,7 @@
               "array"
             ],
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Secret"
             }
           },
           "backup": {
@@ -7266,7 +7266,7 @@
           "secrets": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Secret"
             }
           },
           "backup": {
@@ -8063,6 +8063,24 @@
           },
           "where": {
             "type": "string"
+          }
+        }
+      },
+      "Secret": {
+        "required": [
+          "name",
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

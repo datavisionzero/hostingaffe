@@ -28,7 +28,8 @@ const (
 	installationJSON = `{"key":"logaffe-prod","name":"Logaffe production","machine":"ex44","software":"logaffe",
 "environment":"production","role":"application","status":"active","urls":["https://logs.example.test"],
 "ports":[{"port":443,"protocol":"tcp","scope":"public"},{"port":5432,"protocol":"tcp","scope":"private"}],
-"path":"/opt/compose/logaffe","data":"/srv/services/logaffe","secrets":["LOGAFFE_DB_PASSWORD"],
+"path":"/opt/compose/logaffe","data":"/srv/services/logaffe",
+"secrets":[{"name":"LOGAFFE_DB_PASSWORD","path":"/opt/compose/logaffe/.env.runtime"},{"name":"SMTP_PASSWORD","path":null}],
 "backup":"active","monitoring":"external",
 "logging":"central","version":"1.4.0","description":"The one people look at.",` + identities + `}`
 
@@ -215,7 +216,8 @@ func TestPortsAreWrittenAsPeopleWriteThem(t *testing.T) {
 
 	code, _, stderr := run(t, server, "inst", "set", "logaffe-prod",
 		"--port", "443/tcp:public", "--port", "5432/tcp:private",
-		"--url", "https://logs.example.test", "--secret", "LOGAFFE_DB_PASSWORD")
+		"--url", "https://logs.example.test",
+		"--secret", "LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime", "--secret", "SMTP_PASSWORD")
 	if code != exit.OK || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
@@ -233,8 +235,11 @@ func TestPortsAreWrittenAsPeopleWriteThem(t *testing.T) {
 	if string(urls) != `["https://logs.example.test"]` {
 		t.Errorf("urls = %s", urls)
 	}
+	// A secret is written the way it is read: the name, and the file its value
+	// lies in where somebody has said which one.
 	secrets, _ := json.Marshal(body["secrets"])
-	if string(secrets) != `["LOGAFFE_DB_PASSWORD"]` {
+	want = `[{"name":"LOGAFFE_DB_PASSWORD","path":"/opt/compose/logaffe/.env.runtime"},{"name":"SMTP_PASSWORD"}]`
+	if string(secrets) != want {
 		t.Errorf("secrets = %s", secrets)
 	}
 
@@ -398,6 +403,9 @@ func TestAnInstallationPrintsItsPortsAsPeopleReadThem(t *testing.T) {
 	}
 	if !strings.Contains(out, "ports: 443/tcp:public, 5432/tcp:private") {
 		t.Fatalf("ports read as a person writes them:\n%s", out)
+	}
+	if !strings.Contains(out, "secrets: LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime, SMTP_PASSWORD") {
+		t.Fatalf("a secret says where it lies, and never what it is:\n%s", out)
 	}
 	if !strings.Contains(out, "backup: active  monitoring: external  logging: central") {
 		t.Fatalf("the three decisions are on one line:\n%s", out)

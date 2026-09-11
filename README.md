@@ -44,12 +44,12 @@ one acted. The block to copy into your own repository's `AGENTS.md` is
 No discovery — no agent on the machine, no SSH scanning, no registry polling.
 The record is written, not observed. No deployment engine: hostingaffe writes
 an installation's files onto the machine when asked and records that a
-deployment happened; it does not run Compose or watch whether it worked, and it
-does not become Ansible. No monitoring, no metrics, no alerts. No secret
-*values* — an installation names the secrets it needs and where they live. No
-IPAM, no racks, no VLANs. No custom fields and no entity designer: one fixed
-set of entities, one fixed set of fields, which is what lets a human and an
-agent both understand it in five minutes. No multi-tenancy.
+deployment happened; it does not run Compose or watch whether it worked, and
+it does not become Ansible. No monitoring, no metrics, no alerts. No secret
+*values* — an installation names the secrets it needs and the file each one
+lies in. No IPAM, no racks, no VLANs. No custom fields and no entity designer:
+one fixed set of entities, one fixed set of fields, which is what lets a human
+and an agent both understand it in five minutes. No multi-tenancy.
 
 That list is the product decision rather than a roadmap of regrets. If you need
 things from it, NetBox and Ansible are the better tools and we would rather say

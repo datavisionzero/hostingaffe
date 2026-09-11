@@ -207,7 +207,7 @@ func installationMarkdown(installation installationRecord) string {
 		{"data", value(installation.Data)},
 		{"ports", render.Ports(installation.Ports)},
 		{"urls", strings.Join(installation.Urls, ", ")},
-		{"secrets", strings.Join(installation.Secrets, ", ")},
+		{"secrets", render.Secrets(installation.Secrets)},
 	})
 
 	body(&out, installation.Description)

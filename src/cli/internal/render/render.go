@@ -188,7 +188,7 @@ func Installation(w io.Writer, i api.Installation) {
 	line(w, maybe("path", i.Path), maybe("data", i.Data))
 	line(w, said("ports", Ports(i.Ports)))
 	line(w, said("urls", strings.Join(i.Urls, ", ")))
-	line(w, said("secrets", strings.Join(i.Secrets, ", ")))
+	line(w, said("secrets", Secrets(i.Secrets)))
 	touched(w, i.UpdatedAt, i.UpdatedBy, i.CreatedBy)
 	body(w, i.Description)
 }
@@ -209,6 +209,22 @@ func Ports(ports []api.Port) string {
 	spelled := make([]string, 0, len(ports))
 	for _, p := range ports {
 		spelled = append(spelled, fmt.Sprintf("%d/%s:%s", p.Port, p.Protocol, p.Scope))
+	}
+	return strings.Join(spelled, ", ")
+}
+
+// Secrets spells a list of secrets the way a person writes and reads one —
+// `POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime`, and the name alone
+// where nobody has said where it lies. The value is nowhere near it
+// (CONTEXT.md, Installation).
+func Secrets(secrets []api.Secret) string {
+	spelled := make([]string, 0, len(secrets))
+	for _, s := range secrets {
+		if s.Path != nil && *s.Path != "" {
+			spelled = append(spelled, fmt.Sprintf("%s@%s", s.Name, *s.Path))
+			continue
+		}
+		spelled = append(spelled, s.Name)
 	}
 	return strings.Join(spelled, ", ")
 }

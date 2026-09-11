@@ -130,7 +130,7 @@ func (i *installationFields) flags(cmd *cobra.Command) {
 	f.StringVar(&i.path, "path", "", "where it lives on the machine")
 	f.StringVar(&i.data, "data", "", "where its persistent data lies, and what a backup has to take")
 	f.StringArrayVar(&i.urls, "url", nil, "an address it is reachable at; repeat for more, `none` clears the list")
-	f.StringArrayVar(&i.secrets, "secret", nil, "the *name* of a secret it needs, never a value; repeat for more, `none` clears the list")
+	f.StringArrayVar(&i.secrets, "secret", nil, "a secret it needs as NAME@/the/file/it/lies/in, or the bare `name`; never a value, repeat for more, `none` clears the list")
 	f.StringArrayVar(&i.ports, "port", nil, "a port as 443/tcp:public; repeat for more, `none` clears the list")
 	f.StringVar(&i.description, "description", "", "what does not fit in a field, in Markdown")
 	f.StringVar(&i.descriptionFile, "description-file", "", "the description, from a file or `-` for stdin")
@@ -150,7 +150,7 @@ func (i *installationFields) body(cmd *cobra.Command) (*fields, error) {
 	if err := f.takeList("url", "urls", i.urls, asItIs); err != nil {
 		return nil, err
 	}
-	if err := f.takeList("secret", "secrets", i.secrets, asItIs); err != nil {
+	if err := f.takeList("secret", "secrets", i.secrets, aSecret); err != nil {
 		return nil, err
 	}
 	if err := f.takeList("port", "ports", i.ports, aPort); err != nil {

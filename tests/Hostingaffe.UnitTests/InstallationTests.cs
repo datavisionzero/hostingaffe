@@ -184,14 +184,90 @@ public sealed class InstallationTests
     [Theory]
     [InlineData("LOGAFFE_DB_PASSWORD")]
     [InlineData("acme/cloudflare-token")]
-    public void A_secret_is_named(string name) => Assert.Equal(name, Installation.NormalizeSecretName(name));
+    public void A_secret_is_named(string name) => Assert.Equal(name, Secret.Of(name, null).Name);
 
     [Theory]
     [InlineData("LOGAFFE_DB_PASSWORD=hunter2")]
     [InlineData("a secret")]
     [InlineData("")]
     public void A_secret_is_never_given(string name) =>
-        Assert.Throws<ArgumentException>(() => Installation.NormalizeSecretName(name));
+        Assert.Throws<ArgumentException>(() => Secret.Of(name, null));
+
+    [Fact]
+    public void A_secret_says_which_file_it_lies_in()
+    {
+        var secret = Secret.Of("LOGAFFE_DB_PASSWORD", "/opt/compose/logaffe/.env.runtime/");
+
+        Assert.Equal("/opt/compose/logaffe/.env.runtime", secret.Path);
+        Assert.Equal("LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime", secret.ToString());
+
+        // Nobody has decided where it goes yet, and that is a state the record
+        // has to be able to hold: the name alone is what it was before.
+        Assert.Null(Secret.Of("LOGAFFE_DB_PASSWORD", "  ").Path);
+        Assert.Equal("LOGAFFE_DB_PASSWORD", Secret.Of("LOGAFFE_DB_PASSWORD", null).ToString());
+
+        Assert.Throws<ArgumentException>(() => Secret.Of("LOGAFFE_DB_PASSWORD", "compose/logaffe/.env"));
+        Assert.Throws<ArgumentException>(() => Secret.Of("LOGAFFE_DB_PASSWORD", "/opt/../etc/shadow"));
+    }
+
+    [Fact]
+    public void A_secret_is_the_same_secret_by_its_name()
+    {
+        var installation = An();
+
+        var refusal = Assert.Throws<ArgumentException>(() => installation.Apply(
+            new InstallationEdit
+            {
+                Secrets =
+                [
+                    Secret.Of("LOGAFFE_DB_PASSWORD", "/opt/compose/logaffe/.env.runtime"),
+                    Secret.Of("LOGAFFE_DB_PASSWORD", "/srv/services/logaffe/.env"),
+                ],
+            },
+            Actor,
+            Now));
+
+        Assert.Equal("secrets", refusal.ParamName);
+    }
+
+    [Fact]
+    public void The_history_reads_a_secret_the_way_a_person_writes_one()
+    {
+        var installation = An();
+
+        var change = installation.Apply(
+            new InstallationEdit
+            {
+                Secrets =
+                [
+                    Secret.Of("LOGAFFE_DB_PASSWORD", "/opt/compose/logaffe/.env.runtime"),
+                    Secret.Of("SMTP_PASSWORD", null),
+                ],
+            },
+            Actor,
+            Now).Single();
+
+        Assert.Equal("secrets", change.Field);
+        Assert.Null(change.OldValue);
+        Assert.Equal("LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime, SMTP_PASSWORD", change.NewValue);
+
+        // Moving one is a change to the list, because the list is what the
+        // field is: there is no address for an entry to patch.
+        var moved = installation.Apply(
+            new InstallationEdit
+            {
+                Secrets =
+                [
+                    Secret.Of("LOGAFFE_DB_PASSWORD", "/srv/services/logaffe/.env"),
+                    Secret.Of("SMTP_PASSWORD", null),
+                ],
+            },
+            Actor,
+            Now).Single();
+
+        Assert.Equal("LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime, SMTP_PASSWORD", moved.OldValue);
+        Assert.Equal("LOGAFFE_DB_PASSWORD@/srv/services/logaffe/.env, SMTP_PASSWORD", moved.NewValue);
+    }
 
     [Fact]
     public void A_url_in_the_list_is_a_url()

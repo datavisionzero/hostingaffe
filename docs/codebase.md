@@ -33,7 +33,8 @@ Api ──────► Application ──────► Domain
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
 browser session, one-time secret, device login), `Machines`, `Installations`
-(with the port and its two closed sets), `Files` (with the one list of refused
+(with the port and its two closed sets, and the secret and the file it lies
+in), `Files` (with the one list of refused
 paths), `Deployments` (with `Derived`, which says what "latest" means), `Pages`,
 `History`, and at the root what belongs to more than one of them — `Key`, the
 handle an operator chooses; `AssignedKey`, the register that makes a key never

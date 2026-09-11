@@ -202,7 +202,7 @@ public sealed class ReadMachineContext(
             Listed(document, "data", one.Data is { } data ? [data] : []);
             Listed(document, "ports", [.. one.Ports.Select(port => port.ToString())]);
             Listed(document, "urls", one.Urls);
-            Listed(document, "secrets", one.Secrets);
+            Listed(document, "secrets", [.. one.Secrets.Select(secret => secret.ToString())]);
             document.Append('\n');
 
             Description(document, one.Description);

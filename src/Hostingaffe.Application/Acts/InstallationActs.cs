@@ -33,6 +33,25 @@ public sealed record PortShape(int Port, Protocol Protocol, Scope Scope)
 }
 
 /// <summary>
+/// One secret an installation needs, as the contract carries it:
+/// <c>{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }</c>.
+/// </summary>
+/// <remarks>
+/// The name is a name and never a value (VISION 7); <c>path</c> is the file on
+/// the machine the value lies in, and is left out where nobody has decided yet.
+/// An object rather than the spelling <c>NAME@/path</c> for the reason a port is
+/// one: that spelling is what a person types and what a history row carries.
+/// </remarks>
+public sealed record SecretShape(string Name, string? Path)
+{
+    public static SecretShape Of(Secret secret)
+    {
+        ArgumentNullException.ThrowIfNull(secret);
+        return new SecretShape(secret.Name, secret.Path);
+    }
+}
+
+/// <summary>
 /// The slim installation every list returns: the two keys, the three closed
 /// sets that say what it is, and the three decisions — because "every
 /// production installation without a backup" is a column a person reads down
@@ -66,7 +85,7 @@ public sealed record InstallationShape(
     IReadOnlyList<PortShape> Ports,
     string? Path,
     string? Data,
-    IReadOnlyList<string> Secrets,
+    IReadOnlyList<SecretShape> Secrets,
     Backup Backup,
     Monitoring Monitoring,
     Logging Logging,
@@ -110,7 +129,7 @@ public sealed record CreateInstallationRequest(
     IReadOnlyList<PortShape>? Ports,
     string? Path,
     string? Data,
-    IReadOnlyList<string>? Secrets,
+    IReadOnlyList<SecretShape>? Secrets,
     Backup? Backup,
     Monitoring? Monitoring,
     Logging? Logging,
@@ -137,7 +156,7 @@ public sealed record ChangeInstallationRequest(
     IReadOnlyList<PortShape>? Ports,
     string? Path,
     string? Data,
-    IReadOnlyList<string>? Secrets,
+    IReadOnlyList<SecretShape>? Secrets,
     Backup? Backup,
     Monitoring? Monitoring,
     Logging? Logging,
@@ -214,7 +233,7 @@ public sealed class InstallationAssembler(
             [.. installation.Ports.Select(PortShape.Of)],
             installation.Path,
             installation.Data,
-            installation.Secrets,
+            [.. installation.Secrets.Select(SecretShape.Of)],
             installation.Backup,
             installation.Monitoring,
             installation.Logging,
@@ -584,7 +603,7 @@ internal static class InstallationWrites
             Ports = Ports(request.Ports),
             Path = request.Path,
             Data = request.Data,
-            Secrets = request.Secrets,
+            Secrets = Secrets(request.Secrets),
             Backup = request.Backup,
             Monitoring = request.Monitoring,
             Logging = request.Logging,
@@ -606,7 +625,7 @@ internal static class InstallationWrites
             Ports = Ports(changes.Ports),
             Path = changes.Path,
             Data = changes.Data,
-            Secrets = changes.Secrets,
+            Secrets = Secrets(changes.Secrets),
             Backup = changes.Backup,
             Monitoring = changes.Monitoring,
             Logging = changes.Logging,
@@ -635,4 +654,10 @@ internal static class InstallationWrites
             ? null
             : [.. given.Select(port => Validated.Field(
                 "ports", () => Port.Of(port.Port, port.Protocol, port.Scope)))];
+
+    private static IReadOnlyList<Secret>? Secrets(IReadOnlyList<SecretShape>? given) =>
+        given is null
+            ? null
+            : [.. given.Select(secret => Validated.Field(
+                "secrets", () => Secret.Of(secret.Name, secret.Path)))];
 }

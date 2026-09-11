@@ -313,7 +313,7 @@ create table installation (
     ports       -- a table of its own, below
     path        varchar(500),
     data        varchar(500),
-    secrets     text[]        not null default '{}',
+    secrets     -- a table of its own, below
     backup      text          not null check (backup in ('none', 'planned', 'active')),
     monitoring  text          not null check (monitoring in ('none', 'external')),
     logging     text          not null check (logging in ('local', 'central')),
@@ -355,10 +355,8 @@ these columns or on one of the two foreign keys.
 `installation_software` is read whenever a software is asked what still hangs on
 it, which is what refuses its deletion.
 
-`urls` and `secrets` are arrays of text: nothing is read by them, and a join per
-URL would buy nothing the row does not already say. `secrets` holds **names**,
-never values — a name is one word, and a value with an `=` or a space in it does
-not fit the shape.
+`urls` is an array of text: nothing is read by it, and a join per URL would buy
+nothing the row does not already say.
 
 ```sql
 create table installation_port (
@@ -370,6 +368,34 @@ create table installation_port (
     primary key (installation_id, port, protocol)
 );
 ```
+
+```sql
+create table installation_secret (
+    installation_id uuid         not null
+                    references installation (id) on delete cascade,
+    name            varchar(200) not null,
+    path            varchar(500),
+    search          tsvector generated always as
+        (to_tsvector('simple', name || ' ' || coalesce(path, ''))) stored,
+
+    primary key (installation_id, name)
+);
+
+create index installation_secret_search
+    on installation_secret using gin (search);
+```
+
+**A secret is a row for the reason a port is** (ADR 0011): it is two facts —
+the name the installation needs it under, and the file on the machine its
+value lies in — and an entry of a `text[]` holds one. The **name** is the
+key, because an installation needs `POSTGRES_PASSWORD` once; `path` is
+nullable, because a secret may be known before its place is decided. Neither
+column ever holds a value: a name is one word, and a value with an `=` or a
+space in it does not fit the shape.
+
+The vector is on this row and not on the installation's, because a generated
+column reads its own row and nothing else. That is what keeps both halves
+searchable after the names left `installation.search`.
 
 **A port is a row, not a string and not a document.** `protocol` and `scope` are
 closed sets like every other one in the model, and a closed set is a column with
@@ -630,9 +656,10 @@ order of the ids is the order the rows were written and nothing else. That is
 what makes `order by id` the history's order.
 
 **A list records what it became.** `urls`, `secrets` and `ports` write their
-entries as one line, separated by commas, and a port reads as `443/tcp:public`
-there — a history row is text a person reads, which is exactly what that
-spelling is for.
+entries as one line, separated by commas; a port reads as `443/tcp:public`
+there and a secret as `POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime` —
+a history row is text a person reads, which is exactly what those spellings
+are for.
 
 **A text records that it changed, not how.** A page's body and a machine's or a
 software's description write a row with both values empty; the text itself is
@@ -675,7 +702,8 @@ index over it, generated from its own row:
 |---|---|---|
 | `machine` | `search` | the key, the name and every text field, description included |
 | `software` | `search` | the key, the name, the image, the two URLs, the description |
-| `installation` | `search` | the key, the name, the two directories, the urls, the secret names, the description |
+| `installation` | `search` | the key, the name, the two directories, the urls, the description |
+| `installation_secret` | `search` | the secret's name and the file it lies in |
 | `deployment` | `search` | the version, the ref, the ticket, the note |
 | `file` | `search` | the path |
 | `file_revision` | `search` | what that revision said |
@@ -706,14 +734,18 @@ create function words(value text[]) returns text
 Postgres marks `array_to_string` **stable** rather than immutable, and a
 generated column takes only immutable expressions — while for a `text[]` and a
 constant separator the result depends on nothing at all. Without it an
-installation's `urls` and `secrets` would be the two fields nobody could search
-for. It is the only function in the schema.
+installation's `urls` would be the one field nobody could search for. It is the
+only function in the schema.
 
 **Ports are not in any of these columns.** They are rows of
 `installation_port`, and `18502` inside the token `18502/tcp` is not something
 anyone would find by typing the number. A query that *is* a port number is
 looked up in that column instead, which is what makes VISION 5's own example
 answer.
+
+**A secret answers once.** Its row's vector is read with the rest, and an
+installation whose own `search` already matched is not listed a second time for
+it — the same installation twice is not two answers.
 
 **A file is read at the revision it is at.** The query joins the revision whose
 number is the highest for that file: what an older one said stopped being true

@@ -412,10 +412,26 @@ Both are absolute, both may be left out, and nothing holds them apart: where a
 host keeps configuration and state in one directory, both carry it. `data` is
 searched like `path`.
 
-`secrets` holds the **names** of the secrets the installation needs and never
-their values — the values live in vaultaffe or on the host. A name is one word;
-anything with a space or an `=` in it is `validation`, which is what keeps a
-line of an `.env` file from arriving here whole.
+**`secrets` is a list of objects too**, and never a list of values:
+
+```json
+{"secrets": [{"name": "POSTGRES_PASSWORD",
+              "path": "/opt/compose/logaffe/.env.runtime"},
+             {"name": "SMTP_PASSWORD"}]}
+```
+
+`name` is the name the installation needs it under — one word; anything with
+a space or an `=` in it is `validation`, which is what keeps a line of an
+`.env` file from arriving here whole. `path` is the file on the machine the
+value lies in, absolute like every other path, and it may be left out: an
+installation may need a secret before anybody has decided where it goes. The
+value itself lives in vaultaffe or on the host and never here
+([ADR 0011](adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)).
+
+A secret is the same secret by its **name**, so two entries naming one are
+`validation` — the rule a port's number and protocol state one level up. Both
+halves are searched: `GET /api/search?q=POSTGRES_PASSWORD` and the file it
+lies in answer with the installation.
 
 `version` is derived from the deployments and is read-only on an installation —
 `PATCH` refuses it as `unknown-field`. `POST` takes it once, for the first

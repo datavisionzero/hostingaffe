@@ -47,6 +47,11 @@ it is deployed from and where its files lie, and `data`, where its persistent
 data lies — the one a backup has to take and the one a `docker compose down -v`
 does not bring back. Where a host keeps both in one directory, both say it.
 
+Its `secrets` line names each secret and the file its value lies in —
+`POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime` — so the file to keep
+at `0600`, to restore, and to keep out of a repository is in the document you
+already read. The value is not there and never is.
+
 File *contents* are not in it. They are one call away:
 
 ```sh
@@ -127,6 +132,7 @@ Record what you did, in the same session:
 ha deploy logaffe-prod --version 1.4.0 \
    --ref ghcr.io/example/logaffe@sha256:… --ticket OPS-42 --note-file -
 ha inst set logaffe-prod --backup active --data /srv/services/logaffe \
+   --secret POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime \
    --note "restic to the offsite bucket"
 ha machine set caddy --os "Ubuntu 26.04 LTS" --measured-at 2026-09-05 --note "dist-upgrade"
 ha page add logaffe-restore --title "Restoring logaffe" --kind runbook \
@@ -145,9 +151,12 @@ renders as plain text. Nothing checks a body as it is written; `ha page check`
 says which references point at nothing.
 
 Never put a secret in the record — not in a file, not in a description, not in
-a page. `secrets` on an installation holds the *names* of the secrets it needs;
-the values live where secrets live. `.env` and anything under `secrets/` are
-refused, and `.env.example` is welcome.
+a page. `secrets` on an installation holds the *name* of each secret it needs
+and the file its value lies in, written as
+`--secret POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime`, or as the bare
+name while nobody has decided where it goes. The values themselves live where
+secrets live. `.env` and anything under `secrets/` are refused, and
+`.env.example` is welcome.
 
 ### Documenting a new host
 

@@ -42,7 +42,7 @@ public sealed record InstallationEdit
 
     public string? Data { get; init; }
 
-    public IReadOnlyList<string>? Secrets { get; init; }
+    public IReadOnlyList<Secret>? Secrets { get; init; }
 
     public Backup? Backup { get; init; }
 

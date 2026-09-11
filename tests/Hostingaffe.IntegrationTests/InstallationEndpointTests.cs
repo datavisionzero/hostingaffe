@@ -39,7 +39,10 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
                 },
                 path = "/opt/compose/logaffe",
                 data = "/srv/services/logaffe",
-                secrets = new[] { "LOGAFFE_DB_PASSWORD" },
+                secrets = new object[]
+                {
+                    new { name = "LOGAFFE_DB_PASSWORD", path = "/opt/compose/logaffe/.env.runtime" },
+                },
                 backup = "active",
                 monitoring = "external",
                 logging = "central",
@@ -57,7 +60,10 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
         Assert.Equal("application", installation.GetProperty("role").GetString());
         Assert.Equal("/opt/compose/logaffe", installation.GetProperty("path").GetString());
         Assert.Equal("/srv/services/logaffe", installation.GetProperty("data").GetString());
-        Assert.Equal(["LOGAFFE_DB_PASSWORD"], installation.GetProperty("secrets").EnumerateArray().Select(s => s.GetString()!));
+        var secrets = installation.GetProperty("secrets");
+        Assert.Equal(1, secrets.GetArrayLength());
+        Assert.Equal("LOGAFFE_DB_PASSWORD", secrets[0].GetProperty("name").GetString());
+        Assert.Equal("/opt/compose/logaffe/.env.runtime", secrets[0].GetProperty("path").GetString());
 
         var ports = installation.GetProperty("ports");
         Assert.Equal(2, ports.GetArrayLength());
@@ -202,10 +208,73 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
 
         using var given = await admin.PatchAsJsonAsync(
             "/api/installations/logaffe-prod",
-            new { secrets = new[] { "LOGAFFE_DB_PASSWORD=hunter2" } },
+            new { secrets = new object[] { new { name = "LOGAFFE_DB_PASSWORD=hunter2" } } },
             Ct);
         var problem = await Refusals.Problem(given, HttpStatusCode.BadRequest, "validation");
         Assert.Contains("secrets", problem.GetProperty("errors").EnumerateObject().Select(field => field.Name));
+
+        // The name is one half; the other is a file on the machine, and a
+        // relative one is no more an answer here than it is for a path.
+        using var nowhere = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod",
+            new { secrets = new object[] { new { name = "LOGAFFE_DB_PASSWORD", path = "compose/.env" } } },
+            Ct);
+        await Refusals.Problem(nowhere, HttpStatusCode.BadRequest, "validation");
+    }
+
+    [Fact]
+    public async Task A_secret_says_which_file_it_lies_in_and_the_history_reads_it_whole()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Installation(admin, "logaffe-prod");
+
+        using var written = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod",
+            new
+            {
+                secrets = new object[]
+                {
+                    new { name = "LOGAFFE_DB_PASSWORD", path = "/opt/compose/logaffe/.env.runtime" },
+                    new { name = "SMTP_PASSWORD" },
+                },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        var installation = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod", Ct);
+        var secrets = installation.GetProperty("secrets");
+        Assert.Equal("/opt/compose/logaffe/.env.runtime", secrets[0].GetProperty("path").GetString());
+
+        // A secret whose place nobody has decided is a secret the installation
+        // still needs, and the field says so by being empty rather than absent.
+        Assert.Equal("SMTP_PASSWORD", secrets[1].GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, secrets[1].GetProperty("path").ValueKind);
+
+        // A history row is text a person reads, and this is how a person writes
+        // a secret down.
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/history", Ct);
+        var written_ = history.EnumerateArray().Last();
+        Assert.Equal("secrets", written_.GetProperty("field").GetString());
+        Assert.Equal(
+            "LOGAFFE_DB_PASSWORD@/opt/compose/logaffe/.env.runtime, SMTP_PASSWORD",
+            written_.GetProperty("new_value").GetString());
+
+        // An installation needs a secret once. Two entries naming the same one
+        // are a contradiction, not two secrets.
+        using var twice = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod",
+            new
+            {
+                secrets = new object[]
+                {
+                    new { name = "LOGAFFE_DB_PASSWORD", path = "/opt/compose/logaffe/.env.runtime" },
+                    new { name = "LOGAFFE_DB_PASSWORD", path = "/srv/services/logaffe/.env" },
+                },
+            },
+            Ct);
+        await Refusals.Problem(twice, HttpStatusCode.BadRequest, "validation");
     }
 
     [Fact]

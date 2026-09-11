@@ -239,6 +239,20 @@ and `--port` are repeated, what is given is what the list becomes, and the lone
 value `none` clears it. A port is written and read the way a person writes one,
 `443/tcp:public`; the field itself is the object, and `ha` converts.
 
+**A secret is written as `NAME@/the/file/it/lies/in`**, or as the bare name
+where nobody has decided where the value goes — never as a value
+(ADR 0011):
+
+```sh
+ha inst set logaffe-prod \
+  --secret POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime \
+  --secret SMTP_PASSWORD
+```
+
+Moving one is a new list with the new file in it, and the history says what the
+list became. `ha search POSTGRES_PASSWORD` and `ha search
+/opt/compose/logaffe/.env.runtime` both find the installation.
+
 **`--measured-at` takes a day** — `2026-09-05`, meaning midnight UTC — or a full
 RFC 3339 timestamp. Anything else is exit 2, said before any request goes out.
 

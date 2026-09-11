@@ -94,6 +94,32 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
         }
     }
 
+    /// <summary>
+    /// A secret is found by its name and by the file it lies in, and the hit
+    /// says which of an installation's places answered (ADR 0011).
+    /// </summary>
+    [Fact]
+    public async Task A_secret_is_searched_by_its_name_and_by_the_file_it_lies_in()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        foreach (var query in new[] { "LOGAFFE_DB_PASSWORD", "/opt/compose/logaffe/.env.runtime" })
+        {
+            var hit = Assert.Single(await HitsAsync(admin, query));
+            Assert.Equal("installation", Field(hit, "kind"));
+            Assert.Equal("logaffe-prod", Field(hit, "key"));
+            Assert.Equal("secrets", Field(hit, "where"));
+        }
+
+        // An installation whose own fields already answered is one hit, not
+        // two: the same installation twice is not two answers.
+        Assert.Equal(
+            "fields",
+            Field(Assert.Single(await HitsAsync(admin, "/opt/compose/logaffe")), "where"));
+    }
+
     [Fact]
     public async Task A_deleted_row_is_not_a_hit()
     {
@@ -225,6 +251,10 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
             ports = new object[] { new { port = 18502, protocol = "tcp", scope = "internal" } },
             path = "/opt/compose/logaffe",
             data = "/srv/services/logaffe",
+            secrets = new object[]
+            {
+                new { name = "LOGAFFE_DB_PASSWORD", path = "/opt/compose/logaffe/.env.runtime" },
+            },
         });
 
         await Created(client, "/api/installations/logaffe-prod/files", new

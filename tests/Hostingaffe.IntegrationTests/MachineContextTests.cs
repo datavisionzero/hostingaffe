@@ -46,7 +46,8 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         Assert.Contains("backup: active · monitoring: external · logging: central", document, StringComparison.Ordinal);
         Assert.Contains("path: /opt/compose/app-1\ndata: /srv/services/app-1", document, StringComparison.Ordinal);
         Assert.Contains("ports: 443/tcp:public, 5432/tcp:private", document, StringComparison.Ordinal);
-        Assert.Contains("secrets: APP_1_DB_PASSWORD", document, StringComparison.Ordinal);
+        Assert.Contains(
+            "secrets: APP_1_DB_PASSWORD@/opt/compose/app-1/.env.runtime", document, StringComparison.Ordinal);
         Assert.Contains("files: .env.example (revision 1), compose.yml (revision 2)", document, StringComparison.Ordinal);
 
         // The last deployments, newest first.
@@ -239,7 +240,14 @@ public sealed class MachineContextTests(PostgresFixture postgres)
                 },
                 path = $"/opt/compose/{key}",
                 data = $"/srv/services/{key}",
-                secrets = new[] { $"{key.ToUpperInvariant().Replace('-', '_')}_DB_PASSWORD" },
+                secrets = new object[]
+                {
+                    new
+                    {
+                        name = $"{key.ToUpperInvariant().Replace('-', '_')}_DB_PASSWORD",
+                        path = $"/opt/compose/{key}/.env.runtime",
+                    },
+                },
                 backup = "active",
                 monitoring = "external",
                 logging = "central",

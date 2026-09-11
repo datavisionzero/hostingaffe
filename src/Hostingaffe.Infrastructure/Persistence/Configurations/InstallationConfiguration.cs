@@ -17,7 +17,9 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// The ports are a table of their own rather than a column of text or of JSON,
 /// because <c>protocol</c> and <c>scope</c> are closed sets like every other one
 /// in the model, and a closed set is a column with a check constraint that lists
-/// the words.
+/// the words. The secrets are a table for the neighbouring reason: a secret is
+/// two facts now — the name and the file it lies in — and two facts do not fit
+/// in an entry of a <c>text[]</c> (ADR 0011).
 /// </remarks>
 public sealed class InstallationConfiguration : IEntityTypeConfiguration<Installation>
 {
@@ -96,17 +98,16 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             .HasConversion(new SnakeCaseEnumConverter<Logging>())
             .IsRequired();
 
-        // Two lists of plain text, held as arrays: nothing is read by them, and
-        // a join per URL would buy nothing the row does not already say.
+        // One list of plain text, held as an array: nothing is read by it, and a
+        // join per URL would buy nothing the row does not already say.
         builder.Property(i => i.Urls).HasColumnName("urls").HasDefaultValue(Array.Empty<string>()).IsRequired();
-        builder.Property(i => i.Secrets).HasColumnName("secrets").HasDefaultValue(Array.Empty<string>()).IsRequired();
 
         // Two directories, because an installation has two: the one it is
         // deployed from and the one its state lies in (ADR 0009). Nothing in the
         // column holds them apart — on a host that keeps both together they are
         // the same string.
-        builder.Property(i => i.Path).HasColumnName("path").HasMaxLength(Installation.PathMaxLength);
-        builder.Property(i => i.Data).HasColumnName("data").HasMaxLength(Installation.PathMaxLength);
+        builder.Property(i => i.Path).HasColumnName("path").HasMaxLength(Fields.PathMaxLength);
+        builder.Property(i => i.Data).HasColumnName("data").HasMaxLength(Fields.PathMaxLength);
 
         builder.Property(i => i.Description)
             .HasColumnName("description")
@@ -135,9 +136,34 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
 
         builder.Navigation(i => i.Ports).AutoInclude();
 
-        // The ports are a table of their own and are searched as numbers,
-        // not as words: `18502` is looked up in the column, which is what makes
-        // VISION 5's example answer at all.
+        // A secret is a row for the reason a port is: it stopped being a word
+        // the day it got a second half to say (ADR 0011). The name is what makes
+        // two of them the same secret, so it is the key and the file is not —
+        // one secret lies in one place.
+        builder.OwnsMany(i => i.Secrets, secret =>
+        {
+            secret.ToTable("installation_secret");
+
+            secret.WithOwner().HasForeignKey("installation_id").HasConstraintName("fk_installation_secret_installation");
+            secret.Property(s => s.Name).HasColumnName("name").HasMaxLength(Secret.NameMaxLength);
+            secret.Property(s => s.Path).HasColumnName("path").HasMaxLength(Fields.PathMaxLength);
+            secret.HasKey("installation_id", nameof(Secret.Name)).HasName("pk_installation_secret");
+
+            // Searched on its own row, because a generated column reads its own
+            // row and nothing else. That is what keeps `ha search
+            // POSTGRES_PASSWORD` — and the file it lies in — answering after the
+            // names left the installation's own column.
+            secret.Property<NpgsqlTsVector>("Search")
+                .HasColumnName("search")
+                .HasComputedColumnSql("to_tsvector('simple', name || ' ' || coalesce(path, ''))", stored: true);
+            secret.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_secret_search");
+        });
+
+        builder.Navigation(i => i.Secrets).AutoInclude();
+
+        // The ports and the secrets are tables of their own: a port is searched
+        // as a number, looked up in its column — which is what makes VISION 5's
+        // example answer at all — and a secret carries a vector of its own row.
         //
         // `words` is the one function the schema owns, and it exists because
         // Postgres marks `array_to_string` stable rather than immutable, which
@@ -148,7 +174,7 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             .HasColumnName("search")
             .HasComputedColumnSql(
                 "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(path, '') || ' ' "
-                + "|| coalesce(data, '') || ' ' || words(urls) || ' ' || words(secrets) || ' ' || description)",
+                + "|| coalesce(data, '') || ' ' || words(urls) || ' ' || description)",
                 stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_search");
 

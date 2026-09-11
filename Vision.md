@@ -154,9 +154,9 @@ permission matrix.
   that. An installation *names* where its logs and monitors are; it does not
   receive them.
 - **No secret values.** An installation lists the *names* of the secrets it
-  needs and where they live. The values are vaultaffe's, or wherever the
-  operator keeps them. hostingaffe refuses the files and paths that the
-  template already declares secret-bearing.
+  needs and the file each one lies in on the machine. The values are
+  vaultaffe's, or wherever the operator keeps them. hostingaffe refuses the
+  files and paths that the template already declares secret-bearing.
 - **No IPAM, DCIM, racks, cables, VLANs, subnets.** A machine has addresses;
   addresses are not an entity.
 - **No custom fields, no custom entity types, no configurable relationships.**
@@ -417,7 +417,7 @@ means something else to systemd and to Docker Compose.
 | `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network) |
 | `path` | text | where it lives on the machine, `/srv/logaffe` — also where `files sync` writes by default |
 | `data` | text | where its persistent data lies, `/srv/services/logaffe` — what a backup has to take |
-| `secrets` | list of names | the secret *names* it needs, never values |
+| `secrets` | list of objects | `{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }`; the *name* it needs and the file the value lies in, never the value. `path` may be empty, and reads as `NAME@/the/file` ([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)) |
 | `backup` | `none` · `planned` · `active` | the decision, as in the template |
 | `monitoring` | `none` · `external` | |
 | `logging` | `local` · `central` | |
@@ -648,7 +648,8 @@ The cycle the product is built around, in the order it happens:
    runs with, how each is updated, and which decisions apply. No repository to
    clone, no six files to read.
 2. **While working**, the agent may look things up by key or by search — a
-   port, a path, a secret name, a file — with one command each.
+   port, a path, a secret and the file it lies in, a file — with one command
+   each.
 3. **Changing configuration** is `ha files put`, then `ha files sync` on the
    host, then whatever the runbook says — `docker compose up -d --wait`, a
    Caddy reload. The product wrote the file and remembers the revision; the
@@ -716,10 +717,11 @@ attack surface, configuration included. Consequences:
 - Sign-in is rate-limited, sessions are server-side and revocable, tokens are
   stored hashed.
 - The product refuses to store what the template already declares secret: a
-  secret *name* may not contain `=`, `:` or whitespace, a file may not have
-  one of the paths section 7 refuses, and the CLI warns when Markdown or a
-  file on stdin contains something that looks like a private key or a token.
-  That is a guard against accidents, not a security boundary.
+  secret *name* may not contain `=`, `:` or whitespace, the file it lies in is
+  a path and not a value, a file may not have one of the paths section 7
+  refuses, and the CLI warns when Markdown or a file on stdin contains
+  something that looks like a private key or a token. That is a guard against
+  accidents, not a security boundary.
 - No token is stored on a machine (9.). The one command that runs on a host
   borrows the session's token and leaves nothing behind.
 
@@ -744,8 +746,8 @@ runtime. Where they touch is by reference, and the references are cheap:
   direction — logaffe's host list seeded from here — is a change to logaffe,
   and later (15.4).
 - An installation's secret names may point to a **vaultaffe** project and
-  environment, so an agent knows where to get them without asking. Values
-  never cross.
+  environment, so an agent knows where to get them without asking — beside
+  the file on the machine each one already names. Values never cross.
 - hostingaffe logs into logaffe through the same Serilog sink planaffe uses.
 
 What hostingaffe replaces: the `hostaffe` template, the private per-machine
@@ -879,8 +881,10 @@ documentation has grown past what a session should read is visible as such.
 ### 15.4 Talking to the siblings
 
 An installation's `logaffe` project and a machine's logaffe host, as fields
-with a link; an installation's secret names resolved against a vaultaffe
-project so that `vaultaffe run` and `ha inst view` agree on the list;
+with a link; an installation's secrets resolved against a vaultaffe project so
+that `vaultaffe run` and `ha inst view` agree on the list, and so that where a
+value is kept off the machine becomes a reference rather than prose
+([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md));
 logaffe's host list and collectors seeded from hostingaffe's machines. Each of
 these is partly a change to the other product and is decided there.
 

@@ -100,8 +100,17 @@ both `platform` and `production`.
 
 `ports` is a list of objects — `{ "port": 443, "protocol": "tcp", "scope":
 "public" }`. The spelling `443/tcp:public` is what a person reads and types, and
-what a history row carries; it is a rendering, not the field. `secrets` is a
-list of secret **names**, never values. `urls` is a list of URLs.
+what a history row carries; it is a rendering, not the field. `urls` is a list
+of URLs.
+
+`secrets` is a list of objects too — `{ "name": "POSTGRES_PASSWORD", "path":
+"/opt/compose/logaffe/.env.runtime" }`. The **name** is a name and never a
+value; `path` is the file on the machine the value lies in, absolute, and is
+empty where nobody has decided yet. It reads and is typed as
+`POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime`, or as the bare name
+([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)).
+Where a value is kept *besides* the machine — a vault, a password manager —
+is prose in the runbook. There is no field for how a secret is rotated.
 
 **An installation has two directories.** `path` is where it lives on the
 machine — the one it is deployed from, `/opt/compose/logaffe`, and the one every

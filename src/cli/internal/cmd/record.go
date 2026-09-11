@@ -134,8 +134,22 @@ func aPort(text string) (any, error) {
 	return map[string]any{"port": port, "protocol": protocol, "scope": scope}, nil
 }
 
-// asItIs is the entry of a list that is already what it says: a URL, the name
-// of a secret.
+// aSecret reads the spelling a person writes and a history row keeps —
+// `POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime`, and the bare name
+// where nobody has decided yet where the value goes. The name never carries an
+// `@`, so the first one is the one that separates the two.
+func aSecret(text string) (any, error) {
+	name, path, hasPath := strings.Cut(text, "@")
+	if name == "" {
+		return nil, fmt.Errorf("a secret is named: NAME, or NAME@/the/file/it/lies/in")
+	}
+	if !hasPath {
+		return map[string]any{"name": name}, nil
+	}
+	return map[string]any{"name": name, "path": path}, nil
+}
+
+// asItIs is the entry of a list that is already what it says: a URL.
 func asItIs(text string) (any, error) { return text, nil }
 
 // guard puts the `updated_at` last read on a write, quoted, so that the

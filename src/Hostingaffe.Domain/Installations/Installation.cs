@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Hostingaffe.Domain.History;
 
 namespace Hostingaffe.Domain.Installations;
@@ -25,25 +24,12 @@ namespace Hostingaffe.Domain.Installations;
 /// would be exactly the second truth VISION 7 avoids.
 /// </para>
 /// </remarks>
-public sealed partial class Installation
+public sealed class Installation
 {
     public const int NameMaxLength = 200;
 
-    /// <summary>What a path on a machine fits in.</summary>
-    public const int PathMaxLength = 500;
-
-    /// <summary>What the name of a secret fits in.</summary>
-    public const int SecretNameMaxLength = 200;
-
     /// <summary>How many entries one list holds — enough for anything real, and a bound on the row.</summary>
     public const int ListMaxCount = 50;
-
-    /// <summary>
-    /// The shape of a secret's <em>name</em>: a word, not a sentence and not a
-    /// value. Whitespace and <c>=</c> fall outside it, which is what keeps the
-    /// line of an <c>.env</c> file from being pasted in here whole.
-    /// </summary>
-    public const string SecretNamePattern = "^[A-Za-z_][A-Za-z0-9_./-]*$";
 
     /// <summary>
     /// The ports, in the field EF Core fills: the navigation itself is read
@@ -51,6 +37,12 @@ public sealed partial class Installation
     /// into it.
     /// </summary>
     private readonly List<Port> _ports = [];
+
+    /// <summary>
+    /// The secrets, in the field EF Core fills — read only for the reason the
+    /// ports are: a list is replaced whole and never reached into.
+    /// </summary>
+    private readonly List<Secret> _secrets = [];
 
     private Installation()
     {
@@ -80,7 +72,6 @@ public sealed partial class Installation
         Monitoring = Monitoring.None;
         Logging = Logging.Local;
         Urls = [];
-        Secrets = [];
         Description = string.Empty;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
@@ -135,8 +126,12 @@ public sealed partial class Installation
     /// </summary>
     public string? Data { get; private set; }
 
-    /// <summary>The <em>names</em> of the secrets it needs. Never the values; those live in vaultaffe or on the host.</summary>
-    public string[] Secrets { get; private set; } = [];
+    /// <summary>
+    /// The secrets it needs: each one named, and each one saying which file on
+    /// the machine its value lies in. Never a value — those live in vaultaffe or
+    /// on the host (ADR 0011).
+    /// </summary>
+    public IReadOnlyList<Secret> Secrets => _secrets;
 
     /// <summary>The backup decision, as a field so that it can be listed.</summary>
     public Backup Backup { get; private set; }
@@ -221,14 +216,22 @@ public sealed partial class Installation
             ListMaxCount,
             changes);
 
+        // A secret is the same secret by its name, whatever it says about where
+        // it lies: an installation needs `POSTGRES_PASSWORD` once, and two rows
+        // naming two files would be a contradiction rather than two secrets.
         Fields.Many(
             "secrets",
-            Fields.InField("secrets", () => edit.Secrets?.Select(NormalizeSecretName).ToArray()),
+            edit.Secrets,
             Secrets,
-            value => Secrets = [.. value],
-            name => name,
+            value =>
+            {
+                _secrets.Clear();
+                _secrets.AddRange(value);
+            },
+            secret => secret.ToString(),
             ListMaxCount,
-            changes);
+            changes,
+            secret => secret.Name);
 
         // Two ports on the same number and protocol are one port, whatever
         // their scopes say, so that is what makes them the same entry.
@@ -312,7 +315,7 @@ public sealed partial class Installation
     /// </summary>
     /// <exception cref="ArgumentException">It is not an absolute path, or it climbs.</exception>
     public static string NormalizePath(string path) =>
-        Directory(path, "A path is where the installation lives on the machine, from the root: /srv/logaffe.");
+        Fields.Absolute(path, "A path is where the installation lives on the machine, from the root: /srv/logaffe.");
 
     /// <summary>
     /// Where the installation's persistent data lies: the same shape as
@@ -323,46 +326,5 @@ public sealed partial class Installation
     /// </summary>
     /// <exception cref="ArgumentException">It is not an absolute path, or it climbs.</exception>
     public static string NormalizeData(string path) =>
-        Directory(path, "Data is where the installation's persistent data lies, from the root: /srv/services/logaffe.");
-
-    /// <summary>A directory on the machine: absolute, one line, and it does not climb.</summary>
-    private static string Directory(string path, string said)
-    {
-        var trimmed = path?.Trim() ?? string.Empty;
-        Fields.Line(trimmed, PathMaxLength, "A path");
-
-        if (!trimmed.StartsWith('/'))
-        {
-            throw new ArgumentException(said);
-        }
-
-        if (trimmed.Split('/').Any(segment => segment is ".."))
-        {
-            throw new ArgumentException("A path does not climb; .. is not part of one.");
-        }
-
-        // One trailing slash is what a person types and means nothing; the root
-        // is the one path that is a slash.
-        return trimmed.Length > 1 ? trimmed.TrimEnd('/') : trimmed;
-    }
-
-    /// <summary>
-    /// The name of a secret, and only ever a name: the values live in vaultaffe
-    /// or on the host, never here (VISION 7).
-    /// </summary>
-    /// <exception cref="ArgumentException">It is not the shape of a name.</exception>
-    public static string NormalizeSecretName(string? name)
-    {
-        var trimmed = name?.Trim() ?? string.Empty;
-        Fields.Line(trimmed, SecretNameMaxLength, "A secret name");
-
-        return SecretName().IsMatch(trimmed)
-            ? trimmed
-            : throw new ArgumentException(
-                $"A secret is named, never given: a name is one word ({SecretNamePattern}), and the value belongs nowhere near here.",
-                "secrets");
-    }
-
-    [GeneratedRegex(SecretNamePattern)]
-    private static partial Regex SecretName();
+        Fields.Absolute(path, "Data is where the installation's persistent data lies, from the root: /srv/services/logaffe.");
 }

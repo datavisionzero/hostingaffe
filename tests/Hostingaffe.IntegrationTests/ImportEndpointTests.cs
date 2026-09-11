@@ -46,6 +46,10 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal("/opt/compose/app-1", installation.GetProperty("path").GetString());
         Assert.Equal("/srv/services/app-1", installation.GetProperty("data").GetString());
         Assert.Equal(443, installation.GetProperty("ports")[0].GetProperty("port").GetInt32());
+        Assert.Equal("DB_PASSWORD", installation.GetProperty("secrets")[0].GetProperty("name").GetString());
+        Assert.Equal(
+            "/opt/compose/app-1/.env.runtime",
+            installation.GetProperty("secrets")[0].GetProperty("path").GetString());
 
         var file = await admin.GetFromJsonAsync<JsonElement>(
             "/api/installations/app-1/files/compose.yml", Ct);
@@ -430,6 +434,14 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         ["ports"] = new List<object>
         {
             new Dictionary<string, object?> { ["port"] = port, ["protocol"] = "tcp", ["scope"] = "public" },
+        },
+        ["secrets"] = new List<object>
+        {
+            new Dictionary<string, object?>
+            {
+                ["name"] = "DB_PASSWORD",
+                ["path"] = $"/opt/compose/{key}/.env.runtime",
+            },
         },
         ["files"] = key == "app-1"
             ? new List<object>
