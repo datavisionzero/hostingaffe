@@ -247,9 +247,12 @@ exception:
   machine with its installations, software entries, files and first
   deployments in one transaction, because documenting a host is one act, not
   thirty commands. The file has the shape of the JSON that `ha export` writes
-  (14.), so export and import round-trip, and migrating a `hostaffe`
-  repository has a defined target: one file the agent writes while it reads
-  the old one.
+  (14.), so migrating a `hostaffe` repository has a defined target: one file
+  the agent writes while it reads the old one. What an export carries back is
+  the record and not the account of how it got there — the history, a file's
+  earlier revisions and the original timestamps stay with the instance that
+  wrote them, because the import is the ordinary acts and the history is the
+  instance's to write (7.). Moving an instance is `pg_dump`, not this.
 - **Every write can carry a `--note`.** The note lands in the history next to
   the change, so "why" is recorded where "what" is.
 - **A write carries what it last read, and what that is depends on the
@@ -835,7 +838,8 @@ is what the host runs, verbatim, so that what is stored is what is true.
 - Export as a Markdown tree with the files in place, plus JSON — the escape
   hatch that makes adopting the product safe, and a tree that looks like the
   repositories it replaces. The JSON is the bulk-import format (6.1), so an
-  export can be imported again.
+  export can be read back into an instance as the record it describes,
+  beginning there (6.1).
 
 **Not included (deliberately deferred):**
 

@@ -207,13 +207,14 @@ keep the glossary's words and the short forms are only short forms, and
 `--inst` is `--installation` wherever that flag appears. There is no
 `ha softwares`: the word is uncountable (`CONTEXT.md`, Software).
 
-**`ha machine add --file FILE`** is the bulk write: a whole host — its software,
-its installations, their files and their first deployments — in one transaction,
-because documenting a host is one act and not thirty commands. The file is the
-JSON `ha export` writes, so export and import go in a circle, and `-` reads it
-from stdin. All or nothing: a refusal anywhere leaves nothing standing. `ha`
-does not read the document; it hands it to the instance, which is the one place
-that knows what a record may hold.
+**`ha machine add --file FILE`** is the bulk write: a whole host — its
+software, its installations, their files and their first deployments — in one
+transaction, because documenting a host is one act and not thirty commands.
+The file is the JSON `ha export` writes — what that carries back and what it
+does not is under Exporting, below — and `-` reads it from stdin. All or
+nothing: a refusal anywhere leaves nothing standing. `ha` does not read the
+document; it hands it to the instance, which is the one place that knows what
+a record may hold.
 
 **`add` and `set` take the same flags**, so that what a record can be created
 with is what it can be corrected with. A flag left off leaves the field alone;
@@ -337,8 +338,16 @@ when it was written, and everything is ordered by its address, so an export can
 be kept in a repository and diffed — which is how a record that has drifted
 shows itself.
 
-**`export.json` is the shape the bulk write reads back**: export and import go
-in a circle, which is what gives migrating an old repository a defined target.
+**`export.json` is the shape the bulk write reads back**, which is what gives
+migrating an old repository a defined target. What comes back is the record —
+the machines, the software, the installations, the files at the content they
+are at, the deployments, the pages — and **not the account of how it got
+there**: the history, a file's earlier revisions, the original timestamps and
+the identities that wrote them stay behind, because the import is the ordinary
+acts run in one transaction and those are the instance's to write
+([`api.md`](api.md), Importing). An export read into another instance is the
+record as it stands, beginning there. **Moving an instance is `pg_dump`** and
+not export and import ([`operations.md`](operations.md), Backup).
 
 **It is composed from the ordinary endpoints**, not from an endpoint of its own:
 whoever may read an export may make the single reads it is built from, and one

@@ -586,6 +586,19 @@ file's `revision` and `owner`, a deployment's `number`, `previous`, `files` and
 else is `unknown-field`, as everywhere. **The closed sets arrive as their
 words**, spelled as the contract spells them.
 
+**So the circle carries the record and not the account of how it got there.**
+An export read back in is the machines, the software, the installations, the
+files at the content they are at, the deployments and the pages — beginning
+here, written by whoever ran the import, at the moment they ran it. The
+history of the source instance, the revisions its files went through, the
+timestamps and the identities behind them do not come along, and nothing here
+invents them: this is the ordinary acts inside one transaction, and the
+history is the instance's to write and never to be written to (`CONTEXT.md`,
+History). What that is good for is adopting a record — a migrated repository,
+a second instance seeded from an export, a record lifted out of one place and
+put down in another. **Moving an instance with its history intact is `pg_dump`
+and `psql`** and not this endpoint ([`operations.md`](operations.md), Backup).
+
 **A file arrives at the content it is at**, as its first revision: what it said
 before is in the source's history, and a record that invented revisions it never
 had would be a worse copy than one that says where it began. **An installation's

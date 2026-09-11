@@ -129,7 +129,10 @@ func readme(whole *record) string {
 	var out strings.Builder
 	out.WriteString("# The record\n\nEverything this hostingaffe instance holds, written by `ha export`.\n\n")
 	out.WriteString("- `export.json` is all of it, machine-readable, the history included. It is\n")
-	out.WriteString("  the shape `ha machine add --file` reads, so an export can be imported again.\n")
+	out.WriteString("  the shape `ha machine add --file` reads, so an export can be read back into\n")
+	out.WriteString("  an instance — as the record it describes, beginning there: the history and\n")
+	out.WriteString("  the earlier revisions are read past, because they are the instance's to\n")
+	out.WriteString("  write. Moving an instance is `pg_dump`, not this.\n")
 	out.WriteString("- `machines/<key>/` is one machine: what it is, its history, its own files at\n")
 	out.WriteString("  their paths, and a directory per installation on it.\n")
 	out.WriteString("- `software/<key>.md` is what the installations are installations of.\n")

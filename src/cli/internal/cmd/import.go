@@ -13,9 +13,9 @@ import (
 
 // `ha machine add --file batch.json` is the bulk write: documenting a host is
 // one act and not thirty commands (VISION 6.1). The file is the JSON `ha export`
-// writes, so export and import go in a circle — and ha does not read it, it
-// hands it to the instance, which is the one place that knows what a record may
-// hold.
+// writes — what of it arrives and what is read past is the instance's to say
+// (docs/api.md, Importing) — and ha does not read the document, it hands it to
+// the instance, which is the one place that knows what a record may hold.
 func importRecord(g *globals, cmd *cobra.Command, file, note string) error {
 	document, err := readContent(cmd.InOrStdin(), file)
 	if err != nil {

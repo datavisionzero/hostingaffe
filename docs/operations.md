@@ -98,6 +98,16 @@ Restoring is `psql` into an empty database, then starting the instance against
 it. Take one before every upgrade, and on a schedule that matches how much work
 you are willing to lose.
 
+**Moving an instance is the same two commands** — a dump out of the old
+database and a `psql` into the new one — and not `ha export` and
+`ha machine add --file`. The export is the escape hatch: it hands the record
+back as a Markdown tree and a JSON document that another instance can be
+seeded from, and what it seeds begins there. The history, a file's earlier
+revisions and the original timestamps are the instance's own and travel with
+the database, not with the document ([`api.md`](api.md), Importing). An instance that
+arrives somewhere else through an export is a new record of the same hosts;
+one that arrives through a dump is the same instance.
+
 ## On a host, not on the instance
 
 `ha files sync` is the one command that touches a machine, and it belongs to

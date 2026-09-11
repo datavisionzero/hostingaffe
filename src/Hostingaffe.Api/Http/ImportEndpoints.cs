@@ -8,10 +8,11 @@ namespace Hostingaffe.Api.Http;
 /// because documenting a host is one act and not thirty calls.
 /// </summary>
 /// <remarks>
-/// The document is the one <c>ha export</c> writes, so export and import go in
-/// a circle and a migration out of an old repository has a defined target
-/// (VISION 14). It sits beside the objects rather than under one, because it
-/// creates more kinds than any one of them is.
+/// The document is the one <c>ha export</c> writes, so a migration out of an old
+/// repository has a defined target (VISION 14). What arrives is the record and
+/// not the history behind it (<c>docs/api.md</c>, Importing). It sits beside the
+/// objects rather than under one, because it creates more kinds than any one of
+/// them is.
 /// </remarks>
 public static class ImportEndpoints
 {

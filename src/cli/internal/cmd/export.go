@@ -68,9 +68,11 @@ func newExport(g *globals) *cobra.Command {
 	return cmd
 }
 
-// The shape of the JSON, which is also the shape the bulk write reads back:
-// export and import go in a circle (VISION 6.1, 14). Every object is the one
-// the API answered with; what nests under it is what belongs to it.
+// The shape of the JSON, which is also the shape the bulk write reads back
+// (VISION 6.1, 14). Every object is the one the API answered with; what nests
+// under it is what belongs to it — the history and the revisions included, even
+// though an import reads past them: the export is what hands the record back,
+// and a reader of it is not only an import.
 type record struct {
 	Machines []machineRecord  `json:"machines"`
 	Software []softwareRecord `json:"software"`

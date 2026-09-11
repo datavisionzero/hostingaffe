@@ -125,8 +125,11 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
     }
 
     /// <summary>
-    /// Export and import go in a circle: what an export writes is what the
-    /// import reads, and the record it makes says the same thing.
+    /// What an export writes is what the import reads: every field of an export
+    /// is accepted, and the record it makes says the same thing the export did.
+    /// What it does not say is the account of how the source got there — the
+    /// history, the timestamps and who wrote them begin here
+    /// (<c>docs/api.md</c>, Importing).
     /// </summary>
     [Fact]
     public async Task What_an_export_writes_is_what_an_import_reads()
@@ -166,7 +169,18 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
                     ["updated_by"] = new { id = Guid.Empty, kind = "user", name = "somebody" },
                     ["created_at"] = "2026-09-01T08:00:00Z",
                     ["updated_at"] = "2026-09-01T08:00:00Z",
-                    ["history"] = new List<object>(),
+                    ["history"] = new List<object>
+                    {
+                        new
+                        {
+                            at = "2026-09-01T08:00:00Z",
+                            actor = new { id = Guid.Empty, kind = "user", name = "somebody" },
+                            field = "status",
+                            from = "planned",
+                            to = "active",
+                            note = "racked",
+                        },
+                    },
                     ["installations"] = new List<object>(),
                     ["files"] = new List<object>(),
                 },
@@ -180,8 +194,17 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal("2×512G NVMe ZFS mirror", machine.GetProperty("disk").GetString());
 
         // What only the instance writes is the instance's, whatever the
-        // document said: the caller is who imported it.
+        // document said: the caller is who imported it, at the moment they did.
         Assert.Equal("maintainer", machine.GetProperty("created_by").GetProperty("name").GetString());
+        Assert.NotEqual("2026-09-01T08:00:00Z", machine.GetProperty("created_at").GetString());
+
+        // And the history begins here rather than arriving with the document:
+        // the record travels, the account of how it got there does not, so the
+        // one entry is the creation this import made.
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/history", Ct);
+        var entry = Assert.Single(history.EnumerateArray());
+        Assert.Equal("created", entry.GetProperty("field").GetString());
+        Assert.Equal("maintainer", entry.GetProperty("actor").GetProperty("name").GetString());
     }
 
     /// <summary>A field neither writable nor an export's is `unknown-field`, as everywhere.</summary>

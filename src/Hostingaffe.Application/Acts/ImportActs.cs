@@ -14,8 +14,8 @@ namespace Hostingaffe.Application.Acts;
 
 /// <summary>
 /// What a record holds, as one document: the shape <c>ha export</c> writes and
-/// the bulk write reads, so that export and import go in a circle (VISION 6.1,
-/// 14).
+/// the bulk write reads (VISION 6.1, 14). What the circle carries is the record
+/// and not the account of how it got there — see <see cref="ImportRecord"/>.
 /// </summary>
 public sealed record ImportRequest(
     IReadOnlyList<ImportMachine>? Machines,
