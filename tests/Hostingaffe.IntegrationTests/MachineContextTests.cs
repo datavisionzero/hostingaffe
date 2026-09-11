@@ -129,6 +129,58 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         Assert.Contains("## Rules of this instance", document, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The question the document exists to answer before an intervention: what
+    /// falls out if I restart this. A dependency on another machine is named
+    /// with that machine, because a bare key from another host is one the reader
+    /// of this document cannot look up in it (ADR 0014).
+    /// </summary>
+    [Fact]
+    public async Task Each_installation_says_what_it_depends_on_and_what_depends_on_it()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 2);
+
+        // A proxy of its own, on a machine of its own — VISION 15.2's example.
+        using var ingress = await admin.PostAsJsonAsync(
+            "/api/machines", new { key = "ingress-01", kind = "vps" }, Ct);
+        ingress.EnsureSuccessStatusCode();
+
+        using var proxy = await admin.PostAsJsonAsync(
+            "/api/installations",
+            new
+            {
+                key = "caddy",
+                machine = "ingress-01",
+                software = "logaffe",
+                environment = "production",
+                role = "platform",
+            },
+            Ct);
+        proxy.EnsureSuccessStatusCode();
+
+        using var hung = await admin.PatchAsJsonAsync(
+            "/api/installations/app-1", new { depends_on = new[] { "caddy", "app-2" } }, Ct);
+        hung.EnsureSuccessStatusCode();
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        // What is on this machine by its bare key; what is not, with its machine.
+        Assert.Contains("depends on: app-2, caddy (on ingress-01)", document, StringComparison.Ordinal);
+
+        // And the other end, on the installation that is depended on.
+        Assert.Contains("needed by: app-1", document, StringComparison.Ordinal);
+
+        // Nothing of the foreign installation but its key and its machine: a
+        // shared proxy must not drag another host's record in behind it.
+        Assert.DoesNotContain("### caddy", document, StringComparison.Ordinal);
+
+        // The document of the other machine says it the other way round.
+        var over = await DocumentAsync(admin, "ingress-01");
+        Assert.Contains("needed by: app-1 (on ex44)", over, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_machine_with_nothing_on_it_says_so()
     {

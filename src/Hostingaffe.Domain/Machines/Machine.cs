@@ -22,7 +22,7 @@ namespace Hostingaffe.Domain.Machines;
 /// machine nobody has looked at for a year says so itself.
 /// </para>
 /// <para>
-/// <see cref="HostId"/> is one of the two relationships the model has, and it
+/// <see cref="HostId"/> is one of the three relationships the model has, and it
 /// is only a <see cref="MachineKind.Vm"/>'s. Whether the host exists, and
 /// whether a chain of hosts closes on itself, needs the other rows and is the
 /// act's; what is here is that no other kind carries one.

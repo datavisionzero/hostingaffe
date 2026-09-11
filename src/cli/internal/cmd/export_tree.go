@@ -211,6 +211,8 @@ func installationMarkdown(installation installationRecord) string {
 		{"ports", render.Ports(installation.Ports)},
 		{"urls", strings.Join(installation.Urls, ", ")},
 		{"secrets", render.Secrets(installation.Secrets)},
+		{"depends on", strings.Join(installation.DependsOn, ", ")},
+		{"needed by", strings.Join(installation.NeededBy, ", ")},
 	})
 
 	body(&out, installation.Description)

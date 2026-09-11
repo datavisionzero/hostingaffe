@@ -79,7 +79,7 @@ public static class MachineEndpoints
                 return Results.NoContent();
             })
             .WithName("DeleteMachine")
-            .WithSummary("Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary("Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. One carrying installations that installations on other machines depend on is refused as `transition`, with `dependents` saying how many. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent);
 
         door.MapPost("/{key}/restore", (string key, string? note, MoveMachine move, CancellationToken cancellationToken) =>

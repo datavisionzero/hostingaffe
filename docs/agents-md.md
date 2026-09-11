@@ -42,6 +42,13 @@ with the version each runs, their ports, directories and file lists, the last
 deployments, the software, and every page that applies — the runbooks of that
 host and the decisions that hold on all of them. Read that and nothing else.
 
+**Each installation says what it depends on and what depends on it.** That is
+the line to read before you restart anything: on a host with a shared reverse
+proxy, taking the proxy down takes every application behind it, and `needed by`
+is what says so. A dependency on another machine is named with that machine —
+`caddy (on ingress-01)`. It is one hop: what a dependency itself depends on is
+one `ha inst view` away.
+
 An installation has two directories, and the document says both: `path`, where
 it is deployed from and where its files lie, and `data`, where its persistent
 data lies — the one a backup has to take and the one a `docker compose down -v`
@@ -126,6 +133,19 @@ either side:
 ha inst set app-1 --description-file - --note "named the TLS endpoint"
 ```
 
+**And say that it hangs on the proxy**, which is the fact the fragment is only a
+consequence of. The description carries the path; the field carries the
+relationship, and it is what `ha machine context` reads back to the next agent:
+
+```sh
+ha inst set app-1 --depends-on caddy --depends-on app-1-db \
+   --note "behind the shared proxy, on its own postgres"
+```
+
+The list is replaced whole — what you give is what it becomes, and `none` clears
+it — so read it before you change it. `needed by` is the other end and nobody
+writes it.
+
 ### After the work
 
 Record what you did, in the same session:
@@ -182,6 +202,7 @@ ha files put PATH --installation KEY --file ./x --revision N --note "…"
 ha files sync DIR --installation KEY    # on the host: write the files into place
 ha deploy KEY --version 1.4.0 --note-file -
 ha inst set KEY --note "…"              # and `ha machine set`, `ha software set`
+ha inst set KEY --depends-on OTHER       # what it needs; `needed by` is derived
 ha page add SLUG --title "…" --kind runbook --installation KEY --body-file -
 ```
 

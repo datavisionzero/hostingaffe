@@ -18,7 +18,9 @@ namespace Hostingaffe.Application.Ports;
 /// The list takes every field that is a closed set and the two keys, because
 /// the question VISION 7 names — "every production installation without a
 /// backup" — is a filter over exactly those and nothing else. There is no
-/// cursor, for the reason ADR 0012 keeps a list slim.
+/// cursor, for the reason ADR 0012 keeps a list slim, and <c>depends_on</c> is
+/// not among the filters: it is read whole where an installation or a machine
+/// is read, and never as a query across the record (ADR 0014).
 /// </remarks>
 public interface IInstallations
 {
@@ -40,6 +42,34 @@ public interface IInstallations
 
     /// <summary>How many live installations still hang on a software — the number a refusal names.</summary>
     Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The live rows for these keys, in one read: what a <c>depends_on</c> list
+    /// arrives as, and what the act turns into the rows the Domain takes. A key
+    /// nothing answers to is simply absent, and naming it is the act's.
+    /// </summary>
+    Task<IReadOnlyList<Installation>> LiveByKeysAsync(
+        IEnumerable<string> keys, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Which live installations depend on each of these — the dependencies read
+    /// from the other side, which is the direction a person asks in: what falls
+    /// out if I touch this. An id nothing depends on is absent from the map
+    /// rather than present with an empty list.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> DependentsAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>How many live installations depend on this one — the number a refusal names.</summary>
+    Task<int> CountDependentsAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The rows for these ids, deleted or not — for the document that has to say
+    /// not only which installation a dependency names but which machine it lies
+    /// on, because a key from another host is one the reader cannot look up.
+    /// </summary>
+    Task<IReadOnlyList<Installation>> FindManyAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken);
 
     /// <summary>The keys of the given rows, for the shapes that name one.</summary>
     Task<IReadOnlyDictionary<Guid, string>> KeysAsync(

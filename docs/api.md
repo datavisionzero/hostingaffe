@@ -66,7 +66,7 @@ to message on `validation`.
 | `device-expired` | 400 | nobody approved it in time, or its token was already collected |
 | `secret-expired` | 410 | a one-time link, spent or expired |
 | `stale` | 412 | `If-Match` did not match; `current` carries the object |
-| `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many) |
+| `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many), deleting an installation or a machine that others depend on (`dependents` says how many) |
 | `smtp-not-configured` | 422 | the act needs a mail and the instance sends none |
 | `internal` | 500 | a bug; the document carries nothing else |
 
@@ -433,9 +433,34 @@ A secret is the same secret by its **name**, so two entries naming one are
 halves are searched: `GET /api/search?q=POSTGRES_PASSWORD` and the file it
 lies in answer with the installation.
 
+**`depends_on` is a list of installation keys** — what this installation needs
+to do its job, on its machine or on another one:
+
+```json
+{"depends_on": ["caddy", "logaffe-db"]}
+```
+
+A key nothing live answers to is `validation` on the field, the way an unknown
+`machine` is; an installation naming itself is `validation` too. It is replaced
+whole like every other list, `[]` clears it, and the order does not matter — the
+instance holds it in key order, so sending the same set another way round changes
+nothing and writes no history.
+
+**`needed_by` is the same edge read from the other end** and is on the complete
+installation only, never on a summary. It is derived, like `version`: `PATCH`
+refuses it as `unknown-field`, and nothing can write it into disagreement with
+the dependencies it is read from. Both lists are one hop — nothing computes what
+a dependency itself depends on — and a longer cycle is held rather than refused,
+because the product orders no startup and resolves no closure
+([ADR 0014](adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+
+**An installation others depend on is not deleted**, and neither is a machine
+carrying one that installations elsewhere depend on: `transition`, with
+`dependents` saying how many. Retiring is the normal end and keeps every edge.
+
 `version` is derived from the deployments and is read-only on an installation —
 `PATCH` refuses it as `unknown-field`. `POST` takes it once, for the first
-deployment. `depends_on` is roadmap (VISION 15.2), not an omission.
+deployment.
 
 ### Files
 
@@ -581,10 +606,17 @@ spent.
 
 **What only the instance writes is read past.** The document is an export, so it
 carries `created_by`, `updated_by`, `created_at`, `updated_at`, the `history`, a
-file's `revision` and `owner`, a deployment's `number`, `previous`, `files` and
-`by`, and a page's `author`. Those are accepted by name and dropped; anything
-else is `unknown-field`, as everywhere. **The closed sets arrive as their
-words**, spelled as the contract spells them.
+file's `revision` and `owner`, an installation's `version` and `needed_by`, a
+deployment's `number`, `previous`, `files` and `by`, and a page's `author`. Those
+are accepted by name and dropped; anything else is `unknown-field`, as
+everywhere. **The closed sets arrive as their words**, spelled as the contract
+spells them.
+
+**`depends_on` is set after every installation is there.** An installation may
+depend on one that is further down the same document, under a machine the import
+has not read yet, so the dependencies are written in a pass of their own — the
+way a machine's `host` is, for the same reason. Within one transaction, so a
+dependency naming nothing at all still fails the whole thing.
 
 **So the circle carries the record and not the account of how it got there.**
 An export read back in is the machines, the software, the installations, the

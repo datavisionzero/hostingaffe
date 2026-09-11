@@ -106,14 +106,14 @@ func newInstallationView(g *globals) *cobra.Command {
 	}
 }
 
-// installationFields are the flags an installation is written with. The three
+// installationFields are the flags an installation is written with. The four
 // lists are repeated flags and are replaced whole; `--version` is on `add` only,
 // because a version after that is a deployment.
 type installationFields struct {
 	name, machine, software, environment, role, status string
 	backup, monitoring, logging, path, data            string
 	description, descriptionFile                       string
-	urls, secrets, ports                               []string
+	urls, secrets, ports, dependsOn                    []string
 }
 
 func (i *installationFields) flags(cmd *cobra.Command) {
@@ -132,6 +132,7 @@ func (i *installationFields) flags(cmd *cobra.Command) {
 	f.StringArrayVar(&i.urls, "url", nil, "an address it is reachable at; repeat for more, `none` clears the list")
 	f.StringArrayVar(&i.secrets, "secret", nil, "a secret it needs as NAME@/the/file/it/lies/in, or the bare `name`; never a value, repeat for more, `none` clears the list")
 	f.StringArrayVar(&i.ports, "port", nil, "a port as 443/tcp:public; repeat for more, `none` clears the list")
+	f.StringArrayVar(&i.dependsOn, "depends-on", nil, "an installation this one needs, by `key`, here or on another machine; repeat for more, `none` clears the list")
 	f.StringVar(&i.description, "description", "", "what does not fit in a field, in Markdown")
 	f.StringVar(&i.descriptionFile, "description-file", "", "the description, from a file or `-` for stdin")
 }
@@ -154,6 +155,9 @@ func (i *installationFields) body(cmd *cobra.Command) (*fields, error) {
 		return nil, err
 	}
 	if err := f.takeList("port", "ports", i.ports, aPort); err != nil {
+		return nil, err
+	}
+	if err := f.takeList("depends-on", "depends_on", i.dependsOn, asItIs); err != nil {
 		return nil, err
 	}
 

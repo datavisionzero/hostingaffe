@@ -296,8 +296,9 @@ period.
 
 ## Installations
 
-One software installed once on one machine (`CONTEXT.md`, Installation), and the
-second of the two relationships the model builds.
+One software installed once on one machine (`CONTEXT.md`, Installation), and two
+of the three relationships the model builds — the third is the one it depends
+on, `installation_depends_on` below.
 
 ```sql
 create table installation (
@@ -311,6 +312,7 @@ create table installation (
     status      text          not null check (status in ('planned', 'active', 'retired')),
     urls        text[]        not null default '{}',
     ports       -- a table of its own, below
+    depends_on  -- a table of its own, below
     path        varchar(500),
     data        varchar(500),
     secrets     -- a table of its own, below
@@ -331,11 +333,10 @@ create        index installation_machine  on installation (machine_id);
 create        index installation_software on installation (software_id);
 ```
 
-**There is no `version` column and no `depends_on` column.** The first is
-derived from the deployments and arrives with them; the second is roadmap
-(VISION 15.2), and a nullable column prepared in advance would be a decision
-taken quietly. Both are `unknown-field` in a request body, and the message says
-which of the two reasons applies.
+**There is no `version` column and no `needed_by` column.** The first is
+derived from the deployments; the second is the dependencies read from the other
+end (ADR 0014). Both are `unknown-field` in a request body, and the message says
+which of the two derivations applies.
 
 **Two directories, and no constraint between them.** `path` is where the
 installation lives — the directory it is deployed from and the one every file it
@@ -384,6 +385,39 @@ create table installation_secret (
 create index installation_secret_search
     on installation_secret using gin (search);
 ```
+
+```sql
+create table installation_depends_on (
+    installation_id uuid not null
+                    references installation (id) on delete cascade,
+    depends_on_id   uuid not null references installation (id),
+
+    primary key (installation_id, depends_on_id)
+);
+
+create index installation_depends_on_target
+    on installation_depends_on (depends_on_id);
+```
+
+**The third relationship, and the only one that points back at this table**
+(ADR 0014). It is a row and not a `text[]` of keys for the reason every other
+relationship is a foreign key: an array names something the database cannot be
+asked to hold on to, and the question the edge exists for — "which installations
+depend on this one" — would be a scan rather than an index read. That index is
+the reverse direction, which is the one a person asks in.
+
+**The pair is the key**, because an installation depends on another one once.
+There is no column for the key it names: a key is resolved where a shape or a
+document is assembled, the way the machine and the software of an installation
+are, and a second place to read it from would have to argue why it can never
+disagree with the first.
+
+**The target cascades nothing.** An installation others depend on is refused
+deletion outright, and so is a machine carrying one that installations elsewhere
+depend on, so nothing is ever swept out from under a dependent; the soft delete
+leaves the row standing, which is what a restore needs. The purge deletes the
+edges pointing at a row before it deletes the row, the way it clears a page's
+anchor.
 
 **A secret is a row for the reason a port is** (ADR 0011): it is two facts —
 the name the installation needs it under, and the file on the machine its
@@ -659,7 +693,9 @@ what makes `order by id` the history's order.
 entries as one line, separated by commas; a port reads as `443/tcp:public`
 there and a secret as `POSTGRES_PASSWORD@/opt/compose/logaffe/.env.runtime` —
 a history row is text a person reads, which is exactly what those spellings
-are for.
+are for. `depends_on` writes the keys and writes **only** what it became: the
+rows hold ids, the Domain resolves no keys, and a list that is always replaced
+whole has its previous value in the previous row.
 
 **A text records that it changed, not how.** A page's body and a machine's or a
 software's description write a row with both values empty; the text itself is

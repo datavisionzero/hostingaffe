@@ -252,6 +252,110 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal("outer", vm.GetProperty("host").GetString());
     }
 
+    /// <summary>
+    /// An installation depends on one under a machine the import has not read
+    /// yet — the reason the dependencies are a pass of their own, as a machine's
+    /// host is (ADR 0014).
+    /// </summary>
+    [Fact]
+    public async Task An_installation_finds_what_it_depends_on_further_down_the_same_document()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var imported = await admin.PostAsJsonAsync(
+            "/api/import",
+            new
+            {
+                software = new object[] { new { key = "caddy" } },
+                machines = new object[]
+                {
+                    new
+                    {
+                        key = "ex44",
+                        kind = "dedicated",
+                        installations = new object[]
+                        {
+                            new
+                            {
+                                key = "app-1",
+                                software = "caddy",
+                                environment = "production",
+                                role = "application",
+                                depends_on = new[] { "proxy" },
+                            },
+                        },
+                    },
+                    new
+                    {
+                        key = "ingress-01",
+                        kind = "vps",
+                        installations = new object[]
+                        {
+                            new
+                            {
+                                key = "proxy",
+                                software = "caddy",
+                                environment = "production",
+                                role = "platform",
+                            },
+                        },
+                    },
+                },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+
+        var app = await admin.GetFromJsonAsync<JsonElement>("/api/installations/app-1", Ct);
+        Assert.Equal(["proxy"], app.GetProperty("depends_on").EnumerateArray().Select(one => one.GetString()));
+
+        var proxy = await admin.GetFromJsonAsync<JsonElement>("/api/installations/proxy", Ct);
+        Assert.Equal(["app-1"], proxy.GetProperty("needed_by").EnumerateArray().Select(one => one.GetString()));
+    }
+
+    /// <summary>
+    /// `needed_by` is in an export because it is on the installation, and it is
+    /// read past on the way back in — the way `version` is. A document that
+    /// carries one does not fail for carrying it.
+    /// </summary>
+    [Fact]
+    public async Task What_only_the_instance_derives_is_read_past()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var imported = await admin.PostAsJsonAsync(
+            "/api/import",
+            new
+            {
+                software = new object[] { new { key = "caddy" } },
+                machines = new object[]
+                {
+                    new
+                    {
+                        key = "ex44",
+                        kind = "dedicated",
+                        installations = new object[]
+                        {
+                            new
+                            {
+                                key = "app-1",
+                                software = "caddy",
+                                environment = "production",
+                                role = "application",
+                                needed_by = new[] { "nothing-at-all" },
+                            },
+                        },
+                    },
+                },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+
+        var app = await admin.GetFromJsonAsync<JsonElement>("/api/installations/app-1", Ct);
+        Assert.Empty(app.GetProperty("needed_by").EnumerateArray());
+    }
+
     [Fact]
     public async Task An_empty_document_is_refused()
     {

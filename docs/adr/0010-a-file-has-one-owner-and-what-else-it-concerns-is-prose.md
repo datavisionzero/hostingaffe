@@ -95,4 +95,8 @@ findable from the record itself: its content names the service it fronts, so
   path in the sentence goes stale. `ha page check` reports dead links in pages,
   not in descriptions.
 - **Vision §15.2 is where this is answered if it stops being enough**, as a
-  relation between installations rather than a field on the file.
+  relation between installations rather than a field on the file. It stopped
+  being enough on the first host with a shared proxy, and the relation is
+  [ADR 0014](./0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md).
+  It carries the relationship and not the fragment's path: that is still the
+  sentence in the description, for the reason this decision gives.

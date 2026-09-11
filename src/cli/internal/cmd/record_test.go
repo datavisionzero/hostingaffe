@@ -255,6 +255,45 @@ func TestPortsAreWrittenAsPeopleWriteThem(t *testing.T) {
 	}
 }
 
+// `--depends-on` is a list of keys like every other list: repeated, replaced
+// whole, cleared by `none` (ADR 0014). `ha` sends the keys and nothing else —
+// what they name, and whether one of them is this installation, is the
+// instance's to say.
+func TestDependenciesAreWrittenAsKeys(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, _, stderr := run(t, server, "inst", "set", "logaffe-prod",
+		"--depends-on", "caddy", "--depends-on", "logaffe-db")
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	body := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	depends, _ := json.Marshal(body["depends_on"])
+	if string(depends) != `["caddy","logaffe-db"]` {
+		t.Errorf("depends_on = %s", depends)
+	}
+
+	// And there is no `--needed-by`: the other end is derived, and a flag for
+	// it would be a second way to say the same thing.
+	if code, _, _ = run(t, server, "inst", "set", "logaffe-prod", "--needed-by", "caddy"); code != exit.Usage {
+		t.Errorf("--needed-by = %d", code)
+	}
+
+	if code, _, _ = run(t, server, "inst", "set", "logaffe-prod", "--depends-on", "none"); code != exit.OK {
+		t.Fatal("code")
+	}
+	body = map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	cleared, _ := json.Marshal(body["depends_on"])
+	if string(cleared) != `[]` {
+		t.Errorf("cleared depends_on = %s", cleared)
+	}
+}
+
 // A day is a moment: that is how a person writes down when they last looked at
 // a machine, and the contract wants RFC 3339.
 func TestAMeasurementIsADayOrATimestamp(t *testing.T) {

@@ -5,9 +5,9 @@ using System.Text.Json;
 namespace Hostingaffe.IntegrationTests;
 
 /// <summary>
-/// Installations over HTTP (<c>docs/api.md</c>, Installations): the second and
-/// last relationship the model builds, and the six closed sets that say what an
-/// installation is.
+/// Installations over HTTP (<c>docs/api.md</c>, Installations): the two
+/// relationships that make an installation one, the third it carries itself, and
+/// the six closed sets that say what an installation is.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class InstallationEndpointTests(PostgresFixture postgres)
@@ -370,7 +370,7 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task The_key_is_immutable_and_the_two_fields_the_model_does_not_have_say_why()
+    public async Task The_key_is_immutable_and_the_two_derived_fields_say_why()
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
@@ -384,9 +384,105 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
         var version = await Refusals.Problem(versioned, HttpStatusCode.BadRequest, "unknown-field");
         Assert.Contains("derived", version.GetProperty("detail").GetString(), StringComparison.Ordinal);
 
-        using var depends = await admin.PatchAsJsonAsync(
-            "/api/installations/logaffe-prod", new { depends_on = "postgres-prod" }, Ct);
-        await Refusals.Problem(depends, HttpStatusCode.BadRequest, "unknown-field");
+        // `depends_on` is written and `needed_by` is the same edge read from the
+        // other end, which nothing writes into disagreement with it (ADR 0014).
+        using var needed = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { needed_by = new[] { "caddy" } }, Ct);
+        await Refusals.Problem(needed, HttpStatusCode.BadRequest, "unknown-field");
+    }
+
+    [Fact]
+    public async Task An_installation_depends_on_installations_and_they_say_so_from_the_other_end()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        await Installation(admin, "caddy", role: "platform");
+        await Installation(admin, "logaffe-db", role: "platform");
+
+        // Given the other way round, and held in key order: the set is the
+        // field, not the order it arrived in (ADR 0014).
+        var app = await Installation(
+            admin, "logaffe-prod", rest: new { depends_on = new[] { "logaffe-db", "caddy" } });
+        Assert.Equal(["caddy", "logaffe-db"], app.GetProperty("depends_on").EnumerateArray().Select(one => one.GetString()));
+        Assert.Empty(app.GetProperty("needed_by").EnumerateArray());
+
+        // The same edge from the other end, derived and never written.
+        var caddy = await admin.GetFromJsonAsync<JsonElement>("/api/installations/caddy", Ct);
+        Assert.Equal(["logaffe-prod"], caddy.GetProperty("needed_by").EnumerateArray().Select(one => one.GetString()));
+        Assert.Empty(caddy.GetProperty("depends_on").EnumerateArray());
+
+        // One hop and no closure: what caddy needs is caddy's business.
+        await admin.PatchAsJsonAsync("/api/installations/caddy", new { depends_on = new[] { "logaffe-db" } }, Ct);
+        var again = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod", Ct);
+        Assert.Equal(["caddy", "logaffe-db"], again.GetProperty("depends_on").EnumerateArray().Select(one => one.GetString()));
+
+        // The history says what the list became, and the keys are what a person
+        // reads there. A change to it is a row of its own; what an installation
+        // was created with is the one `created` row, as with every other field.
+        using var narrowed = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "caddy" } }, Ct);
+        Assert.Equal(HttpStatusCode.OK, narrowed.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/history", Ct);
+        var written = history.EnumerateArray().Single(row => row.GetProperty("field").GetString() == "depends_on");
+        Assert.Equal("caddy", written.GetProperty("new_value").GetString());
+
+        // An empty list clears it, and the other end notices.
+        using var cleared = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = Array.Empty<string>() }, Ct);
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        var emptied = await admin.GetFromJsonAsync<JsonElement>("/api/installations/caddy", Ct);
+        Assert.Empty(emptied.GetProperty("needed_by").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_dependency_that_names_nothing_or_names_itself_is_refused_on_its_field()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Installation(admin, "logaffe-prod");
+
+        using var nowhere = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "nothing" } }, Ct);
+        var problem = await Refusals.Problem(nowhere, HttpStatusCode.BadRequest, "validation");
+        Assert.Contains("depends_on", problem.GetProperty("errors").EnumerateObject().Select(field => field.Name));
+
+        using var itself = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "logaffe-prod" } }, Ct);
+        await Refusals.Problem(itself, HttpStatusCode.BadRequest, "validation");
+
+        using var twice = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "caddy", "caddy" } }, Ct);
+        await Refusals.Problem(twice, HttpStatusCode.BadRequest, "validation");
+    }
+
+    /// <summary>
+    /// Two installations that need each other. The product computes no closure
+    /// and no startup order, so a cycle costs nothing to hold (ADR 0014).
+    /// </summary>
+    [Fact]
+    public async Task A_cycle_of_two_is_held_rather_than_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Installation(admin, "one");
+        await Installation(admin, "other");
+
+        using var first = await admin.PatchAsJsonAsync(
+            "/api/installations/one", new { depends_on = new[] { "other" } }, Ct);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using var second = await admin.PatchAsJsonAsync(
+            "/api/installations/other", new { depends_on = new[] { "one" } }, Ct);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var read = await admin.GetFromJsonAsync<JsonElement>("/api/installations/one", Ct);
+        Assert.Equal(["other"], read.GetProperty("depends_on").EnumerateArray().Select(one => one.GetString()));
+        Assert.Equal(["other"], read.GetProperty("needed_by").EnumerateArray().Select(one => one.GetString()));
     }
 
     /// <summary>The machine and the software every installation here stands on.</summary>

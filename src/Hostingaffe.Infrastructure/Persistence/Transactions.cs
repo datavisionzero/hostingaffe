@@ -117,6 +117,20 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
             """,
             [settings.DeletionGrace], cancellationToken);
 
+        // The same for a dependency, and for the same reason a page loses its
+        // anchor: an installation others depend on is never deleted out from
+        // under them, so an edge can only reach the purge from a dependent that
+        // was itself deleted — and it cannot name something that is gone for
+        // good. The dependent keeps its other edges and loses this one.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from installation_depends_on
+             where depends_on_id in (
+                select id from installation
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval)
+            """,
+            [settings.DeletionGrace], cancellationToken);
+
         await context.Database.ExecuteSqlRawAsync(
             """
             delete from installation where id in (

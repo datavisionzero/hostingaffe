@@ -43,21 +43,21 @@ public static class InstallationEndpoints
                 var installation = await create.ExecuteAsync(
                     request ?? new CreateInstallationRequest(
                         null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null, null),
                     note,
                     cancellationToken);
 
                 return Results.Created($"{Routes.Api}/installations/{installation.Key}", installation);
             })
             .WithName("CreateInstallation")
-            .WithSummary("Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary("Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is. `depends_on` names installations by key, on this machine or on another one. `note` goes into the history beside the change (ADR 0004).")
             .Produces<InstallationShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         door.MapGet("/{key}", (string key, ReadInstallation read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(key, cancellationToken))
             .WithName("ReadInstallation")
-            .WithSummary("The complete installation: every field, the machine and the software it names, and who touched it last.");
+            .WithSummary("The complete installation: every field, the machine and the software it names, and who touched it last. `depends_on` is what it needs and `needed_by` is what needs it — the same edge from both ends, one hop, in key order; the second is derived and is not written.");
 
         door.MapGet("/{key}/history", (string key, ReadInstallationHistory read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(key, cancellationToken))
@@ -68,13 +68,13 @@ public static class InstallationEndpoints
                 change.ExecuteAsync(
                     key,
                     request ?? new ChangeInstallationRequest(
-                        null, null, null, null, null, null, null,
+                        null, null, null, null, null, null, null, null,
                         null, null, null, null, null, null, null, null),
                     http.Headers.IfMatch.ToString(),
                     note,
                     cancellationToken))
             .WithName("ChangeInstallation")
-            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary("Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list — `depends_on` included, which is replaced whole and never patched entry by entry. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).")
             .Produces<InstallationShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
@@ -85,7 +85,7 @@ public static class InstallationEndpoints
                 return Results.NoContent();
             })
             .WithName("DeleteInstallation")
-            .WithSummary("Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary("Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. One that others depend on is refused as `transition`, with `dependents` saying how many: an installation is not deleted out from under them. Deleting is for mistakes; retiring is `status=retired` and keeps every edge. `note` goes into the history beside the change (ADR 0004).")
             .Produces(StatusCodes.Status204NoContent);
 
         door.MapPost("/{key}/restore", (string key, string? note, MoveInstallation move, CancellationToken cancellationToken) =>

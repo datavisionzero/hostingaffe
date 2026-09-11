@@ -44,16 +44,121 @@ public sealed class InstallationTests
         Assert.Empty(installation.Urls);
         Assert.Empty(installation.Ports);
         Assert.Empty(installation.Secrets);
+        Assert.Empty(installation.DependsOn);
     }
 
     [Fact]
-    public void There_is_no_version_to_set()
+    public void There_is_no_version_and_no_needed_by_to_set()
     {
         // The type says it: nothing here carries a version, because the
-        // deployments do (VISION 7).
+        // deployments do, and nothing carries what needs this installation,
+        // because the installations that name it do (VISION 7, ADR 0014).
         Assert.Null(typeof(Installation).GetProperty("Version"));
         Assert.Null(typeof(InstallationEdit).GetProperty("Version"));
-        Assert.Null(typeof(InstallationEdit).GetProperty("DependsOn"));
+        Assert.Null(typeof(Installation).GetProperty("NeededBy"));
+        Assert.Null(typeof(InstallationEdit).GetProperty("NeededBy"));
+    }
+
+    [Fact]
+    public void A_dependency_is_held_in_key_order_and_recorded_as_what_it_became()
+    {
+        var installation = An();
+        var caddy = An("caddy");
+        var postgres = An("logaffe-db");
+
+        var changes = installation.Apply(
+            new InstallationEdit { DependsOn = [postgres, caddy] }, Actor, Now);
+
+        var change = Assert.Single(changes);
+        Assert.Equal("depends_on", change.Field);
+
+        // What it became, and not what it was: the row holds ids, and the keys
+        // a person reads are the act's to resolve (docs/storage.md).
+        Assert.Null(change.OldValue);
+        Assert.Equal("caddy, logaffe-db", change.NewValue);
+
+        Assert.Equal(
+            [caddy.Id, postgres.Id],
+            installation.DependsOn.Select(one => one.DependsOnId));
+    }
+
+    [Fact]
+    public void The_same_dependencies_in_another_order_are_no_change()
+    {
+        var installation = An();
+        var caddy = An("caddy");
+        var postgres = An("logaffe-db");
+
+        installation.Apply(new InstallationEdit { DependsOn = [caddy, postgres] }, Actor, Now);
+
+        Assert.Empty(installation.Apply(
+            new InstallationEdit { DependsOn = [postgres, caddy] }, Actor, Now));
+    }
+
+    [Fact]
+    public void An_empty_list_clears_the_dependencies()
+    {
+        var installation = An();
+        installation.Apply(new InstallationEdit { DependsOn = [An("caddy")] }, Actor, Now);
+
+        var change = Assert.Single(installation.Apply(
+            new InstallationEdit { DependsOn = [] }, Actor, Now));
+
+        Assert.Equal("depends_on", change.Field);
+        Assert.Null(change.NewValue);
+        Assert.Empty(installation.DependsOn);
+    }
+
+    [Fact]
+    public void An_installation_does_not_depend_on_itself()
+    {
+        var installation = An();
+
+        var refusal = Assert.Throws<ArgumentException>(
+            () => installation.Apply(new InstallationEdit { DependsOn = [installation] }, Actor, Now));
+
+        Assert.Equal("depends_on", refusal.ParamName);
+    }
+
+    [Fact]
+    public void A_dependency_named_twice_is_refused()
+    {
+        var installation = An();
+        var caddy = An("caddy");
+
+        var refusal = Assert.Throws<ArgumentException>(
+            () => installation.Apply(new InstallationEdit { DependsOn = [caddy, caddy] }, Actor, Now));
+
+        Assert.Equal("depends_on", refusal.ParamName);
+    }
+
+    [Fact]
+    public void A_longer_cycle_is_not_refused()
+    {
+        // Two services that need each other exist, and the product computes no
+        // closure and no start order, so holding one costs nothing (ADR 0014).
+        var one = An("a");
+        var other = An("b");
+
+        one.Apply(new InstallationEdit { DependsOn = [other] }, Actor, Now);
+        other.Apply(new InstallationEdit { DependsOn = [one] }, Actor, Now);
+
+        Assert.Equal(other.Id, Assert.Single(one.DependsOn).DependsOnId);
+        Assert.Equal(one.Id, Assert.Single(other.DependsOn).DependsOnId);
+    }
+
+    [Fact]
+    public void A_dependency_list_is_bounded_like_every_other_list()
+    {
+        var installation = An();
+        var many = Enumerable.Range(0, Installation.ListMaxCount + 1)
+            .Select(number => An($"one-{number}"))
+            .ToArray();
+
+        var refusal = Assert.Throws<ArgumentException>(
+            () => installation.Apply(new InstallationEdit { DependsOn = many }, Actor, Now));
+
+        Assert.Equal("depends_on", refusal.ParamName);
     }
 
     [Fact]

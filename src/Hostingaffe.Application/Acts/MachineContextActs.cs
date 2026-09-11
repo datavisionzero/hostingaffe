@@ -33,8 +33,18 @@ public sealed record MachineContextShape(string Key, string Document);
 /// the rules that hold on every host.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <strong>File contents are not in it.</strong> They are one <c>ha files
 /// get</c> away, and they are what would fill a context window.
+/// </para>
+/// <para>
+/// <strong>Each installation says what it depends on and what depends on it</strong>,
+/// which is the question an agent asks before it touches anything: what falls
+/// out if I restart this. An installation on another machine is named with that
+/// machine, because a bare key from another host is one the reader of this
+/// document cannot look up in it — and nothing else of it is carried, so a
+/// shared proxy does not drag seven foreign records in behind it (ADR 0014).
+/// </para>
 /// </remarks>
 public sealed class ReadMachineContext(
     IMachines machines,
@@ -73,6 +83,8 @@ public sealed class ReadMachineContext(
             ? (await machines.KeysAsync([on], cancellationToken)).GetValueOrDefault(on)
             : null;
 
+        var edge = await EdgeAsync(installed, cancellationToken);
+
         var attached = await AttachedAsync(machine, installed, cancellationToken);
         var rules = (await pages.ListAsync(null, PageKind.Decision, null, cancellationToken))
             .Where(page => !page.Attached)
@@ -81,7 +93,7 @@ public sealed class ReadMachineContext(
 
         var document = new StringBuilder();
         Head(document, machine, hostKey);
-        Installations(document, installed, programs, recorded, underInstallations);
+        Installations(document, installed, programs, recorded, underInstallations, edge);
         Software(document, programs);
         MachineFiles(document, machine, underMachine);
         Pages(document, attached);
@@ -92,6 +104,61 @@ public sealed class ReadMachineContext(
 
     private static IReadOnlyList<Installation> Ordered(IEnumerable<Installation> rows) =>
         [.. rows.OrderBy(one => one.Key, StringComparer.Ordinal)];
+
+    /// <summary>
+    /// How every installation of this machine is named in the document: by its
+    /// key, and by its key and its machine where it lies on another one.
+    /// </summary>
+    /// <remarks>
+    /// Both ends of the edge are read at once — what these installations depend
+    /// on, and what depends on them — and every id either end names that is not
+    /// on this machine is looked up once, with the machine it lies on. A
+    /// dependency the purge has already taken is in no map and is left out
+    /// rather than printed as a question mark: the record no longer says it.
+    /// </remarks>
+    private async Task<Edge> EdgeAsync(
+        IReadOnlyList<Installation> installed, CancellationToken cancellationToken)
+    {
+        var here = installed.ToDictionary(one => one.Id, one => one.Key);
+
+        var dependents = await installations.DependentsAsync(here.Keys, cancellationToken);
+
+        var named = installed
+            .SelectMany(one => one.DependsOn.Select(dependency => dependency.DependsOnId))
+            .Concat(dependents.SelectMany(pair => pair.Value))
+            .Where(id => !here.ContainsKey(id))
+            .Distinct()
+            .ToArray();
+
+        var elsewhere = await installations.FindManyAsync(named, cancellationToken);
+        var hosts = await machines.KeysAsync(elsewhere.Select(one => one.MachineId), cancellationToken);
+
+        var names = new Dictionary<Guid, string>(here);
+        foreach (var one in elsewhere)
+        {
+            names[one.Id] = hosts.GetValueOrDefault(one.MachineId) is { } host
+                ? $"{one.Key} (on {host})"
+                : one.Key;
+        }
+
+        return new Edge(names, dependents);
+    }
+
+    /// <summary>
+    /// What each installation of this machine is called in the document, and
+    /// which installations depend on each of them.
+    /// </summary>
+    private sealed record Edge(
+        IReadOnlyDictionary<Guid, string> Names,
+        IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> Dependents)
+    {
+        public IReadOnlyList<string> Of(IEnumerable<Guid> ids) =>
+        [
+            .. ids.Select(id => Names.GetValueOrDefault(id))
+                .OfType<string>()
+                .OrderBy(name => name, StringComparer.Ordinal),
+        ];
+    }
 
     /// <summary>
     /// The pages that hang on the machine or on anything installed on it, each
@@ -170,7 +237,8 @@ public sealed class ReadMachineContext(
         IReadOnlyList<Installation> installed,
         IReadOnlyList<Domain.Software> programs,
         IReadOnlyList<Deployment> recorded,
-        IReadOnlyList<File> owned)
+        IReadOnlyList<File> owned,
+        Edge edge)
     {
         document.Append("## Installations\n\n");
 
@@ -203,6 +271,12 @@ public sealed class ReadMachineContext(
             Listed(document, "ports", [.. one.Ports.Select(port => port.ToString())]);
             Listed(document, "urls", one.Urls);
             Listed(document, "secrets", [.. one.Secrets.Select(secret => secret.ToString())]);
+
+            // The two directions of the one edge, and the second is the reason
+            // it exists: "needed by" is what a restart of this installation
+            // takes with it.
+            Listed(document, "depends on", edge.Of(one.DependsOn.Select(dependency => dependency.DependsOnId)));
+            Listed(document, "needed by", edge.Of(edge.Dependents.GetValueOrDefault(one.Id) ?? []));
             document.Append('\n');
 
             Description(document, one.Description);

@@ -144,9 +144,17 @@ public sealed class Cascade(
 }
 
 /// <summary>Delete and restore a machine, with everything it carries (ADR 0013).</summary>
+/// <remarks>
+/// It carries its installations, and an installation on another machine may
+/// depend on one of them. Deleting the machine would take that installation out
+/// from under a dependent the deletion never named, so it is refused for the
+/// reason deleting the installation on its own is — and the number it says is
+/// the dependents that are not going with it (ADR 0014).
+/// </remarks>
 public sealed class MoveMachine(
     ICallerIdentity callerIdentity,
     IMachines machines,
+    IInstallations installations,
     Cascade cascade,
     IHistory history,
     ITransactions transactions,
@@ -160,10 +168,18 @@ public sealed class MoveMachine(
         var said = Validated.Note(note);
         var before = await machines.LiveAsync(key, settings, cancellationToken);
 
+        // Before anything else, and said with a number, for the reason a
+        // software carrying installations says one.
+        await NothingElsewhereDependsAsync(before.Key, before.Id, cancellationToken);
+
         await transactions.RunAsync(async () =>
         {
             var row = await machines.LoadForWriteAsync(before.Id, cancellationToken)
                 ?? throw new Refusal(RefusalCode.NotFound, $"No machine {key}.");
+
+            // Asked again inside the transaction: the first answer was read
+            // outside it, and a dependent may have arrived since.
+            await NothingElsewhereDependsAsync(row.Key, row.Id, cancellationToken);
 
             var now = clock.GetUtcNow();
 
@@ -206,6 +222,33 @@ public sealed class MoveMachine(
         }, cancellationToken);
 
         return await assembler.CompleteAsync(machine, cancellationToken);
+    }
+
+    /// <summary>
+    /// Whether anything that stays behind depends on something that would go.
+    /// A dependent on this same machine is going with it and is no reason to
+    /// refuse: what the deletion takes, it takes whole.
+    /// </summary>
+    /// <exception cref="Refusal"><c>transition</c>, with <c>dependents</c> saying how many.</exception>
+    private async Task NothingElsewhereDependsAsync(string key, Guid id, CancellationToken cancellationToken)
+    {
+        var here = (await installations.OnMachineAsync(id, null, cancellationToken))
+            .Select(one => one.Id)
+            .ToHashSet();
+
+        var hanging = (await installations.DependentsAsync(here, cancellationToken))
+            .SelectMany(pair => pair.Value)
+            .Where(dependent => !here.Contains(dependent))
+            .Distinct()
+            .Count();
+
+        if (hanging > 0)
+        {
+            throw new Refusal(
+                RefusalCode.Transition,
+                $"{key} carries installations that {hanging} installation(s) on other machines depend on; a machine is not deleted out from under them. Clear their depends_on, or retire it instead.",
+                new Dictionary<string, object?> { ["dependents"] = hanging });
+        }
     }
 }
 
@@ -295,6 +338,13 @@ public sealed class MoveSoftware(
 }
 
 /// <summary>Delete and restore an installation, with its files and its deployments.</summary>
+/// <remarks>
+/// An installation others depend on is not deleted out from under them, the way
+/// a software carrying installations is not: the answer is a number and not a
+/// cascade, because an edge is not a possession and sweeping it away would take
+/// a fact out of somebody else's record. Retiring is the normal end and keeps
+/// every edge (<c>CONTEXT.md</c>, Retired and deleted; ADR 0014).
+/// </remarks>
 public sealed class MoveInstallation(
     ICallerIdentity callerIdentity,
     IInstallations installations,
@@ -311,10 +361,18 @@ public sealed class MoveInstallation(
         var said = Validated.Note(note);
         var before = await installations.LiveAsync(key, settings, cancellationToken);
 
+        // Before anything else, and said with a number, for the reason a
+        // software carrying installations says one.
+        await NothingDependsAsync(before.Key, before.Id, cancellationToken);
+
         await transactions.RunAsync(async () =>
         {
             var row = await installations.LoadForWriteAsync(before.Id, cancellationToken)
                 ?? throw new Refusal(RefusalCode.NotFound, $"No installation {key}.");
+
+            // Asked again inside the transaction: the first answer was read
+            // outside it, and a dependent may have arrived since.
+            await NothingDependsAsync(row.Key, row.Id, cancellationToken);
 
             var now = clock.GetUtcNow();
 
@@ -357,6 +415,20 @@ public sealed class MoveInstallation(
         }, cancellationToken);
 
         return await assembler.CompleteAsync(installation, cancellationToken);
+    }
+
+    /// <exception cref="Refusal"><c>transition</c>, with <c>dependents</c> saying how many.</exception>
+    private async Task NothingDependsAsync(string key, Guid id, CancellationToken cancellationToken)
+    {
+        var hanging = await installations.CountDependentsAsync(id, cancellationToken);
+
+        if (hanging > 0)
+        {
+            throw new Refusal(
+                RefusalCode.Transition,
+                $"{key} still has {hanging} installation(s) depending on it; an installation is not deleted out from under them. Clear their depends_on, or retire this one instead.",
+                new Dictionary<string, object?> { ["dependents"] = hanging });
+        }
     }
 }
 

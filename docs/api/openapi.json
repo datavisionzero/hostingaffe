@@ -1868,7 +1868,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Soft-delete a machine and everything on it — its installations, their files and deployments, and the vms it hosts. Its pages stay, still naming it. One carrying installations that installations on other machines depend on is refused as `transition`, with `dependents` saying how many. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteMachine",
         "parameters": [
           {
@@ -2639,7 +2639,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Create an installation: `key`, `machine`, `software`, `environment` and `role` are required, everything else may arrive later. `version` records the first deployment in the same transaction; without it there is no deployment yet, which is what a planned installation is. `depends_on` names installations by key, on this machine or on another one. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateInstallation",
         "parameters": [
           {
@@ -2709,7 +2709,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "The complete installation: every field, the machine and the software it names, and who touched it last.",
+        "summary": "The complete installation: every field, the machine and the software it names, and who touched it last. `depends_on` is what it needs and `needed_by` is what needs it — the same edge from both ends, one hop, in key order; the second is derived and is not written.",
         "operationId": "ReadInstallation",
         "parameters": [
           {
@@ -2758,7 +2758,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Change any field but the key, which is immutable. A field left out stays as it is; the empty string clears a text field and an empty list clears a list — `depends_on` included, which is replaced whole and never patched entry by entry. `If-Match` with the `updated_at` last read guards the write. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "ChangeInstallation",
         "parameters": [
           {
@@ -2844,7 +2844,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. Deleting is for mistakes; retiring is `status=retired`. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Soft-delete an installation with its files and its deployments. Its pages stay, still naming it. One that others depend on is refused as `transition`, with `dependents` saying how many: an installation is not deleted out from under them. Deleting is for mistakes; retiring is `status=retired` and keeps every edge. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "DeleteInstallation",
         "parameters": [
           {
@@ -5501,6 +5501,15 @@
               "$ref": "#/components/schemas/Secret"
             }
           },
+          "depends_on": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
           "backup": {
             "oneOf": [
               {
@@ -5900,6 +5909,15 @@
             ],
             "items": {
               "$ref": "#/components/schemas/Secret"
+            }
+          },
+          "depends_on": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
             }
           },
           "backup": {
@@ -6709,6 +6727,7 @@
           "path",
           "data",
           "secrets",
+          "depends_on",
           "backup",
           "monitoring",
           "logging",
@@ -6797,6 +6816,15 @@
             ],
             "items": {
               "$ref": "#/components/schemas/Secret"
+            }
+          },
+          "depends_on": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
             }
           },
           "backup": {
@@ -7206,6 +7234,8 @@
           "path",
           "data",
           "secrets",
+          "depends_on",
+          "needed_by",
           "backup",
           "monitoring",
           "logging",
@@ -7267,6 +7297,18 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Secret"
+            }
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "needed_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           },
           "backup": {

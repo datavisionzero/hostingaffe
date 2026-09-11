@@ -54,9 +54,10 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
 
         builder.Property(i => i.Name).HasColumnName("name").HasMaxLength(Installation.NameMaxLength).IsRequired();
 
-        // The two relationships the model builds, and no third. No cascade:
-        // what a deleted machine does to the installations on it is the soft
-        // delete's business, not the database's.
+        // Two of the three relationships the model builds; the third is
+        // `installation_depends_on` below. No cascade: what a deleted machine
+        // does to the installations on it is the soft delete's business, not the
+        // database's.
         builder.Property(i => i.MachineId).HasColumnName("machine_id").IsRequired();
         builder.HasOne<Machine>()
             .WithMany()
@@ -173,6 +174,43 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
         });
 
         builder.Navigation(i => i.Secrets).AutoInclude();
+
+        // The third relationship, and the only one that points at this same
+        // table (ADR 0014). It is a row and not a `text[]` of keys for the
+        // reason every other relationship is a foreign key: a key in an array
+        // names something the database cannot be asked to hold on to, and
+        // "which installations depend on this one" — the question the whole
+        // edge exists for — would be a scan rather than an index read.
+        builder.OwnsMany(i => i.DependsOn, dependency =>
+        {
+            dependency.ToTable("installation_depends_on");
+
+            dependency.WithOwner().HasForeignKey("installation_id")
+                .HasConstraintName("fk_installation_depends_on_installation");
+            dependency.Property(d => d.DependsOnId).HasColumnName("depends_on_id");
+
+            // The pair is the row: an installation depends on another one once,
+            // and a second row saying it again would be nothing new.
+            dependency.HasKey("installation_id", nameof(Dependency.DependsOnId))
+                .HasName("pk_installation_depends_on");
+
+            // No cascade here either, and for a sharper reason than above: an
+            // installation others depend on is refused deletion outright
+            // (DeletionActs), so nothing is ever swept out from under a
+            // dependent — and the soft delete leaves the row standing, which is
+            // what a restore needs.
+            dependency.HasOne<Installation>()
+                .WithMany()
+                .HasForeignKey(d => d.DependsOnId)
+                .HasConstraintName("fk_installation_depends_on_target")
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Read from the other side on every `needed_by`, which is the
+            // direction a person actually asks in.
+            dependency.HasIndex(d => d.DependsOnId).HasDatabaseName("installation_depends_on_target");
+        });
+
+        builder.Navigation(i => i.DependsOn).AutoInclude();
 
         // The ports and the secrets are tables of their own: a port is searched
         // as a number, looked up in its column — which is what makes VISION 5's

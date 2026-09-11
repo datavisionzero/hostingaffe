@@ -14,9 +14,10 @@ namespace Hostingaffe.Domain.Installations;
 /// ambiguous in a product that also knows a systemd unit as a file.
 /// </para>
 /// <para>
-/// <see cref="MachineId"/> is the second and last relationship the model builds.
-/// <c>depends_on</c> is roadmap (VISION 15.2) and is not a column here, not even
-/// a nullable one prepared in advance.
+/// <see cref="MachineId"/> and <see cref="SoftwareId"/> are two of the three
+/// relationships the model builds; <see cref="DependsOn"/> is the third, which
+/// VISION 15.2 held back until the first real host showed that the other two do
+/// not carry "what falls out if I touch this" (ADR 0014).
 /// </para>
 /// <para>
 /// <strong>There is no version field.</strong> The current version is the one of
@@ -43,6 +44,12 @@ public sealed class Installation
     /// ports are: a list is replaced whole and never reached into.
     /// </summary>
     private readonly List<Secret> _secrets = [];
+
+    /// <summary>
+    /// What it needs, in the field EF Core fills — read only for the reason the
+    /// ports are: a list is replaced whole and never reached into.
+    /// </summary>
+    private readonly List<Dependency> _dependsOn = [];
 
     private Installation()
     {
@@ -132,6 +139,19 @@ public sealed class Installation
     /// on the host (ADR 0011).
     /// </summary>
     public IReadOnlyList<Secret> Secrets => _secrets;
+
+    /// <summary>
+    /// The installations this one needs to do its job: the reverse proxy in
+    /// front of it, the database beside it. One hop and never a closure — a
+    /// transitive list would put this installation under one it never named,
+    /// which is the second truth VISION 7 avoids (ADR 0014).
+    /// </summary>
+    /// <remarks>
+    /// The entries are ids; the keys are the act's to resolve. What needs
+    /// <em>this</em> installation is the same rows read the other way and is
+    /// derived on read, never stored.
+    /// </remarks>
+    public IReadOnlyList<Dependency> DependsOn => _dependsOn;
 
     /// <summary>The backup decision, as a field so that it can be listed.</summary>
     public Backup Backup { get; private set; }
@@ -263,6 +283,30 @@ public sealed class Installation
             SoftwareId = software.Id;
         }
 
+        // The third relationship, and rows rather than keys for the reason the
+        // two above are: the Domain resolves nothing. The list has no order of
+        // its own, so it is held in key order — which makes a caller who sends
+        // the same set in another order no change at all, and an export of it
+        // the same bytes twice.
+        if (edit.DependsOn is { } dependencies)
+        {
+            var wanted = InOrder(dependencies);
+
+            if (!_dependsOn.Select(one => one.DependsOnId).ToHashSet().SetEquals(wanted.Select(one => one.Id)))
+            {
+                _dependsOn.Clear();
+                _dependsOn.AddRange(wanted.Select(one => Dependency.On(one.Id)));
+
+                // What the list became, and not what it was. The rows hold ids,
+                // and the keys a person reads are the act's to resolve; the
+                // previous history row carries the previous list, which is what
+                // makes the pair readable without the Domain looking anything up
+                // (docs/storage.md, A list records what it became).
+                changes.Add(new FieldChange(
+                    "depends_on", null, Fields.Joined(wanted, one => one.Key)));
+            }
+        }
+
         // A description records that it changed, never how: the history is read
         // for what happened, and the text itself is one read away.
         if (edit.Description is not null && edit.Description != Description)
@@ -296,6 +340,41 @@ public sealed class Installation
     {
         DeletedAt = null;
         DeletedBy = null;
+    }
+
+    /// <summary>
+    /// The dependencies a caller gave, checked and put in key order. An
+    /// installation does not depend on itself: that is not a relationship, it is
+    /// a typo, and the one shape of cycle worth refusing. A longer one is not
+    /// refused — the product reads one hop and computes no closure, so a cycle
+    /// costs nothing to hold, and two services that need each other exist
+    /// (ADR 0014).
+    /// </summary>
+    /// <exception cref="ArgumentException">There are too many, one is this one, or one is named twice.</exception>
+    private IReadOnlyList<Installation> InOrder(IReadOnlyList<Installation> given)
+    {
+        if (given.Count > ListMaxCount)
+        {
+            throw new ArgumentException($"A depends_on list holds at most {ListMaxCount} entries.", "depends_on");
+        }
+
+        var ordered = given.OrderBy(one => one.Key, StringComparer.Ordinal).ToArray();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var one in ordered)
+        {
+            if (one.Id == Id)
+            {
+                throw new ArgumentException($"{Key} would depend on itself.", "depends_on");
+            }
+
+            if (!seen.Add(one.Key))
+            {
+                throw new ArgumentException($"{one.Key} is in depends_on twice.", "depends_on");
+            }
+        }
+
+        return ordered;
     }
 
     /// <exception cref="ArgumentException"><paramref name="name"/> is blank, spans lines, or is too long.</exception>

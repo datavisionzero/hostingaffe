@@ -15,9 +15,14 @@ namespace Hostingaffe.Domain.Installations;
 /// and one without either is not an installation.
 /// </para>
 /// <para>
-/// There is no <c>version</c> here and no <c>depends_on</c>. The first is
-/// derived from the deployments, the second is roadmap (VISION 15.2), and
-/// neither is a field an edit can carry.
+/// <see cref="DependsOn"/> is rows for the reason those two are, and is the one
+/// list here that is not made of value objects: what an installation depends on
+/// is other installations, and the Domain is handed them rather than their keys.
+/// </para>
+/// <para>
+/// There is no <c>version</c> here and no <c>needed_by</c>. Both are derived —
+/// the first from the deployments, the second from the dependencies read the
+/// other way — and neither is a field an edit can carry.
 /// </para>
 /// </remarks>
 public sealed record InstallationEdit
@@ -43,6 +48,9 @@ public sealed record InstallationEdit
     public string? Data { get; init; }
 
     public IReadOnlyList<Secret>? Secrets { get; init; }
+
+    /// <summary>The installations this one needs; an empty list clears them.</summary>
+    public IReadOnlyList<Installation>? DependsOn { get; init; }
 
     public Backup? Backup { get; init; }
 

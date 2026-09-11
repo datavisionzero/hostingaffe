@@ -19,6 +19,8 @@ const installation = {
   path: "/opt/compose/logaffe",
   data: "/srv/services/logaffe",
   secrets: [{ name: "logaffe/postgres-password", path: "/opt/compose/logaffe/.env.runtime" }],
+  depends_on: ["caddy"],
+  needed_by: [],
   backup: "active",
   monitoring: "external",
   logging: "central",
@@ -91,6 +93,17 @@ describe("an installation (VISION 6.2)", () => {
     // records the place, and vaultaffe holds the value (VISION 11, ADR 0011).
     expect(screen.getByText("logaffe/postgres-password")).toBeInTheDocument();
     expect(screen.getByText("/opt/compose/logaffe/.env.runtime")).toBeInTheDocument();
+  });
+
+  // The edge is written from one end and read from both, and what it depends on
+  // is a link: the question behind it is "what falls out if I touch this", and
+  // the answer has to be one click away (ADR 0014).
+  it("links to what it depends on, and leaves out the end with nothing in it", async () => {
+    view();
+
+    expect(await screen.findByRole("link", { name: "caddy" })).toHaveAttribute("href", "/installations/caddy");
+    expect(screen.getByText("Depends on")).toBeInTheDocument();
+    expect(screen.queryByText("Needed by")).not.toBeInTheDocument();
   });
 
   // The version on an installation is the newest deployment's, so the newest

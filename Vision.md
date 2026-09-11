@@ -329,10 +329,12 @@ Instance
 └── Identity           (user or agent)
 ```
 
-Two relationships are built in and no others: an installation is on a machine,
-and a VM is on a host machine. A third — an installation depends on another
-installation — is the first candidate for the roadmap (15.2), not a field in
-the MVP.
+Three relationships are built in and no others: an installation is on a
+machine, a VM is on a host machine, and an installation depends on another
+installation. The third was held back until the MVP showed whether the first two
+carried the everyday questions; the first host with a shared reverse proxy showed
+that they do not, and it is a field
+([ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
 
 Every entity has a **key**: a short, lowercase, immutable handle the operator
 chooses — `caddy`, `ex44`, `docker-prod-01`, `logaffe-prod`. Keys are what
@@ -424,6 +426,8 @@ means something else to systemd and to Docker Compose.
 | `backup` | `none` · `planned` · `active` | the decision, as in the template |
 | `monitoring` | `none` · `planned` · `external` | the decision, like the backup: `planned` is what was deferred on purpose, `none` what nobody decided |
 | `logging` | `local` · `central` | |
+| `depends_on` | list of installation keys | what it needs to do its job: the proxy in front of it, the database beside it — on this machine or on another one |
+| `needed_by` | derived | what needs *it*: the same edge read from the other end |
 | `version` | derived | the `version` of its latest deployment by `at` |
 | `description` | Markdown | the runbook: how it is deployed, checked, updated, rolled back, what its data is |
 
@@ -457,6 +461,17 @@ second in the description has the fact that decides every backup as prose
 Where a host keeps both in one directory, both fields say it, and nothing holds
 them apart: two directories is what the model allows, not what it demands.
 
+**`depends_on` is written from one end and read from both.** An installation
+names what it needs; what needs it is `needed_by`, derived on read the way a
+version is derived from the deployments, so there are never two lists to
+disagree. It reaches across machines, because a proxy on its own host is what the
+relationship is for, and `ha machine context` names a dependency that lies
+elsewhere with its machine. It is one hop and never a closure: nothing computes
+what a dependency itself depends on, because a record says what somebody wrote
+down. And an installation others depend on is not deleted out from under them —
+retiring is the normal end and keeps every edge
+([ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+
 The three decision fields — backup, monitoring, logging — are fields rather
 than prose because they are the ones we want to *list*: "every production
 installation without a backup" is a question the product must answer in one
@@ -471,8 +486,10 @@ starting point, not a schema: an agent may delete a heading that does not
 apply.
 
 **Deliberately left out:** criticality, acceptable downtime, acceptable data
-loss, owner, external dependencies (15.2), a `logaffe` project reference and a
-`vaultaffe` reference (15.4).
+loss, owner, a dependency on anything that is not an installation — a machine's
+own systemd timer is a file, and what it concerns is prose
+([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md))
+— a `logaffe` project reference and a `vaultaffe` reference (15.4).
 
 ### The File
 
@@ -543,10 +560,13 @@ installation it fronts. That installation says so in its description instead —
 the path, and `[caddy](installation:caddy)` — the way the `hostaffe` template
 already says it under **Network** in every service's own document. A second
 owner would be a claim on a directory that is not the service's, and a field
-naming what a file *concerns* would be 15.2 entered through the side door, with
-the wrong cardinality: a fragment can front two installations and a
-`daemon.json` concerns them all
-([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+naming what a file *concerns* would say the relationship in the wrong place and
+with the wrong cardinality: a fragment can front two installations and a
+`daemon.json` concerns them all. The relationship itself is `depends_on` on the
+installations
+([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md),
+[ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md));
+what stays here is the fragment's path.
 
 **Deliberately left out:** directories as objects, binary content, symlinks,
 ownership and mode beyond the executable bit, templates or variable
@@ -854,7 +874,6 @@ is what the host runs, verbatim, so that what is stored is what is true.
 **Not included (deliberately deferred):**
 
 - Assisted measurement of a machine from the machine itself (15.1).
-- Dependencies between installations (15.2).
 - Live references into logaffe and vaultaffe beyond a link (15.4).
 - An MCP server (15.5).
 - Import from an existing `hostaffe`-style repository as a feature: the
@@ -879,11 +898,19 @@ the record — is the drift check for configuration.
 
 ### 15.2 An installation depends on an installation
 
+**Shipped**, and part of the model (7).
+
 Caddy on `ingress-01` routes to payaffe on `docker-stage-01`; payaffe uses the
-Postgres beside it. A `depends_on` list of installation keys would let the
-machine screen say what breaks when the machine goes down, across machines. It
-is the one relationship worth adding, and it is deferred only because the MVP
-should first show whether the two built-in ones carry the everyday questions.
+Postgres beside it. A `depends_on` list of installation keys lets the machine
+screen say what breaks when the machine goes down, across machines. It was the
+one relationship worth adding, and it was deferred only until the MVP showed
+whether the two built-in ones carry the everyday questions. The first host with a
+shared reverse proxy showed that they do not — nine of ten installations behind
+one Caddy, and nothing in the record saying so — and it is now part of the model
+(7,
+[ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+What stays out of it: a closure, a startup order, and a dependency on anything
+that is not an installation.
 
 ### 15.3 The context package, tuned
 

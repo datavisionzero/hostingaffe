@@ -5,10 +5,24 @@ import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { Failed, Fields, Nothing, Section, Waiting } from "@/shared/Detail";
 import { moment } from "@/shared/when";
-import { machinePath, softwarePath } from "./addresses";
+import { installationPath, machinePath, softwarePath } from "./addresses";
 import { About, Asks, Attached, Description, Files, History, Line, Rows, StatusBadge } from "./Parts";
 
 type Installation = Schemas["Installation"];
+
+/** A list of installation keys, each a link to the installation it names. */
+function Keys({ keys }: { keys: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-1">
+      {keys.map((key) => (
+        <Link key={key} className="text-brand hover:underline" to={installationPath(key)}>
+          <Badge variant="outline">{key}</Badge>
+        </Link>
+      ))}
+    </span>
+  );
+}
+
 type DeploymentSummary = Schemas["DeploymentSummary"];
 type HistoryEntry = Schemas["HistoryEntry"];
 
@@ -119,6 +133,16 @@ export function InstallationView() {
                     </li>
                   ))}
                 </ul>
+              )],
+              // The one edge from both ends. The first is what this
+              // installation was written to need; the second is what needs it,
+              // derived from the other side and never written — and it is the
+              // one a person reads before touching anything (ADR 0014).
+              ["Depends on", installation.depends_on.length === 0 ? null : (
+                <Keys keys={installation.depends_on} />
+              )],
+              ["Needed by", installation.needed_by.length === 0 ? null : (
+                <Keys keys={installation.needed_by} />
               )],
             ]}
           />

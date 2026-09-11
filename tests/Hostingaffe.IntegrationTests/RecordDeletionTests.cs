@@ -251,6 +251,97 @@ public sealed class RecordDeletionTests(PostgresFixture postgres)
             .EnumerateArray().Select(row => row.GetProperty("key").GetString()!)];
 
     /// <summary>A machine with everything the record can hang under it.</summary>
+    /// <summary>
+    /// An edge is not a possession: sweeping it away with a cascade would take a
+    /// fact out of somebody else's record, so what others depend on is refused
+    /// deletion and the number says how many. Retiring is the normal end and
+    /// keeps every edge (ADR 0014).
+    /// </summary>
+    [Fact]
+    public async Task An_installation_others_depend_on_is_not_deleted_out_from_under_them()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var proxy = await admin.PostAsJsonAsync(
+            "/api/installations",
+            new
+            {
+                key = "caddy",
+                machine = "ex44",
+                software = "logaffe",
+                environment = "production",
+                role = "platform",
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, proxy.StatusCode);
+
+        using var hung = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "caddy" } }, Ct);
+        Assert.Equal(HttpStatusCode.OK, hung.StatusCode);
+
+        using var refused = await admin.DeleteAsync("/api/installations/caddy", Ct);
+        var problem = await Refusals.Problem(refused, HttpStatusCode.UnprocessableEntity, "transition");
+        Assert.Equal(1, problem.GetProperty("dependents").GetInt32());
+
+        // Retiring is the normal end, and it keeps the edge standing.
+        using var retired = await admin.PatchAsJsonAsync("/api/installations/caddy", new { status = "retired" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
+        var still = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod", Ct);
+        Assert.Equal(["caddy"], still.GetProperty("depends_on").EnumerateArray().Select(one => one.GetString()));
+
+        // Cleared, it goes.
+        using var let = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = Array.Empty<string>() }, Ct);
+        Assert.Equal(HttpStatusCode.OK, let.StatusCode);
+        using var gone = await admin.DeleteAsync("/api/installations/caddy", Ct);
+        Assert.Equal(HttpStatusCode.NoContent, gone.StatusCode);
+    }
+
+    /// <summary>
+    /// The same rule one level up: a machine takes its installations with it,
+    /// and one of them may be what an installation on another machine depends
+    /// on. A dependent that is going along is no reason to refuse.
+    /// </summary>
+    [Fact]
+    public async Task A_machine_carrying_what_another_machine_depends_on_is_not_deleted_either()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var ingress = await admin.PostAsJsonAsync(
+            "/api/machines", new { key = "ingress-01", kind = "vps" }, Ct);
+        Assert.Equal(HttpStatusCode.Created, ingress.StatusCode);
+
+        using var proxy = await admin.PostAsJsonAsync(
+            "/api/installations",
+            new
+            {
+                key = "caddy",
+                machine = "ingress-01",
+                software = "logaffe",
+                environment = "production",
+                role = "platform",
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, proxy.StatusCode);
+
+        using var hung = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { depends_on = new[] { "caddy" } }, Ct);
+        Assert.Equal(HttpStatusCode.OK, hung.StatusCode);
+
+        using var refused = await admin.DeleteAsync("/api/machines/ingress-01", Ct);
+        var problem = await Refusals.Problem(refused, HttpStatusCode.UnprocessableEntity, "transition");
+        Assert.Equal(1, problem.GetProperty("dependents").GetInt32());
+
+        // The machine the dependent is itself on goes whole, edge and all: what
+        // the deletion takes, it takes together.
+        using var whole = await admin.DeleteAsync("/api/machines/ex44", Ct);
+        Assert.Equal(HttpStatusCode.NoContent, whole.StatusCode);
+    }
+
     private static async Task Ground(HttpClient client)
     {
         using var machine = await client.PostAsJsonAsync("/api/machines", new { key = "ex44", kind = "dedicated" }, Ct);

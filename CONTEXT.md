@@ -27,8 +27,9 @@ Instance
 └── Identity           user or agent
 ```
 
-Two relationships are built in and no others: an installation is on a machine,
-and a virtual machine is on a host machine.
+Three relationships are built in and no others: an installation is on a
+machine, a virtual machine is on a host machine, and an installation depends on
+another installation.
 
 ## Key
 
@@ -120,6 +121,24 @@ down -v` does not bring back ([ADR 0009](docs/adr/0009-an-installation-has-two-d
 Where a host keeps configuration and state in one directory, both say the same
 thing, and nothing holds them apart.
 
+**`depends_on` is what an installation needs** — a list of installation keys,
+on this machine or on another one: the reverse proxy in front of it, the
+database beside it. It is written from one end only. What needs *this*
+installation is `needed_by`, derived on read from the installations that name it
+and never written, so the two can never disagree
+([ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+
+It is **one hop**: nothing computes what a dependency itself depends on, and no
+list ever carries an installation that did not name it. An installation does not
+depend on itself; a longer cycle is not refused, because nothing here computes a
+closure or a startup order. An installation others depend on is not deleted, and
+neither is a machine carrying one they depend on — retiring is the normal end and
+keeps every edge.
+
+What is depended on is always an **installation**. Two installations sharing a
+backup timer that lives on the machine depend on a file, and what a file concerns
+is prose ([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+
 `version` is derived: the version of the installation's latest deployment.
 
 ## Deployment
@@ -161,10 +180,11 @@ The TLS endpoint is `sites/hostingaffe.caddy` in [caddy](installation:caddy).
 ```
 
 There is no field for a second installation a file concerns. A relationship
-between installations is
-[Vision §15.2](Vision.md#152-an-installation-depends-on-an-installation), not a
-column here
-([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+between installations is `depends_on` on the installations, not a column here
+([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md),
+[ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+The edge carries the relationship; the fragment's **path** is still the sentence
+above.
 
 An owner is named by its kind and its key together — `{"kind": "machine", "key":
 "ex44"}` — because a key is unique per entity type and not across them, and a

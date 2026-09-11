@@ -175,8 +175,10 @@ func SoftwareSummaries(w io.Writer, items []api.SoftwareSummary) {
 }
 
 // Installation prints the complete installation: the two keys that make it one,
-// the answers to the questions every installation answers, and the three
-// decisions that are the point of asking.
+// the answers to the questions every installation answers, the three decisions
+// that are the point of asking, and the one edge from both ends — what it needs,
+// and what needs it. The second is what a person asks before an intervention,
+// and it is the instance's to derive (ADR 0014).
 func Installation(w io.Writer, i api.Installation) {
 	fmt.Fprintf(w, "%s  %s\n", i.Key, i.Name)
 	line(w, said("machine", i.Machine), said("software", i.Software), maybe("version", i.Version))
@@ -189,6 +191,8 @@ func Installation(w io.Writer, i api.Installation) {
 	line(w, said("ports", Ports(i.Ports)))
 	line(w, said("urls", strings.Join(i.Urls, ", ")))
 	line(w, said("secrets", Secrets(i.Secrets)))
+	line(w, said("depends on", strings.Join(i.DependsOn, ", ")))
+	line(w, said("needed by", strings.Join(i.NeededBy, ", ")))
 	touched(w, i.UpdatedAt, i.UpdatedBy, i.CreatedBy)
 	body(w, i.Description)
 }

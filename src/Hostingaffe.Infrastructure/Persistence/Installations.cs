@@ -14,7 +14,9 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// production installation without a backup" one query rather than a scan
 /// (VISION 7). The ports come with the row: they are part of what an
 /// installation is, and a second round trip per row would be the cost of
-/// pretending otherwise.
+/// pretending otherwise. So do the dependencies, and they are ids — the keys
+/// are resolved once for a whole list where a shape is assembled, never once
+/// per row.
 /// </remarks>
 public sealed class Installations(HostingaffeDbContext context) : IInstallations
 {
@@ -83,6 +85,60 @@ public sealed class Installations(HostingaffeDbContext context) : IInstallations
 
     public Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken) =>
         context.Installations.CountAsync(i => i.SoftwareId == softwareId && i.DeletedAt == null, cancellationToken);
+
+    public async Task<IReadOnlyList<Installation>> LiveByKeysAsync(
+        IEnumerable<string> keys, CancellationToken cancellationToken)
+    {
+        var wanted = keys?.Distinct(StringComparer.Ordinal).ToArray() ?? [];
+
+        return wanted.Length == 0
+            ? []
+            : await context.Installations
+                .Where(i => wanted.Contains(i.Key) && i.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+    }
+
+    // The edge read from the other side, and the reason `installation_depends_on`
+    // carries an index on its target column. A deleted dependent does not count:
+    // `needed_by` says what would fall out, and what is deleted has fallen out
+    // already.
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> DependentsAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var wanted = ids?.Distinct().ToArray() ?? [];
+
+        if (wanted.Length == 0)
+        {
+            return new Dictionary<Guid, IReadOnlyList<Guid>>();
+        }
+
+        var found = await context.Installations
+            .Where(i => i.DeletedAt == null)
+            .SelectMany(
+                i => i.DependsOn.Where(d => wanted.Contains(d.DependsOnId)),
+                (i, d) => new { Target = d.DependsOnId, Dependent = i.Id })
+            .ToListAsync(cancellationToken);
+
+        return found
+            .GroupBy(one => one.Target)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Guid>)[.. group.Select(one => one.Dependent)]);
+    }
+
+    public Task<int> CountDependentsAsync(Guid id, CancellationToken cancellationToken) =>
+        context.Installations
+            .CountAsync(i => i.DeletedAt == null && i.DependsOn.Any(d => d.DependsOnId == id), cancellationToken);
+
+    public async Task<IReadOnlyList<Installation>> FindManyAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var wanted = ids?.Distinct().ToArray() ?? [];
+
+        return wanted.Length == 0
+            ? []
+            : await context.Installations.Where(i => wanted.Contains(i.Id)).ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken)

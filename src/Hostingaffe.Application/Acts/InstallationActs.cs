@@ -73,6 +73,14 @@ public sealed record InstallationSummaryShape(
     DateTimeOffset UpdatedAt);
 
 /// <summary>The complete installation: every field of VISION 7, and who touched it.</summary>
+/// <remarks>
+/// <see cref="DependsOn"/> and <see cref="NeededBy"/> are the one edge read from
+/// its two ends. The first is written and is the installations this one needs;
+/// the second is derived on read and is the installations that need it — the
+/// question a person actually asks before an intervention, and never a second
+/// list somebody could write into disagreement with the first (ADR 0014). Both
+/// are keys in key order, one hop and no closure.
+/// </remarks>
 public sealed record InstallationShape(
     string Key,
     string Name,
@@ -86,6 +94,8 @@ public sealed record InstallationShape(
     string? Path,
     string? Data,
     IReadOnlyList<SecretShape> Secrets,
+    IReadOnlyList<string> DependsOn,
+    IReadOnlyList<string> NeededBy,
     Backup Backup,
     Monitoring Monitoring,
     Logging Logging,
@@ -130,6 +140,7 @@ public sealed record CreateInstallationRequest(
     string? Path,
     string? Data,
     IReadOnlyList<SecretShape>? Secrets,
+    IReadOnlyList<string>? DependsOn,
     Backup? Backup,
     Monitoring? Monitoring,
     Logging? Logging,
@@ -157,6 +168,7 @@ public sealed record ChangeInstallationRequest(
     string? Path,
     string? Data,
     IReadOnlyList<SecretShape>? Secrets,
+    IReadOnlyList<string>? DependsOn,
     Backup? Backup,
     Monitoring? Monitoring,
     Logging? Logging,
@@ -167,7 +179,8 @@ public sealed record ChangeInstallationRequest(
     /// request object refuses it as <c>unknown-field</c> rather than ignoring
     /// what somebody meant (<c>docs/api.md</c>, Conventions) — which is what
     /// makes the key immutable, and what refuses <c>version</c> and
-    /// <c>depends_on</c>: the first is derived, the second is roadmap.
+    /// <c>needed_by</c>: both are derived, the first from the deployments and
+    /// the second from the dependencies read the other way.
     /// </summary>
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -183,7 +196,11 @@ public sealed record ChangeInstallationRequest(
 /// recording would move the present every time somebody backfilled the past.
 /// </remarks>
 public sealed class InstallationAssembler(
-    IIdentities identities, IMachines machines, ISoftware software, IDeployments deployments)
+    IIdentities identities,
+    IMachines machines,
+    ISoftware software,
+    IInstallations installations,
+    IDeployments deployments)
 {
     public async Task<IReadOnlyList<InstallationSummaryShape>> SummariesAsync(
         IReadOnlyList<Installation> rows, CancellationToken cancellationToken)
@@ -220,6 +237,7 @@ public sealed class InstallationAssembler(
             [installation.CreatedBy, installation.UpdatedBy], cancellationToken);
         var (machineKeys, softwareKeys) = await KeysAsync([installation], cancellationToken);
         var versions = await VersionsAsync([installation], cancellationToken);
+        var (dependsOn, neededBy) = await EdgeAsync(installation, cancellationToken);
 
         return new InstallationShape(
             installation.Key,
@@ -234,6 +252,8 @@ public sealed class InstallationAssembler(
             installation.Path,
             installation.Data,
             [.. installation.Secrets.Select(SecretShape.Of)],
+            dependsOn,
+            neededBy,
             installation.Backup,
             installation.Monitoring,
             installation.Logging,
@@ -243,6 +263,37 @@ public sealed class InstallationAssembler(
             IdentityRef.Of(people[installation.UpdatedBy]),
             installation.CreatedAt,
             installation.UpdatedAt);
+    }
+
+    /// <summary>
+    /// The one edge from both ends, in key order: what this installation needs,
+    /// and what needs it. Two reads and no join through the shape — the second
+    /// is the same rows asked for by their target, which is what the index on
+    /// <c>depends_on_id</c> is for (ADR 0014).
+    /// </summary>
+    /// <remarks>
+    /// A key is resolved rather than stored beside the id, so a dependency that
+    /// the purge has not reached yet still reads as the key it is. What the
+    /// purge has taken is gone from both ends, because it takes the edges before
+    /// it takes the row.
+    /// </remarks>
+    private async Task<(IReadOnlyList<string> DependsOn, IReadOnlyList<string> NeededBy)> EdgeAsync(
+        Installation installation, CancellationToken cancellationToken)
+    {
+        var dependents = (await installations.DependentsAsync([installation.Id], cancellationToken))
+            .GetValueOrDefault(installation.Id) ?? [];
+
+        var keys = await installations.KeysAsync(
+            installation.DependsOn.Select(one => one.DependsOnId).Concat(dependents), cancellationToken);
+
+        return (Named(installation.DependsOn.Select(one => one.DependsOnId)), Named(dependents));
+
+        IReadOnlyList<string> Named(IEnumerable<Guid> ids) =>
+        [
+            .. ids.Select(id => keys.GetValueOrDefault(id))
+                .OfType<string>()
+                .OrderBy(key => key, StringComparer.Ordinal),
+        ];
     }
 
     /// <summary>
@@ -418,7 +469,11 @@ public sealed class CreateInstallation(
 
         await InstallationWrites.TakenAsync(installations, keys, key, settings, cancellationToken);
 
-        var edit = InstallationWrites.Edit(request);
+        var edit = InstallationWrites.Edit(request) with
+        {
+            DependsOn = await InstallationWrites.DependsOnAsync(
+                installations, request.DependsOn, cancellationToken),
+        };
 
         var created = await transactions.RunAsync(async () =>
         {
@@ -491,6 +546,7 @@ public sealed class ChangeInstallation(
         {
             Machine = await InstallationWrites.MachineAsync(machines, changes.Machine, settings, cancellationToken),
             Software = await InstallationWrites.SoftwareAsync(software, changes.Software, settings, cancellationToken),
+            DependsOn = await InstallationWrites.DependsOnAsync(installations, changes.DependsOn, cancellationToken),
         };
 
         var changed = await transactions.RunAsync(async () =>
@@ -538,7 +594,7 @@ internal static class InstallationWrites
                 {
                     "key" => "An installation's key is immutable; nothing renames it.",
                     "version" => "An installation's version is derived from its deployments and is not written here.",
-                    "depends_on" => "An installation does not depend on another; that is roadmap, not a field.",
+                    "needed_by" => "What needs an installation is read from the depends_on of the installations that name it, and is not written here.",
                     _ => $"An installation has no field {field}.",
                 },
                 new Dictionary<string, object?> { ["field"] = field });
@@ -591,6 +647,45 @@ internal static class InstallationWrites
         string.IsNullOrWhiteSpace(key)
             ? null
             : await Validated.FieldAsync("software", () => software.LiveAsync(key, settings, cancellationToken));
+
+    /// <summary>
+    /// The installations a caller named by key, as rows — <c>null</c> where they
+    /// named none, which leaves the list alone, and empty where they sent an
+    /// empty list, which clears it.
+    /// </summary>
+    /// <remarks>
+    /// One read for the whole list, and a key nothing live answers to is
+    /// <c>validation</c> on the field it arrived in rather than a
+    /// <c>not-found</c> about an address nobody asked for — the rule the machine
+    /// and the software of an installation follow. A deleted installation is not
+    /// one to depend on: it is on its way out, and the record should not grow a
+    /// new reason to keep it.
+    /// </remarks>
+    public static async Task<IReadOnlyList<Installation>?> DependsOnAsync(
+        IInstallations installations, IReadOnlyList<string>? keys, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(installations);
+
+        if (keys is null)
+        {
+            return null;
+        }
+
+        var wanted = keys.Select(one => one?.Trim() ?? string.Empty).ToArray();
+        var found = await installations.LiveByKeysAsync(wanted.Where(Key.IsValid), cancellationToken);
+        var rows = found.ToDictionary(one => one.Key, StringComparer.Ordinal);
+
+        return
+        [
+            .. wanted.Select(one => rows.TryGetValue(one, out var row)
+                ? row
+                : throw Refusal.Validation(
+                    "depends_on",
+                    one.Length == 0
+                        ? "A depends_on entry is the key of an installation."
+                        : $"No installation {one}; depends_on names installations by key.")),
+        ];
+    }
 
     public static InstallationEdit Edit(CreateInstallationRequest request)
     {

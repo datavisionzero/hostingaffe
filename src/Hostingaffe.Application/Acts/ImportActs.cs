@@ -78,6 +78,7 @@ public sealed record ImportInstallation(
     string? Path,
     string? Data,
     IReadOnlyList<SecretShape>? Secrets,
+    IReadOnlyList<string>? DependsOn,
     string? Backup,
     string? Monitoring,
     string? Logging,
@@ -181,6 +182,7 @@ public sealed class ImportRecord(
     ChangeMachine changeMachine,
     CreateSoftware createSoftware,
     CreateInstallation createInstallation,
+    ChangeInstallation changeInstallation,
     CreateFile createFile,
     RecordDeployment recordDeployment,
     CreatePage createPage,
@@ -249,7 +251,11 @@ public sealed class ImportRecord(
 
                 foreach (var installation in machine.Installations ?? [])
                 {
-                    Imports.Closed("installation", installation.UnknownFields, "version", "history");
+                    // `needed_by` beside `version`: both are the instance's own,
+                    // both are in an export, and both are read past rather than
+                    // refused — what needs an installation arrives as the
+                    // depends_on of the installations that name it.
+                    Imports.Closed("installation", installation.UnknownFields, "version", "needed_by", "history");
 
                     if (installation.Machine is { } named && named != machine.Key)
                     {
@@ -281,6 +287,27 @@ public sealed class ImportRecord(
                             cancellationToken);
                         made.Deployments++;
                     }
+                }
+            }
+
+            // Every installation first and what it depends on afterwards, for
+            // the reason a machine's host waits for the second pass: an
+            // installation may depend on one that is further down the same
+            // document, under a machine that has not been read yet, and neither
+            // order of creation would satisfy both directions.
+            foreach (var machine in machines)
+            {
+                foreach (var installation in (machine.Installations ?? [])
+                             .Where(one => one.DependsOn is { Count: > 0 }))
+                {
+                    await changeInstallation.ExecuteAsync(
+                        installation.Key ?? string.Empty,
+                        new ChangeInstallationRequest(
+                            null, null, null, null, null, null, null, null, null, null, null,
+                            installation.DependsOn, null, null, null, null),
+                        ifMatch: null,
+                        note,
+                        cancellationToken);
                 }
             }
 
@@ -381,6 +408,9 @@ public sealed class ImportRecord(
             Validated.Field("role", () => Spelling.Read<Role>(one.Role, "role")),
             Validated.Field("status", () => Spelling.Read<Status>(one.Status, "status")),
             one.Urls, one.Ports, one.Path, one.Data, one.Secrets,
+            // The dependencies are set in the third pass, once every
+            // installation of the document is there.
+            null,
             Validated.Field("backup", () => Spelling.Read<Backup>(one.Backup, "backup")),
             Validated.Field("monitoring", () => Spelling.Read<Monitoring>(one.Monitoring, "monitoring")),
             Validated.Field("logging", () => Spelling.Read<Logging>(one.Logging, "logging")),

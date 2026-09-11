@@ -235,10 +235,26 @@ to take (ADR 0009). `view`, the export tree and `ha machine context` print both.
 `path` — and knows nothing of `data`: what lies there is the machine's, and the
 record only says where it is.
 
-**A list is replaced whole**, never patched entry by entry: `--url`, `--secret`
-and `--port` are repeated, what is given is what the list becomes, and the lone
-value `none` clears it. A port is written and read the way a person writes one,
-`443/tcp:public`; the field itself is the object, and `ha` converts.
+**A list is replaced whole**, never patched entry by entry: `--url`, `--secret`,
+`--port` and `--depends-on` are repeated, what is given is what the list becomes,
+and the lone value `none` clears it. A port is written and read the way a person
+writes one, `443/tcp:public`; the field itself is the object, and `ha` converts.
+
+**`--depends-on` names an installation this one needs**, by key, on this machine
+or on another one:
+
+```sh
+ha inst set logaffe-prod --depends-on caddy --depends-on logaffe-db
+```
+
+`view` prints it as `depends on`, and beside it `needed by` — the same edge read
+from the other end, which the instance derives and nobody writes. Both are one
+hop: what `caddy` itself depends on is a `ha inst view caddy` away, and no list
+here carries an installation that did not name it. **An installation others
+depend on is not deleted** — exit 4, saying how many — and neither is a machine
+carrying one that installations elsewhere depend on; `--status retired` is the
+normal end and keeps every edge
+([ADR 0014](adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
 
 **A secret is written as `NAME@/the/file/it/lies/in`**, or as the bare name
 where nobody has decided where the value goes — never as a value
@@ -441,6 +457,12 @@ host: everything recorded about the machine, as Markdown on stdout, in the
 order that brings first what is needed first — the machine, its installations
 with their version, ports and file list, the last deployments, the software,
 the pages that hang on any of it, and the instance's `decision` pages.
+
+**Each installation says what it depends on and what depends on it**, which is
+the question asked before every intervention: what falls out if I restart this.
+A dependency that lies on another machine is named with that machine —
+`caddy (on ingress-01)` — because a bare key from another host is one this
+document cannot be searched for.
 
 **File contents are not in it**, and that is the point: they are a
 `ha files get` away, and they are what would fill a context window. What comes
