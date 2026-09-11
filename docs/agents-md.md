@@ -103,6 +103,13 @@ ha page add logaffe-restore --title "Restoring logaffe" --kind runbook \
 change. A version change is a deployment; anything else is a `set` with a note
 saying why. A runbook you wrote or corrected is a page.
 
+**A page names the rest of the record with a link**: the target is a scheme and
+an address — `[the runbook](page:backup-restore)`, and likewise `machine:ex44`,
+`software:caddy` and `installation:app-1`. A relative path to a file in some
+repository is not a link here — there is no tree to resolve it against, and it
+renders as plain text. Nothing checks a body as it is written; `ha page check`
+says which references point at nothing.
+
 Never put a secret in the record — not in a file, not in a description, not in
 a page. `secrets` on an installation holds the *names* of the secrets it needs;
 the values live where secrets live. `.env` and anything under `secrets/` are

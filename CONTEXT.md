@@ -155,6 +155,14 @@ status, no supersedes and no enforced template. `attached_to` names a machine
 or an installation, or is empty for a page of the instance, and a page does not
 follow its anchor into deletion.
 
+A body names another thing of the record as a Markdown link whose target is a
+scheme and an address — `[the runbook](page:backup-restore)`, and likewise
+`machine:ex44`, `software:caddy` and `installation:app-1`
+([ADR 0007](docs/adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)).
+That is the Key rule above written down: where a key stands alone it carries
+its type. Nothing validates a body, so a reference that points at nothing is
+stored like any other text.
+
 ## History
 
 Every change to a machine, software, installation, file or page: who, when,

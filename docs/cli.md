@@ -198,7 +198,7 @@ user's own repository.
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
 | `ha search` | one call over every field, every Markdown body and every file |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
-| `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history` |
+| `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history`, `check` |
 | `ha login`, `ha logout`, `ha status` | signing this machine in, out, and what it holds (ADR 0005) |
 | `ha me`, `ha version`, `ha user`, `ha agent`, `ha token` | the foundation's, unchanged |
 
@@ -347,6 +347,48 @@ is not a word — `logaffe` finds the software and the installation by their key
 and not inside `/srv/logaffe`. A port is a number rather than a word and is
 looked up as one, which is what makes the first example answer. A file answers
 for the revision it is at, and a deleted row is not a hit.
+
+## Pages, and what they link to
+
+A Markdown body names another thing of the record with a scheme and an address
+([ADR 0007](adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)):
+
+```md
+Restore it as [the runbook](page:backup-restore) says, on [ex44](machine:ex44),
+where [caddy](software:caddy) runs as [app-1](installation:app-1).
+```
+
+The scheme carries the type because the address does not — a key is unique per
+entity type, so the machine `caddy` and the software `caddy` coexist. The web
+application follows those four schemes to its own screens; everything else in a
+body is a foreign link or plain text, and a relative path to a file in some
+repository is the latter: the instance has no tree to resolve it against.
+
+**Nothing checks a body as it is written.** The instance stores Markdown and
+does not parse it, so a reference to a page nobody wrote is stored like any
+other text, and renaming a page breaks whatever pointed at it — which planaffe
+ADR 0021 always said it would.
+
+```sh
+ha page check                 # every page: what points at nothing
+ha page check backup-restore  # just the one
+```
+
+A line per dead reference: the page it stands in, what it points at, and the
+words it was written as. `--json` gives the same as a list.
+
+**It is a report and not a gate.** It exits 0 whether or not it found anything,
+because every exit code `ha` gives is derived from how the instance answered
+(Exit codes, above), and a number `ha` invented from what it read would be the
+first that is not. A script branches on `--json` — an empty list is a wiki
+whose pages all still find each other. It is composed from the ordinary
+endpoints, the way the export is, so it costs one read per page.
+
+**A migrated repository gets its links written for it.** The bulk write takes a
+`path` on each page — where that page's Markdown sat before — and rewrites the
+relative `.md` links in the bodies onto the slugs the pages arrive as. See
+[`api.md`](api.md), Importing; a path no page in the document claims is left
+exactly as it was.
 
 ## Context
 

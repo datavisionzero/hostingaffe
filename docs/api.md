@@ -536,7 +536,8 @@ transaction**:
                                   "environment": "production", "role": "application",
                                   "files": [{"path": "compose.yml", "content": "…"}],
                                   "deployments": [{"version": "1.4.0", "at": "2026-09-05T12:00:00Z"}]}]}],
- "pages": [{"slug": "backup-restore", "title": "Restoring a backup", "kind": "runbook"}]}
+ "pages": [{"slug": "backup-restore", "title": "Restoring a backup", "kind": "runbook",
+            "path": "docs/operations/backup-restore.md"}]}
 ```
 
 **All or nothing.** It is the ordinary acts run inside one transaction, so every
@@ -558,6 +559,27 @@ had would be a worse copy than one that says where it began. **An installation's
 `version` is not read**, because the deployments are in the document and they
 are what a version is derived from. **A vm finds its host anywhere in the same
 document**: every machine is created first and the hosts are set afterwards.
+
+**A page says where it came from, and its links are rewritten.** `path` is the
+file the page's Markdown sat in before — `docs/setup/README.md` — and it is
+read for one thing and never stored: a relative `.md` link in any body is
+resolved against it and turned into `page:<slug>`, the address of the page that
+arrives in the same document under that path (ADR 0007). A path no page in the
+document claims is left exactly as it was, because a dead link the reader can
+see beats an address the import invented. `links` in the answer counts what was
+rewritten, which is what says whether the paths in the document were the ones
+the bodies actually used.
+
+**Two pages that want one slug are named.** The slug space is flat and
+instance-wide (ADR 0003) and a repository of Markdown is not, so five
+directories each holding a `README.md` are ordinary there and one name here.
+The document is read for that before anything is written, and the refusal says
+which two entries collided rather than only which slug:
+
+```json
+{"type": "…/validation", "status": 400,
+ "errors": {"slug": ["docs/setup/README.md and docs/operations/README.md both want the slug readme, and a slug names one page in the whole instance; one of them is given another."]}}
+```
 
 `note` goes into the history beside every change the import makes.
 
@@ -641,3 +663,16 @@ the same rule the body follows.
 Filtering is `?kind=runbook`, `?machine=ex44` and `?installation=logaffe-prod`.
 Asking for both a machine and an installation is `validation`: a page hangs on
 one thing.
+
+**A body names another thing of the record with a scheme and an address**:
+`[Restoring a backup](page:backup-restore)`, `[ex44](machine:ex44)`,
+`[caddy](software:caddy)`, `[app-1](installation:app-1)`
+([ADR 0007](adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)).
+The scheme carries the type because the address does not — a key is unique per
+entity type, so the machine `caddy` and the software `caddy` coexist.
+
+Nothing validates it. The instance stores Markdown and does not parse it, so a
+link to a page that does not exist is stored like any other text; the web
+application resolves the four schemes to its own addresses and `ha page check`
+says which references point at nothing. Renaming a page therefore breaks its
+inbound links, as it always did — the check is how that shows itself.

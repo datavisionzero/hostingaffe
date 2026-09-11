@@ -6971,7 +6971,8 @@
           "title",
           "body",
           "kind",
-          "attached_to"
+          "attached_to",
+          "path"
         ],
         "type": "object",
         "properties": {
@@ -7007,6 +7008,12 @@
               {
                 "$ref": "#/components/schemas/Anchor"
               }
+            ]
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         }
@@ -7104,7 +7111,8 @@
           "installations",
           "deployments",
           "files",
-          "pages"
+          "pages",
+          "links"
         ],
         "type": "object",
         "properties": {
@@ -7129,6 +7137,10 @@
             "format": "int32"
           },
           "pages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "links": {
             "type": "integer",
             "format": "int32"
           }

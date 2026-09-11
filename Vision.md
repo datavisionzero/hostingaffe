@@ -554,6 +554,15 @@ names what it belongs to in `attached_to`, not in its address. A `decision` is
 a page whose kind says it should be read as one; there is no status, no
 supersedes, no template enforcement beyond the kind.
 
+A body names another thing of the record as an ordinary Markdown link whose
+target is a scheme and an address — `[the runbook](page:backup-restore)`, and
+likewise `machine:ex44`, `software:caddy` and `installation:app-1`
+([ADR 0007](docs/adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)).
+The scheme carries the type because the address does not, which is the same
+rule a key follows everywhere else it stands alone. Nothing validates a body:
+the instance stores Markdown and does not parse it, so a reference that points
+at nothing is stored like any other text, and `ha page check` says so.
+
 **Deliberately left out:** folders, page hierarchy, attachments, images.
 
 ### The History

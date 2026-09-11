@@ -274,6 +274,95 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
             "validation");
     }
 
+    /// <summary>
+    /// The cross-references a Markdown repository is full of become links to
+    /// the pages they arrive as (ADR 0007).
+    /// </summary>
+    [Fact]
+    public async Task A_relative_path_between_two_pages_becomes_a_link_to_the_page_it_arrives_as()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var imported = await admin.PostAsJsonAsync(
+            "/api/import",
+            new
+            {
+                pages = new object[]
+                {
+                    new
+                    {
+                        slug = "setup",
+                        title = "Setting it up",
+                        path = "docs/setup/README.md",
+                        body = "Read [the decision](../decisions/2026-09-10-caddy.md) first, "
+                            + "and [what is not here](../security/README.md) is not here.",
+                    },
+                    new
+                    {
+                        slug = "caddy-in-front",
+                        title = "Caddy in front",
+                        path = "docs/decisions/2026-09-10-caddy.md",
+                        kind = "decision",
+                        body = "Back to [the setup](./README.md)? No: [that one](../setup/README.md).",
+                    },
+                },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+
+        var made = await imported.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal(2, made.GetProperty("pages").GetInt32());
+        Assert.Equal(2, made.GetProperty("links").GetInt32());
+
+        var setup = await admin.GetFromJsonAsync<JsonElement>("/api/pages/setup", Ct);
+        Assert.Equal(
+            "Read [the decision](page:caddy-in-front) first, and [what is not here](../security/README.md) is not here.",
+            setup.GetProperty("body").GetString());
+
+        // `./README.md` beside a decision is a page nothing in the document
+        // arrives as, and it is left alone rather than guessed at.
+        var decision = await admin.GetFromJsonAsync<JsonElement>("/api/pages/caddy-in-front", Ct);
+        Assert.Equal(
+            "Back to [the setup](./README.md)? No: [that one](page:setup).",
+            decision.GetProperty("body").GetString());
+    }
+
+    /// <summary>
+    /// Five directories with a `README.md` in each are ordinary in a repository
+    /// and are one name here. The refusal says which two files collided.
+    /// </summary>
+    [Fact]
+    public async Task Two_pages_that_want_one_slug_are_refused_by_name()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        var problem = await Refusals.Problem(
+            await admin.PostAsJsonAsync(
+                "/api/import",
+                new
+                {
+                    pages = new object[]
+                    {
+                        new { slug = "readme", title = "Setup", path = "docs/setup/README.md" },
+                        new { slug = "readme", title = "Operations", path = "docs/operations/README.md" },
+                    },
+                },
+                Ct),
+            HttpStatusCode.BadRequest,
+            "validation");
+
+        var said = problem.GetProperty("errors").GetProperty("slug")[0].GetString();
+        Assert.Contains("docs/setup/README.md", said, StringComparison.Ordinal);
+        Assert.Contains("docs/operations/README.md", said, StringComparison.Ordinal);
+        Assert.Contains("readme", said, StringComparison.Ordinal);
+
+        // Nothing stood: the first of the two is not there either.
+        using var missing = await admin.GetAsync("/api/pages/readme", Ct);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
     /// <summary>The document the tests above start from: one host, whole.</summary>
     private static Dictionary<string, object?> AHost() => new()
     {

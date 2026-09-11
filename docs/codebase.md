@@ -40,9 +40,10 @@ handle an operator chooses; `AssignedKey`, the register that makes a key never
 reusable; `Status`, the lifecycle a machine and an installation share; `Anchor`,
 the machine-or-installation a file is owned by and a page attached to;
 `Spelling`, which turns a closed set's value into the word the contract, the
-column and the history all use; `Fields`, the shapes every editable field
-shares; and `Refusal` with `RefusalCode`, the one list of every way the product
-says no, which the CLI derives its exit code from.
+column and the history all use; `Link`, how a Markdown body names another thing
+of the record; `Fields`, the shapes every editable field shares; and `Refusal`
+with `RefusalCode`, the one list of every way the product says no, which the
+CLI derives its exit code from.
 
 `Software` is at the root too, and for a different reason: the word is
 uncountable, so there is no plural to name a folder with, and a namespace

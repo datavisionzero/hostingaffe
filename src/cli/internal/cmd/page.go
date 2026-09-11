@@ -25,7 +25,8 @@ func newPage(g *globals) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newPageList(g), newPageView(g), newPageAdd(g), newPageSet(g),
-		newPageRename(g), newPageDelete(g), newPageRestore(g), newPageHistory(g))
+		newPageRename(g), newPageDelete(g), newPageRestore(g), newPageHistory(g),
+		newPageCheck(g))
 	return cmd
 }
 

@@ -115,24 +115,37 @@ public sealed record ImportSoftware(
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
+/// <param name="Path">
+/// Where the page came from in the source the document was made of —
+/// <c>docs/setup/README.md</c>. Read only to turn the relative <c>.md</c> links
+/// in the bodies into the pages they became (ADR 0007), never stored: a page is
+/// addressed by its slug and by nothing else.
+/// </param>
 public sealed record ImportPage(
     string? Slug,
     string? Title,
     string? Body,
     string? Kind,
-    AnchorShape? AttachedTo)
+    AnchorShape? AttachedTo,
+    string? Path)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
 /// <summary>What the import made, counted.</summary>
+/// <param name="Links">
+/// How many cross-references between the document's pages it rewrote onto the
+/// slugs they became. It is what says whether the paths in the document were
+/// the ones the bodies actually used.
+/// </param>
 public sealed record ImportedShape(
     int Machines,
     int Software,
     int Installations,
     int Deployments,
     int Files,
-    int Pages);
+    int Pages,
+    int Links);
 
 /// <summary>
 /// A whole host in one transaction, because documenting a host is one act and
@@ -182,6 +195,8 @@ public sealed class ImportRecord(
         {
             throw Refusal.Validation("document", "There is nothing in this document to create.");
         }
+
+        OneSlugEach(pages);
 
         return await transactions.RunAsync(async () =>
         {
@@ -264,24 +279,70 @@ public sealed class ImportRecord(
                 }
             }
 
+            var sources = ImportLinks.Sources(pages);
+
             foreach (var one in pages)
             {
                 Imports.Closed("page", one.UnknownFields, "author", "history");
+                var (body, rewritten) = ImportLinks.Rewrite(one.Body, one.Path, sources);
+
                 await createPage.ExecuteAsync(
                     new CreatePageRequest(
                         one.Slug,
                         one.Title,
-                        one.Body,
+                        body,
                         Validated.Field("kind", () => Spelling.Read<PageKind>(one.Kind, "kind")),
                         one.AttachedTo),
                     note,
                     cancellationToken);
                 made.Pages++;
+                made.Links += rewritten;
             }
 
             return made.Counted();
         }, cancellationToken);
     }
+
+    /// <summary>
+    /// Two pages of one document asking for one slug, named before anything is
+    /// written.
+    /// </summary>
+    /// <remarks>
+    /// The slug space is flat and instance-wide (ADR 0003), and a repository of
+    /// Markdown is not: five directories with a <c>README.md</c> in each are
+    /// ordinary there and are one name here. Left to the ordinary act, the
+    /// second one refuses with the slug alone, and whoever is migrating has to
+    /// find out by hand which two files it meant — so the document is read for
+    /// this first, and the refusal says both.
+    /// </remarks>
+    /// <exception cref="Refusal"><c>validation</c> on <c>slug</c>, naming both entries.</exception>
+    private static void OneSlugEach(IReadOnlyList<ImportPage> pages)
+    {
+        var taken = new Dictionary<string, ImportPage>(StringComparer.Ordinal);
+
+        foreach (var page in pages)
+        {
+            if (page.Slug?.Trim() is not { Length: > 0 } slug)
+            {
+                continue;
+            }
+
+            if (taken.TryGetValue(slug, out var first))
+            {
+                throw Refusal.Validation(
+                    "slug",
+                    $"{Names(first)} and {Names(page)} both want the slug {slug}, and a slug names one page in the whole instance; one of them is given another.");
+            }
+
+            taken[slug] = page;
+        }
+    }
+
+    /// <summary>What to call an entry of the document in a refusal: where it came from, or what it is called.</summary>
+    private static string Names(ImportPage page) =>
+        page.Path?.Trim() is { Length: > 0 } path ? path
+            : page.Title?.Trim() is { Length: > 0 } title ? $"the page titled {title}"
+                : "a page with neither a path nor a title";
 
     private async Task FileAsync(
         AnchorKind kind, string? key, ImportFile file, string? note, CancellationToken cancellationToken)
@@ -328,9 +389,10 @@ public sealed class ImportRecord(
         public int Deployments;
         public int Files;
         public int Pages;
+        public int Links;
 
         public ImportedShape Counted() =>
-            new(Machines, Software, Installations, Deployments, Files, Pages);
+            new(Machines, Software, Installations, Deployments, Files, Pages, Links);
     }
 }
 

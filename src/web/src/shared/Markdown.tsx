@@ -1,12 +1,13 @@
 import { Children, isValidElement, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { Link } from "react-router";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import { admitUrl } from "./links";
+import { admitUrl, recordPath } from "./links";
 
 /**
- * The Markdown pipeline of ADR 0007: `react-markdown` with `remark-gfm`, parsed
+ * The Markdown pipeline of planaffe ADR 0007: `react-markdown` with `remark-gfm`, parsed
  * to a component tree, with raw HTML skipped — never interpreted, never set as
  * innerHTML — because what it renders was written by agents quoting things
  * nobody vetted (VISION 13).
@@ -17,27 +18,34 @@ import { admitUrl } from "./links";
  * because nothing that reaches here is hard-wrapped any more (ADR 0020).
  *
  * Links are foreign links. The library's default admits `irc`, `ircs` and
- * `xmpp` beside the three below; ADR 0007 admits exactly `http`, `https` and
- * `mailto`, and a URL with any other scheme, or a relative one, loses its
- * `href` here and stays text (ADR 0017).
+ * `xmpp` beside the three below; planaffe ADR 0007 admits exactly `http`,
+ * `https` and `mailto`, and a URL with any other scheme, or a relative one,
+ * loses its `href` here and stays text (planaffe ADR 0017).
+ *
+ * The exception is the record's own four schemes — `page:`, `machine:`,
+ * `software:` and `installation:` (ADR 0007). Those are this instance's own
+ * addresses, so they are followed rather than opened: no new tab, no
+ * `noopener`, and the frame is never remounted (planaffe ADR 0006).
  */
 const components: Components = {
   h1: ({ className, ...props }) => <h2 className={cn("mt-6 mb-2 text-base font-semibold first:mt-0", className)} {...props} />,
   h2: ({ className, ...props }) => <h3 className={cn("mt-5 mb-2 text-sm font-semibold first:mt-0", className)} {...props} />,
   h3: ({ className, ...props }) => <h4 className={cn("mt-4 mb-1 text-sm font-medium first:mt-0", className)} {...props} />,
   p: ({ className, ...props }) => <p className={cn("my-2 leading-6 first:mt-0 last:mb-0", className)} {...props} />,
-  a: ({ className, href, ...props }) =>
-    href === undefined ? (
+  a: ({ className, href, ...props }) => {
+    const style = cn("text-brand underline-offset-4 hover:underline", className);
+    const inside = recordPath(href);
+
+    if (inside !== undefined) {
+      return <Link to={inside} className={style} {...props} />;
+    }
+
+    return href === undefined ? (
       <span className={cn("text-muted-foreground", className)} {...props} />
     ) : (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn("text-brand underline-offset-4 hover:underline", className)}
-        {...props}
-      />
-    ),
+      <a href={href} target="_blank" rel="noopener noreferrer" className={style} {...props} />
+    );
+  },
   ul: ({ className, ...props }) => <ul className={cn("my-2 list-disc pl-5 marker:text-muted-foreground", className)} {...props} />,
   ol: ({ className, ...props }) => <ol className={cn("my-2 list-decimal pl-5 marker:text-muted-foreground", className)} {...props} />,
   li: ({ className, ...props }) => <li className={cn("my-0.5 leading-6", className)} {...props} />,
