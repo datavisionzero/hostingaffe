@@ -18,6 +18,11 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// </remarks>
 public sealed class SoftwareConfiguration : IEntityTypeConfiguration<Software>
 {
+    /// <inheritdoc cref="MachineConfiguration.Letters"/>
+    private const string Letters =
+        "key || ' ' || name || ' ' || coalesce(image, '') || ' ' "
+        + "|| coalesce(homepage, '') || ' ' || coalesce(repository, '') || ' ' || description";
+
     public void Configure(EntityTypeBuilder<Software> builder)
     {
         builder.ToTable("software");
@@ -43,12 +48,14 @@ public sealed class SoftwareConfiguration : IEntityTypeConfiguration<Software>
             .IsRequired();
 
         /// <inheritdoc cref="MachineConfiguration"/>
+        builder.Property<string>("Letters")
+            .HasColumnName("letters")
+            .HasComputedColumnSql(Letters, stored: true);
+        builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("software_letters");
+
         builder.Property<NpgsqlTsVector>("Search")
             .HasColumnName("search")
-            .HasComputedColumnSql(
-                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(image, '') || ' ' "
-                + "|| coalesce(homepage, '') || ' ' || coalesce(repository, '') || ' ' || description)",
-                stored: true);
+            .HasComputedColumnSql($"to_tsvector('simple', {Letters})", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("software_search");
 
         builder.Property(s => s.CreatedBy).HasColumnName("created_by").IsRequired();

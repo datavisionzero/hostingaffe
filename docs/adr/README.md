@@ -41,6 +41,7 @@ material value to understanding the decision.
 - [0009 – An installation has two directories, and `data` is the second](./0009-an-installation-has-two-directories-and-data-is-the-second.md)
 - [0010 – A file has one owner, and what else it concerns is prose](./0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)
 - [0011 – A secret is a row that says which file it lies in](./0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)
+- [0012 – A path is found by its letters, not by its words](./0012-a-path-is-found-by-its-letters-not-by-its-words.md)
 
 ## Adopted from planaffe
 

@@ -356,6 +356,7 @@ remove what it did not write.
 ```sh
 ha search "18502"        # the installation that listens on it
 ha search logaffe        # the software, the installation, the files that name it
+ha search /srv/caddy     # everything that touches the directory
 ```
 
 One call over every field, every Markdown body and every file. A line per hit:
@@ -363,11 +364,17 @@ the kind, the address, which surface matched, what it belongs to, and what it is
 called. `--limit` asks for fewer; the instance caps it whatever is asked, because
 a word that occurs everywhere would otherwise answer with the whole record.
 
-The words are matched the way Postgres splits text, so a fragment inside a path
-is not a word — `logaffe` finds the software and the installation by their keys
-and not inside `/srv/logaffe`. A port is a number rather than a word and is
-looked up as one, which is what makes the first example answer. A file answers
-for the revision it is at, and a deleted row is not a hit.
+The words are matched the way Postgres splits text, and a whole path is one of
+those words: `/opt/compose/logaffe` finds the installation it is the directory
+of. **A piece of a path is not a word**, so a search term that is one word with a
+slash or a dot in it — `/srv/caddy`, `.env.runtime`, `docker-compose.yml` — is
+looked for as a fragment as well, over the same surfaces, from three characters
+up ([ADR 0012](adr/0012-a-path-is-found-by-its-letters-not-by-its-words.md)).
+Two words are two words: `caddy /srv/caddy` is a word search and nothing else.
+
+A port is a number rather than a word and is looked up as one, which is what
+makes the first example answer. A file answers for the revision it is at, and a
+deleted row is not a hit.
 
 ## Pages, and what they link to
 

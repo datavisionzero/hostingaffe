@@ -87,6 +87,11 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
                 .HasComputedColumnSql("to_tsvector('simple', content)", stored: true);
             revision.HasIndex("Search").HasMethod("GIN").HasDatabaseName("file_revision_search");
 
+            // A content is where paths stand thickest, and a path is not a word
+            // (ADR 0012). The column is the text itself, so the fragment index
+            // sits on it directly and copies nothing.
+            revision.HasIndex(r => r.Content).HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("file_revision_letters");
+
             revision.Property(r => r.By).HasColumnName("by").IsRequired();
             revision.HasOne<Identity>()
                 .WithMany()
@@ -108,6 +113,17 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
             .HasColumnName("search")
             .HasComputedColumnSql("to_tsvector('simple', path)", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("file_search");
+
+        // The one place where the words and the letters are made of different
+        // text, and on purpose (ADR 0012). As a word, a file is its name under
+        // its owner — `logaffe.service`, typed the way it is spoken about. As
+        // letters it is its whole place on the machine, because "who touches
+        // /srv/caddy" is a question about the directory, and the directory is
+        // in no other column the search reads.
+        builder.Property<string>("Letters")
+            .HasColumnName("letters")
+            .HasComputedColumnSql("coalesce(rtrim(directory, '/') || '/', '') || path", stored: true);
+        builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("file_letters");
 
         builder.Property(f => f.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()

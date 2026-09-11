@@ -23,6 +23,14 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// </remarks>
 public sealed class InstallationConfiguration : IEntityTypeConfiguration<Installation>
 {
+    /// <inheritdoc cref="MachineConfiguration.Letters"/>
+    private const string Letters =
+        "key || ' ' || name || ' ' || coalesce(path, '') || ' ' "
+        + "|| coalesce(data, '') || ' ' || words(urls) || ' ' || description";
+
+    /// <inheritdoc cref="MachineConfiguration.Letters"/>
+    private const string SecretLetters = "name || ' ' || coalesce(path, '')";
+
     public void Configure(EntityTypeBuilder<Installation> builder)
     {
         builder.ToTable("installation", table =>
@@ -153,9 +161,14 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             // row and nothing else. That is what keeps `ha search
             // POSTGRES_PASSWORD` — and the file it lies in — answering after the
             // names left the installation's own column.
+            secret.Property<string>("Letters")
+                .HasColumnName("letters")
+                .HasComputedColumnSql(SecretLetters, stored: true);
+            secret.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("installation_secret_letters");
+
             secret.Property<NpgsqlTsVector>("Search")
                 .HasColumnName("search")
-                .HasComputedColumnSql("to_tsvector('simple', name || ' ' || coalesce(path, ''))", stored: true);
+                .HasComputedColumnSql($"to_tsvector('simple', {SecretLetters})", stored: true);
             secret.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_secret_search");
         });
 
@@ -170,12 +183,14 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
         // a generated column will not take. For a `text[]` and a constant
         // separator the result depends on nothing, and the migration that
         // creates it says so.
+        builder.Property<string>("Letters")
+            .HasColumnName("letters")
+            .HasComputedColumnSql(Letters, stored: true);
+        builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("installation_letters");
+
         builder.Property<NpgsqlTsVector>("Search")
             .HasColumnName("search")
-            .HasComputedColumnSql(
-                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(path, '') || ' ' "
-                + "|| coalesce(data, '') || ' ' || words(urls) || ' ' || description)",
-                stored: true);
+            .HasComputedColumnSql($"to_tsvector('simple', {Letters})", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_search");
 
         builder.Property(i => i.CreatedBy).HasColumnName("created_by").IsRequired();

@@ -24,11 +24,11 @@ public sealed record SearchHitShape(
 /// answer.
 /// </para>
 /// <para>
-/// The words are matched the way Postgres splits text, which means a fragment
-/// inside a path is not a word — <c>logaffe</c> finds the software and the
-/// installation by their keys, and does not find them inside
-/// <c>/srv/logaffe</c>. That is documented rather than papered over, because a
-/// substring scan over every revision of every file is a different promise.
+/// The words are matched the way Postgres splits text, and a whole path is one
+/// of those words. A <em>piece</em> of one is not, so a query that is a single
+/// word with a slash or a dot in it is looked for as a fragment as well — over
+/// the same surfaces, through the trigram indexes, and never instead of the
+/// words (ADR 0012).
 /// </para>
 /// </remarks>
 public sealed class Search(ISearch search)

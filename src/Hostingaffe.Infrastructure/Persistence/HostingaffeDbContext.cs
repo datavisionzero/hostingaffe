@@ -88,6 +88,14 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
         configurationBuilder.Conventions.Remove(typeof(ForeignKeyIndexConvention));
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // The one extension the schema asks for, and it asks for it because a
+        // path is not a word: `pg_trgm` is what makes a fragment of one
+        // findable (ADR 0012). It is a trusted extension, so the database owner
+        // creates it and no instance needs a superuser to migrate.
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(HostingaffeDbContext).Assembly);
+    }
 }

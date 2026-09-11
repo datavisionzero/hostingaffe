@@ -83,6 +83,14 @@ public sealed class PageConfiguration : IEntityTypeConfiguration<Page>
             .HasComputedColumnSql("to_tsvector('simple', title || ' ' || body)", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("page_search");
 
+        // And it has to know the letters as well, because a runbook is where
+        // the paths are written out (ADR 0012). The title and the body carry
+        // their own index rather than one over both: the hit already has to say
+        // which of the two answered, and a column that is a text needs no copy
+        // of itself to be searched by fragment.
+        builder.HasIndex(p => p.Title).HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("page_title_letters");
+        builder.HasIndex(p => p.Body).HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("page_body_letters");
+
         builder.Property(p => p.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.HasOne<Identity>()
             .WithMany()

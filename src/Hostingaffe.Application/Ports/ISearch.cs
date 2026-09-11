@@ -26,9 +26,10 @@ public sealed record SearchHit(
 /// every file.
 /// </summary>
 /// <remarks>
-/// Postgres full text and nothing beside it — no second index and nothing to
-/// operate, which is part of the promise that an instance starts from a Compose
-/// file (VISION 12).
+/// Postgres and nothing beside it — no second index to operate, which is part
+/// of the promise that an instance starts from a Compose file (VISION 12). The
+/// words go through the stored <c>tsvector</c> columns; a path, which Postgres
+/// makes one word of, goes through the trigram indexes beside them (ADR 0012).
 /// </remarks>
 public interface ISearch
 {

@@ -29,6 +29,7 @@ ha machine context caddy                                   # everything before t
 ha files get compose.yml --installation logaffe-prod       # and the revision with it
 ha deploy logaffe-prod --version 1.4.0 --note "memory limit"
 ha search "18502"                                          # a port, an address, a name, a word
+ha search /srv/caddy                                       # a path, or a piece of one
 ```
 
 `ha` needs `HOSTINGAFFE_URL` and `HOSTINGAFFE_TOKEN` and nothing else, writes

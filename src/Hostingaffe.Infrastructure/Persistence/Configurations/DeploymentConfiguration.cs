@@ -18,6 +18,10 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// </remarks>
 public sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deployment>
 {
+    /// <inheritdoc cref="MachineConfiguration.Letters"/>
+    private const string Letters =
+        "version || ' ' || coalesce(\"ref\", '') || ' ' || coalesce(ticket, '') || ' ' || note";
+
     public void Configure(EntityTypeBuilder<Deployment> builder)
     {
         builder.ToTable("deployment", table =>
@@ -60,12 +64,14 @@ public sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploymen
         // is not necessarily who deployed.
         // A deployment is found by what it says it was: the version, what
         // was actually deployed, the ticket, and the note beside it.
+        builder.Property<string>("Letters")
+            .HasColumnName("letters")
+            .HasComputedColumnSql(Letters, stored: true);
+        builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("deployment_letters");
+
         builder.Property<NpgsqlTsVector>("Search")
             .HasColumnName("search")
-            .HasComputedColumnSql(
-                "to_tsvector('simple', version || ' ' || coalesce(\"ref\", '') || ' ' "
-                + "|| coalesce(ticket, '') || ' ' || note)",
-                stored: true);
+            .HasComputedColumnSql($"to_tsvector('simple', {Letters})", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("deployment_search");
 
         builder.Property(d => d.CreatedBy).HasColumnName("created_by").IsRequired();

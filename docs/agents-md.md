@@ -63,12 +63,14 @@ ha files list --machine caddy
 
 ```sh
 ha search "18502"        # a port, an address, a name, a word in a page or a file
+ha search /srv/caddy     # a path, or a piece of one, wherever it is written down
 ha inst view logaffe-prod
 ha machine list
 ```
 
-`ha search` matches whole words the way Postgres splits text, so a fragment
-inside a path is not a word — a port number is looked up as a number.
+`ha search` matches whole words the way Postgres splits text. A search term that
+is one word with a slash or a dot in it is looked for as a fragment as well, so
+a piece of a path answers; a port number is looked up as a number.
 
 ### Changing configuration
 

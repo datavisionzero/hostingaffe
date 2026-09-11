@@ -743,6 +743,49 @@ anyone would find by typing the number. A query that *is* a port number is
 looked up in that column instead, which is what makes VISION 5's own example
 answer.
 
+**And a path is one word, which is why there is a second index beside every
+one of these.** `/srv/caddy/caddy.env` is a single token, so `/srv/caddy` matches
+nothing — on a record of machines the wrong way round
+([ADR 0012](adr/0012-a-path-is-found-by-its-letters-not-by-its-words.md)). A
+query that is one word with a slash or a dot in it, three characters or longer,
+is looked for as a fragment as well, with `ilike` through a `pg_trgm` index:
+
+| table | column | |
+|---|---|---|
+| `machine` | `letters` | the same text `search` is made of |
+| `software` | `letters` | " |
+| `installation` | `letters` | " |
+| `installation_secret` | `letters` | " |
+| `deployment` | `letters` | " |
+| `file` | `letters` | its directory and its path: the whole place it lies |
+| `file_revision` | `content` | the column is the text already |
+| `page` | `title`, `body` | one index each, and the hit says which answered |
+
+```sql
+alter table machine add column letters text
+    generated always as (key || ' ' || name || ' ' || … ) stored;
+
+create index machine_letters on machine using gin (letters gin_trgm_ops);
+```
+
+**One expression, two columns.** A generated column cannot read another
+generated column, so `letters` and `search` are generated from the same
+expression written once in the entity configuration — a field added to the row
+reaches the words and the letters together or reaches neither. A surface that is
+a text column already carries the trigram index on the column and copies
+nothing, which is what keeps a file's content and a page's body from being
+stored twice.
+
+**A file is the one place where the words and the letters are different text.**
+As a word a file is its `path` under its owner, typed the way it is spoken
+about; as letters it is `directory` and `path` together — the absolute place a
+machine's file lies, which no other column the search reads carries. So
+`ha search /etc/caddy` finds the unit that lies there, and `ha search Caddyfile`
+still finds it by its name.
+
+**`pg_trgm` is the one extension the schema asks for.** It is *trusted*, so the
+database owner creates it and no instance needs a superuser to migrate.
+
 **A secret answers once.** Its row's vector is read with the rest, and an
 installation whose own `search` already matched is not listed a second time for
 it — the same installation twice is not two answers.

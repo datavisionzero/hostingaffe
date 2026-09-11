@@ -14,6 +14,19 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// </summary>
 public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
 {
+    /// <summary>
+    /// Everything of a machine somebody would find it by typing, as one text.
+    /// Both search columns are generated from this and from nothing else, so a
+    /// field added to the row reaches the words and the letters together or
+    /// neither (ADR 0012).
+    /// </summary>
+    private const string Letters =
+        "key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' "
+        + "|| coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' "
+        + "|| coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' "
+        + "|| coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' "
+        + "|| coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description";
+
     public void Configure(EntityTypeBuilder<Machine> builder)
     {
         builder.ToTable("machine", table =>
@@ -94,15 +107,18 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
         // `simple` configuration everywhere, and the closed sets left out:
         // `status=retired` is a filter on the list, not something to find by
         // typing the word.
+        //
+        // The same text twice: as words, which is how a name is asked for, and
+        // as letters, which is how a path is — `/srv/caddy` is a fragment of a
+        // token and no word at all (ADR 0012).
+        builder.Property<string>("Letters")
+            .HasColumnName("letters")
+            .HasComputedColumnSql(Letters, stored: true);
+        builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("machine_letters");
+
         builder.Property<NpgsqlTsVector>("Search")
             .HasColumnName("search")
-            .HasComputedColumnSql(
-                "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' "
-                + "|| coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' "
-                + "|| coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' "
-                + "|| coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' "
-                + "|| coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description)",
-                stored: true);
+            .HasComputedColumnSql($"to_tsvector('simple', {Letters})", stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("machine_search");
 
         builder.Property(m => m.CreatedBy).HasColumnName("created_by").IsRequired();

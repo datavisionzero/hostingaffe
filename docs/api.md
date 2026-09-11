@@ -636,16 +636,22 @@ and the hits come in that order. `key` is the address — a key, a page's slug, 
 file's path, or the installation a deployment lives under; `number` is the
 deployment's number and nothing else has one; `owner` is what a file belongs to
 or a page hangs on. `where` names the surface that matched: `fields`,
-`description`, `ports`, `note`, `path`, `content`, `title` or `body`.
+`description`, `ports`, `secrets`, `note`, `path`, `content`, `title` or `body`.
 
-**Postgres full text, and nothing beside it.** No second index and nothing to
-operate, which is part of the promise that an instance starts from a Compose
-file. Two things follow from that, and both are the honest shape of it rather
-than an omission:
+**Postgres and nothing beside it.** No second index and nothing to operate,
+which is part of the promise that an instance starts from a Compose file. Three
+things follow from that, and all three are the honest shape of it rather than an
+omission:
 
-- **The words are matched the way Postgres splits text.** A fragment inside a
-  path is not a word — `logaffe` finds the software and the installation by
-  their keys, and does not find them inside `/srv/logaffe`.
+- **The words are matched the way Postgres splits text**, and a whole path is
+  one of those words: `/opt/compose/logaffe` finds the installation whose
+  directory it is.
+- **A piece of a path is not a word.** `/srv/caddy/caddy.env` is one token, so a
+  search term that is one word with a slash or a dot in it, three characters or
+  longer, is looked for as a fragment as well — over the same surfaces, through
+  a `pg_trgm` index, and never instead of the words
+  ([ADR 0012](adr/0012-a-path-is-found-by-its-letters-not-by-its-words.md)).
+  `caddy /srv/caddy` is two words and stays a word search.
 - **A port is a number, not a word.** `18502` inside `18502/tcp` is not a token
   anyone would find by typing the number, so a query that *is* a port number is
   looked up in the ports as well. That is what makes `ha search "18502"` answer.

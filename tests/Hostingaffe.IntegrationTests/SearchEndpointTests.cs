@@ -120,6 +120,81 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
             Field(Assert.Single(await HitsAsync(admin, "/opt/compose/logaffe")), "where"));
     }
 
+    /// <summary>
+    /// A path is one word to Postgres, so a piece of one is looked for as a
+    /// fragment — over the fields, and from three characters up (ADR 0012).
+    /// </summary>
+    [Fact]
+    public async Task A_piece_of_a_path_is_found_where_a_word_is_not()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        // The directory an installation's data lies in, typed one segment
+        // short. As a word it is nothing the record contains.
+        var data = Assert.Single(await HitsAsync(admin, "/srv/services"));
+        Assert.Equal("installation", Field(data, "kind"));
+        Assert.Equal("logaffe-prod", Field(data, "key"));
+        Assert.Equal("fields", Field(data, "where"));
+
+        // The file a secret lies in, by the name of the file alone.
+        var secret = Assert.Single(await HitsAsync(admin, ".env.runtime"));
+        Assert.Equal("installation", Field(secret, "kind"));
+        Assert.Equal("secrets", Field(secret, "where"));
+
+        // Three characters is where a trigram starts, and below it the search
+        // is the word search it always was.
+        Assert.Equal("file", Field(Assert.Single(await HitsAsync(admin, ".ym")), "kind"));
+        Assert.Empty(await HitsAsync(admin, ".y"));
+    }
+
+    /// <summary>
+    /// The fragment reaches every surface the words reach: what a file says,
+    /// what a runbook says to edit, and where a machine's file lies — which is
+    /// a column no other surface carries (ADR 0012).
+    /// </summary>
+    [Fact]
+    public async Task A_piece_of_a_path_answers_across_every_surface()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        await Created(admin, "/api/machines/ex44/files", new
+        {
+            path = "Caddyfile",
+            directory = "/etc/caddy",
+            content = "import /srv/caddy/sites/*.caddy\n",
+        });
+
+        await Created(admin, "/api/pages", new
+        {
+            slug = "caddy-certificates",
+            title = "Renewing a certificate",
+            kind = "runbook",
+            body = "Edit /srv/caddy/caddy.env, then reload.",
+        });
+
+        var hits = await HitsAsync(admin, "/srv/caddy");
+        Assert.Equal(["file", "page"], hits.Select(hit => Field(hit, "kind")));
+        Assert.Equal("content", Field(hits[0], "where"));
+        Assert.Equal("body", Field(hits[1], "where"));
+
+        // Where the file lies is the file's own letters, and the hit says whose
+        // file it is.
+        var lies = Assert.Single(await HitsAsync(admin, "/etc/caddy"));
+        Assert.Equal("file", Field(lies, "kind"));
+        Assert.Equal("Caddyfile", Field(lies, "key"));
+        Assert.Equal("path", Field(lies, "where"));
+        Assert.Equal("machine", lies.GetProperty("owner").GetProperty("kind").GetString());
+        Assert.Equal("ex44", lies.GetProperty("owner").GetProperty("key").GetString());
+
+        // A whole path is a word, and a word it stays: the fragment is looked
+        // for beside the words and never instead of them.
+        Assert.NotEmpty(await HitsAsync(admin, "/opt/compose/logaffe"));
+    }
+
     [Fact]
     public async Task A_deleted_row_is_not_a_hit()
     {
