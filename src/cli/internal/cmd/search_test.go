@@ -10,12 +10,15 @@ import (
 )
 
 const hitsJSON = `[
-{"kind":"installation","key":"logaffe-prod","name":"logaffe","number":null,"owner":null,"where":"ports"},
-{"kind":"deployment","key":"logaffe-prod","name":"1.4.0","number":3,
+{"kind":"installation","key":"logaffe-prod","name":"logaffe","number":null,"directory":null,
+ "owner":null,"where":"ports"},
+{"kind":"deployment","key":"logaffe-prod","name":"1.4.0","number":3,"directory":null,
  "owner":{"kind":"installation","key":"logaffe-prod"},"where":"fields"},
-{"kind":"file","key":"compose.override.yml","name":"","number":null,
+{"kind":"file","key":"compose.override.yml","name":"","number":null,"directory":null,
  "owner":{"kind":"installation","key":"logaffe-prod"},"where":"content"},
-{"kind":"page","key":"backup-restore","name":"Restoring a backup","number":null,
+{"kind":"file","key":"logaffe.service","name":"","number":null,"directory":"/etc/systemd/system",
+ "owner":{"kind":"machine","key":"ex44"},"where":"path"},
+{"kind":"page","key":"backup-restore","name":"Restoring a backup","number":null,"directory":null,
  "owner":{"kind":"machine","key":"ex44"},"where":"body"}]`
 
 // One call, and what comes back says what was found and where.
@@ -44,7 +47,7 @@ func TestSearchIsOneCallAndSaysWhereEachHitIs(t *testing.T) {
 	}
 
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	if len(lines) != 4 {
+	if len(lines) != 5 {
 		t.Fatalf("one line per hit:\n%s", out)
 	}
 	if !strings.HasPrefix(lines[0], "installation  logaffe-prod") || !strings.Contains(lines[0], "ports") {
@@ -58,8 +61,16 @@ func TestSearchIsOneCallAndSaysWhereEachHitIs(t *testing.T) {
 	if !strings.Contains(lines[2], "installation logaffe-prod") {
 		t.Errorf("the file hit: %q", lines[2])
 	}
-	if !strings.Contains(lines[3], "machine ex44") || !strings.Contains(lines[3], "Restoring a backup") {
-		t.Errorf("the page hit: %q", lines[3])
+	// An installation's file is its path under the installation; a machine's is
+	// the whole place it lies, because the directory is what the search read.
+	if !strings.Contains(lines[2], "compose.override.yml") || strings.Contains(lines[2], "/compose.override.yml") {
+		t.Errorf("an installation's file is addressed by its path: %q", lines[2])
+	}
+	if !strings.Contains(lines[3], "/etc/systemd/system/logaffe.service") {
+		t.Errorf("a machine's file is addressed by where it lies: %q", lines[3])
+	}
+	if !strings.Contains(lines[4], "machine ex44") || !strings.Contains(lines[4], "Restoring a backup") {
+		t.Errorf("the page hit: %q", lines[4])
 	}
 }
 

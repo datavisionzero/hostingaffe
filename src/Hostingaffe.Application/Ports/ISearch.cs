@@ -10,6 +10,7 @@ namespace Hostingaffe.Application.Ports;
 /// <param name="Key">Its address: a key, a page's slug, a file's path, or the installation a deployment lives under.</param>
 /// <param name="Name">What it is called — a name, a title, a version. Empty where the address is the whole of it.</param>
 /// <param name="Number">The deployment's number. Nothing else has one.</param>
+/// <param name="Directory">Where a machine's file lies on the machine. Nothing else has one, and an installation's file has the installation's own.</param>
 /// <param name="Owner">What a file belongs to or a page hangs on, and nothing for the rest.</param>
 /// <param name="Where">Which surface matched: <c>fields</c>, <c>description</c>, <c>ports</c>, <c>title</c>, <c>body</c>, <c>path</c> or <c>content</c>.</param>
 public sealed record SearchHit(
@@ -17,6 +18,7 @@ public sealed record SearchHit(
     string Key,
     string Name,
     int? Number,
+    string? Directory,
     Anchor? Owner,
     string Where);
 

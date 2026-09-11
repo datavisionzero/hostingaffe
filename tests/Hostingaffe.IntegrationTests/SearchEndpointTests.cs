@@ -182,13 +182,22 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
         Assert.Equal("body", Field(hits[1], "where"));
 
         // Where the file lies is the file's own letters, and the hit says whose
-        // file it is.
+        // file it is — and where, because a bare `Caddyfile` would not say what
+        // the search answered "/etc/caddy" with.
         var lies = Assert.Single(await HitsAsync(admin, "/etc/caddy"));
         Assert.Equal("file", Field(lies, "kind"));
         Assert.Equal("Caddyfile", Field(lies, "key"));
+        Assert.Equal("/etc/caddy", Field(lies, "directory"));
         Assert.Equal("path", Field(lies, "where"));
         Assert.Equal("machine", lies.GetProperty("owner").GetProperty("kind").GetString());
         Assert.Equal("ex44", lies.GetProperty("owner").GetProperty("key").GetString());
+
+        // An installation's file has no directory of its own: the
+        // installation's path said it once for all of them (ADR 0008), and
+        // nothing but a machine's file carries the field at all.
+        var says = Assert.Single(await HitsAsync(admin, "mem_limit"));
+        Assert.Equal("file", Field(says, "kind"));
+        Assert.Equal(JsonValueKind.Null, says.GetProperty("directory").ValueKind);
 
         // A whole path is a word, and a word it stays: the fragment is looked
         // for beside the words and never instead of them.

@@ -410,13 +410,22 @@ func executable(set bool) string {
 // SearchHits prints what was found and where: the kind, the address, what it is
 // called, and which surface of it the words matched. A deployment carries its
 // number, a file and a page carry what they belong to.
+//
+// A machine's file is addressed by the whole place it lies, directory and path
+// together, because the directory is one of the surfaces the search reads and a
+// hit that answered "/etc/systemd/system" with a bare name would not say what
+// it answered with (ADR 0008, 0012). An installation's file has no directory of
+// its own: the installation's path already said it for all of them.
 func SearchHits(w io.Writer, hits []api.SearchHit) {
 	for _, hit := range hits {
 		address := hit.Key
 		if hit.Number != nil {
 			address = fmt.Sprintf("%s #%d", hit.Key, *hit.Number)
 		}
-		fmt.Fprintf(w, "%-13s %-32s %-10s %-26s %s\n",
+		if hit.Directory != nil && *hit.Directory != "" {
+			address = strings.TrimRight(*hit.Directory, "/") + "/" + hit.Key
+		}
+		fmt.Fprintf(w, "%-13s %-40s %-10s %-26s %s\n",
 			hit.Kind, address, hit.Where, Anchor(hit.Owner), hit.Name)
 	}
 }

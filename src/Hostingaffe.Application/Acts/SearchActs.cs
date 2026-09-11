@@ -9,6 +9,7 @@ public sealed record SearchHitShape(
     string Key,
     string Name,
     int? Number,
+    string? Directory,
     AnchorShape? Owner,
     string Where);
 
@@ -63,6 +64,7 @@ public sealed class Search(ISearch search)
                 hit.Key,
                 hit.Name,
                 hit.Number,
+                hit.Directory,
                 hit.Owner is { } owner ? new AnchorShape(owner.Kind, owner.Key) : null,
                 hit.Where)),
         ];

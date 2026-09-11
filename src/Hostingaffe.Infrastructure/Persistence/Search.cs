@@ -66,7 +66,8 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
         )
         select * from (
             select 1 as ordinal, 'machine' as kind, m.key as key, m.name as name,
-                   null::int as number, null::text as owner_kind, null::text as owner_key,
+                   null::int as number, null::text as directory,
+                   null::text as owner_kind, null::text as owner_key,
                    case when to_tsvector('simple', m.description) @@ q.words
                           or (q.fragment is not null and m.description ilike q.fragment)
                         then 'description' else 'fields' end as place
@@ -75,7 +76,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
               and (m.search @@ q.words or (q.fragment is not null and m.letters ilike q.fragment))
 
             union all
-            select 2, 'software', s.key, s.name, null::int, null::text, null::text,
+            select 2, 'software', s.key, s.name, null::int, null::text, null::text, null::text,
                    case when to_tsvector('simple', s.description) @@ q.words
                           or (q.fragment is not null and s.description ilike q.fragment)
                         then 'description' else 'fields' end
@@ -84,7 +85,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
               and (s.search @@ q.words or (q.fragment is not null and s.letters ilike q.fragment))
 
             union all
-            select 3, 'installation', i.key, i.name, null::int, null::text, null::text,
+            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, null::text,
                    case when to_tsvector('simple', i.description) @@ q.words
                           or (q.fragment is not null and i.description ilike q.fragment)
                         then 'description' else 'fields' end
@@ -93,14 +94,14 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
               and (i.search @@ q.words or (q.fragment is not null and i.letters ilike q.fragment))
 
             union all
-            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, 'ports'
+            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, null::text, 'ports'
             from installation i
             where i.deleted_at is null and @port is not null
               and exists (select 1 from installation_port p
                           where p.installation_id = i.id and p.port = @port)
 
             union all
-            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, 'secrets'
+            select 3, 'installation', i.key, i.name, null::int, null::text, null::text, null::text, 'secrets'
             from installation i, q
             where i.deleted_at is null
               and not (i.search @@ q.words or (q.fragment is not null and i.letters ilike q.fragment))
@@ -110,7 +111,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
                                  or (q.fragment is not null and s.letters ilike q.fragment)))
 
             union all
-            select 4, 'deployment', i.key, d.version, d.number, 'installation'::text, i.key,
+            select 4, 'deployment', i.key, d.version, d.number, null::text, 'installation'::text, i.key,
                    case when to_tsvector('simple', d.note) @@ q.words
                           or (q.fragment is not null and d.note ilike q.fragment)
                         then 'note' else 'fields' end
@@ -120,7 +121,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
               and (d.search @@ q.words or (q.fragment is not null and d.letters ilike q.fragment))
 
             union all
-            select 5, 'file', f.path, '', null::int,
+            select 5, 'file', f.path, '', null::int, f.directory,
                    case when f.machine_id is not null then 'machine' else 'installation' end,
                    coalesce(m.key, i.key),
                    case when r.search @@ q.words
@@ -139,7 +140,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
                        and (f.letters ilike q.fragment or r.content ilike q.fragment)))
 
             union all
-            select 6, 'page', p.slug, p.title, null::int,
+            select 6, 'page', p.slug, p.title, null::int, null::text,
                    case when p.machine_id is not null then 'machine'
                         when p.installation_id is not null then 'installation' end,
                    coalesce(m.key, i.key),
@@ -199,8 +200,9 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
                     reader.GetString(2),
                     reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5),
                     Owner(reader),
-                    reader.GetString(7)));
+                    reader.GetString(8)));
             }
 
             return hits;
@@ -248,7 +250,7 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
     }
 
     private static Anchor? Owner(NpgsqlDataReader reader) =>
-        reader.IsDBNull(5) || reader.IsDBNull(6)
+        reader.IsDBNull(6) || reader.IsDBNull(7)
             ? null
-            : new Anchor(Spelling.Read<AnchorKind>(reader.GetString(5), "owner")!.Value, Guid.Empty, reader.GetString(6));
+            : new Anchor(Spelling.Read<AnchorKind>(reader.GetString(6), "owner")!.Value, Guid.Empty, reader.GetString(7));
 }

@@ -373,6 +373,13 @@ the kind, the address, which surface matched, what it belongs to, and what it is
 called. `--limit` asks for fewer; the instance caps it whatever is asked, because
 a word that occurs everywhere would otherwise answer with the whole record.
 
+**A machine's file is addressed by the whole place it lies.** Where on the
+machine a file belongs is one of the surfaces the search reads, so
+`ha search /etc/systemd/system` answers with `/etc/systemd/system/logaffe.service`
+rather than with `logaffe.service` alone — the address names what the search
+answered with. An installation's file stays its path under the installation,
+whose own directory said it once for all of them.
+
 The words are matched the way Postgres splits text, and a whole path is one of
 those words: `/opt/compose/logaffe` finds the installation it is the directory
 of. **A piece of a path is not a word**, so a search term that is one word with a

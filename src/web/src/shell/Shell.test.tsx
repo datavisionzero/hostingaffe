@@ -25,7 +25,14 @@ function shell(path: string) {
       new URL(request.url).searchParams.get("q") === "nothing" ? [] : [aPage("architecture", "The web shell")],
     "GET /api/machines": [],
     "GET /api/search": [
-      { kind: "page", key: "architecture", name: "The web shell", number: null, owner: null, where: "body" },
+      {
+        kind: "file", key: "logaffe.service", name: "", number: null,
+        directory: "/etc/systemd/system", owner: { kind: "machine", key: "ex44" }, where: "path",
+      },
+      {
+        kind: "page", key: "architecture", name: "The web shell", number: null,
+        directory: null, owner: null, where: "body",
+      },
     ],
   });
 
@@ -162,6 +169,11 @@ describe("the shell (ADR 0006)", () => {
     // whether this is a machine, a file or a page.
     const found = await screen.findByRole("option", { name: /The web shell/ });
     expect(within(found).getByText("page · body")).toBeInTheDocument();
+
+    // A file has no name of its own, and a machine's file is called by the
+    // whole place it lies: a hit that answered a directory has to say which.
+    const file = await screen.findByRole("option", { name: /logaffe\.service/ });
+    expect(within(file).getByText("/etc/systemd/system/logaffe.service")).toBeInTheDocument();
   });
 
   it("shows who is signed in, top right", async () => {

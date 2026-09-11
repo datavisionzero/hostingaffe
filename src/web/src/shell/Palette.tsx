@@ -129,7 +129,7 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
 
         list.push({
           id: `found:${hit.kind}:${hit.key}:${hit.number ?? ""}`,
-          label: hit.name ?? hit.key,
+          label: named(hit),
           // What matched, not what it is called: the row is already the name,
           // and the surface is why this row is here at all.
           hint: `${hit.kind} · ${hit.where}`,
@@ -282,6 +282,21 @@ function PaletteBody({ onOpenChange, onShortcuts }: Omit<PaletteProps, "open">) 
         </ul>
     </>
   );
+}
+
+/**
+ * What a hit is called in the list. `name` is empty where the address is the
+ * whole of it, which is every file — and a machine's file is called by the
+ * whole place it lies, directory and path together, because the directory is
+ * one of the surfaces the search reads (`docs/api.md`, Searching).
+ */
+function named(hit: SearchHit): string {
+  if (hit.name !== "") {
+    return hit.name;
+  }
+  return hit.directory === null || hit.directory === undefined || hit.directory === ""
+    ? hit.key
+    : `${hit.directory.replace(/\/+$/, "")}/${hit.key}`;
 }
 
 /**

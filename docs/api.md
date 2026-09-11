@@ -641,15 +641,24 @@ what was found and where:
 
 ```json
 {"kind": "installation", "key": "logaffe-prod", "name": "logaffe",
- "number": null, "owner": null, "where": "ports"}
+ "number": null, "directory": null, "owner": null, "where": "ports"}
 ```
 
 `kind` is `machine`, `software`, `installation`, `deployment`, `file` or `page`,
 and the hits come in that order. `key` is the address — a key, a page's slug, a
 file's path, or the installation a deployment lives under; `number` is the
-deployment's number and nothing else has one; `owner` is what a file belongs to
-or a page hangs on. `where` names the surface that matched: `fields`,
+deployment's number and nothing else has one; `directory` is where a machine's
+file lies on the machine and nothing else has one either; `owner` is what a file
+belongs to or a page hangs on. `where` names the surface that matched: `fields`,
 `description`, `ports`, `secrets`, `note`, `path`, `content`, `title` or `body`.
+
+**A file's directory comes with the hit, because the search reads it.** Where a
+machine's file lies is one of the surfaces a fragment is looked for on
+([ADR 0012](adr/0012-a-path-is-found-by-its-letters-not-by-its-words.md)), so a
+search for `/etc/systemd/system` answers with files whose `key` is a bare name —
+and `directory` is the half of the address that says what it answered with. It
+is `null` for an installation's file, whose directory is the installation's own,
+once for all of them ([ADR 0008](adr/0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)).
 
 **Postgres and nothing beside it.** No second index and nothing to operate,
 which is part of the promise that an instance starts from a Compose file. Three
