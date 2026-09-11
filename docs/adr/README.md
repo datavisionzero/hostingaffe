@@ -39,6 +39,7 @@ material value to understanding the decision.
 - [0007 – A record is linked from Markdown as a scheme and a key](./0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)
 - [0008 – A machine's file says where it lies, and is never synced](./0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)
 - [0009 – An installation has two directories, and `data` is the second](./0009-an-installation-has-two-directories-and-data-is-the-second.md)
+- [0010 – A file has one owner, and what else it concerns is prose](./0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)
 
 ## Adopted from planaffe
 

@@ -105,6 +105,20 @@ ha files get caddy-host-backup.service --machine caddy | \
    sudo tee /etc/systemd/system/caddy-host-backup.service > /dev/null
 ```
 
+**A file belongs to whoever's directory it lies in.** On a host with a shared
+reverse proxy, the site fragment of an application lies under the proxy's path
+and is the *proxy* installation's file — `sites/app-1.caddy` on
+`--installation caddy`, not on `--installation app-1`. Put it there, and name it
+once in the application's own description, so the next reader finds it from
+either side:
+
+```sh
+# one line in app-1's description, the runbook everyone reads:
+#   Reached at https://app-1.example.com. The TLS endpoint is
+#   `sites/app-1.caddy` in [caddy](installation:caddy).
+ha inst set app-1 --description-file - --note "named the TLS endpoint"
+```
+
 ### After the work
 
 Record what you did, in the same session:

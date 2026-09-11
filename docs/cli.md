@@ -446,6 +446,14 @@ stays a not-found rather than creating an empty one. `ha files list --machine
 KEY` prints the directory beside each path; for an installation there is no
 column, because there would be nothing in it.
 
+**`list` answers for the owner, not for whoever cares.** A shared proxy's site
+fragment lies under the proxy installation's path and is its file, so
+`ha files list --inst caddy` has it and `ha files list --inst app-1` does not.
+That is the model working, not a gap: the installation the fragment fronts names
+it in its description, with a link to the proxy
+([ADR 0010](adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)),
+and `ha search app-1` finds the fragment by what it says.
+
 **`--revision` is the write guard.** It carries the revision last read, and a
 write against a newer one is exit 6 with the instance saying which revision the
 file is at. Without it the write wins and the history says so. An agent that

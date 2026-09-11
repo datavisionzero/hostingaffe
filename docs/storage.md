@@ -422,9 +422,13 @@ create table file_revision (
 
 **Exactly one owner**, and the check constraint is what says "exactly": a
 systemd unit belongs to the machine, a Compose file to the installation, and
-nothing belongs to both or to neither. The two partial unique indexes are what
-makes `path` unique *per owner* and are the order an owner's files are read in;
-they cover deleted rows, so a path stays spent for the grace period.
+nothing belongs to both or to neither. A shared proxy's site fragment is no
+exception: it lies under the proxy installation's path and is its file, and the
+installation it fronts names it in its description
+([ADR 0010](adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+The two partial unique indexes are what makes `path` unique *per owner* and are
+the order an owner's files are read in; they cover deleted rows, so a path stays
+spent for the grace period.
 
 **`directory` is where a machine's file lies on the machine**, absolute, and
 the second check constraint is what keeps it a machine's alone: an installation

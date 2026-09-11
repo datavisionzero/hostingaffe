@@ -141,6 +141,22 @@ Files are the one place the history keeps **content** rather than the fact of a
 change, because rolling back a Compose file needs the previous Compose file.
 Each write makes a `revision`, and two revisions can be diffed.
 
+**A file has one owner even where two installations care about it.** On a host
+with a shared reverse proxy, `sites/hostingaffe.caddy` lies under the proxy
+installation's `path`, so it is the proxy's file and nothing else. The
+installation it fronts names it in its **description**, which is the runbook —
+the path, and a link to the proxy:
+
+```md
+The TLS endpoint is `sites/hostingaffe.caddy` in [caddy](installation:caddy).
+```
+
+There is no field for a second installation a file concerns. A relationship
+between installations is
+[Vision §15.2](Vision.md#152-an-installation-depends-on-an-installation), not a
+column here
+([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+
 An owner is named by its kind and its key together — `{"kind": "machine", "key":
 "ex44"}` — because a key is unique per entity type and not across them, and a
 machine `caddy` and an installation `caddy` both exist. A page's `attached_to`

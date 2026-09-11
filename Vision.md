@@ -520,9 +520,23 @@ it is not. The directory is written down, not written to: the agent acts on the
 machine and the record says what is there
 ([ADR 0008](docs/adr/0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)).
 
+**A file has one owner even where two installations care about it.** A host with
+one reverse proxy in front of everything is the ordinary way to run one, and
+`sites/logaffe.caddy` lies under the proxy's `path`: it is the proxy
+installation's file, the proxy's sync writes it, and nothing on it names the
+installation it fronts. That installation says so in its description instead —
+the path, and `[caddy](installation:caddy)` — the way the `hostaffe` template
+already says it under **Network** in every service's own document. A second
+owner would be a claim on a directory that is not the service's, and a field
+naming what a file *concerns* would be 15.2 entered through the side door, with
+the wrong cardinality: a fragment can front two installations and a
+`daemon.json` concerns them all
+([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
+
 **Deliberately left out:** directories as objects, binary content, symlinks,
 ownership and mode beyond the executable bit, templates or variable
-substitution inside files.
+substitution inside files, and a second installation a file refers to (ADR
+0010).
 
 ### The Deployment
 
