@@ -101,7 +101,12 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
         builder.Property(i => i.Urls).HasColumnName("urls").HasDefaultValue(Array.Empty<string>()).IsRequired();
         builder.Property(i => i.Secrets).HasColumnName("secrets").HasDefaultValue(Array.Empty<string>()).IsRequired();
 
+        // Two directories, because an installation has two: the one it is
+        // deployed from and the one its state lies in (ADR 0009). Nothing in the
+        // column holds them apart — on a host that keeps both together they are
+        // the same string.
         builder.Property(i => i.Path).HasColumnName("path").HasMaxLength(Installation.PathMaxLength);
+        builder.Property(i => i.Data).HasColumnName("data").HasMaxLength(Installation.PathMaxLength);
 
         builder.Property(i => i.Description)
             .HasColumnName("description")
@@ -143,7 +148,7 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             .HasColumnName("search")
             .HasComputedColumnSql(
                 "to_tsvector('simple', key || ' ' || name || ' ' || coalesce(path, '') || ' ' "
-                + "|| words(urls) || ' ' || words(secrets) || ' ' || description)",
+                + "|| coalesce(data, '') || ' ' || words(urls) || ' ' || words(secrets) || ' ' || description)",
                 stored: true);
         builder.HasIndex("Search").HasMethod("GIN").HasDatabaseName("installation_search");
 

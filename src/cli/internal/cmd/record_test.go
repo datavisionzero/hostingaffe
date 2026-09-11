@@ -28,7 +28,8 @@ const (
 	installationJSON = `{"key":"logaffe-prod","name":"Logaffe production","machine":"ex44","software":"logaffe",
 "environment":"production","role":"application","status":"active","urls":["https://logs.example.test"],
 "ports":[{"port":443,"protocol":"tcp","scope":"public"},{"port":5432,"protocol":"tcp","scope":"private"}],
-"path":"/srv/logaffe","secrets":["LOGAFFE_DB_PASSWORD"],"backup":"active","monitoring":"external",
+"path":"/opt/compose/logaffe","data":"/srv/services/logaffe","secrets":["LOGAFFE_DB_PASSWORD"],
+"backup":"active","monitoring":"external",
 "logging":"central","version":"1.4.0","description":"The one people look at.",` + identities + `}`
 
 	historyJSON = `[{"id":1,"actor":{"id":"0198e0c0-0000-7000-8000-000000000002","kind":"user","name":"maintainer"},
@@ -134,6 +135,33 @@ func TestAWriteSaysOnlyWhatItWasGiven(t *testing.T) {
 	body := map[string]any{}
 	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
 	if len(body) != 2 || body["os"] != "Ubuntu 26.04 LTS" || body["location"] != "" {
+		t.Errorf("body = %v", body)
+	}
+}
+
+// An installation has two directories, and both are flags of their own: where
+// it lives, and where its data lies (ADR 0009).
+func TestAnInstallationIsWrittenAndReadWithBothItsDirectories(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, out, stderr := run(t, server, "inst", "view", "logaffe-prod")
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	if !strings.Contains(out, "path: /opt/compose/logaffe  data: /srv/services/logaffe") {
+		t.Errorf("stdout %q says nothing about the two directories", out)
+	}
+
+	if code, _, stderr := run(t, server, "inst", "set", "logaffe-prod",
+		"--path", "/opt/compose/logaffe", "--data", "/srv/services/logaffe"); code != exit.OK {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	body := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	if len(body) != 2 || body["path"] != "/opt/compose/logaffe" || body["data"] != "/srv/services/logaffe" {
 		t.Errorf("body = %v", body)
 	}
 }

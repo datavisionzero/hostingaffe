@@ -5486,6 +5486,12 @@
               "string"
             ]
           },
+          "data": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "secrets": {
             "type": [
               "null",
@@ -5876,6 +5882,12 @@
             }
           },
           "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
             "type": [
               "null",
               "string"
@@ -6695,6 +6707,7 @@
           "urls",
           "ports",
           "path",
+          "data",
           "secrets",
           "backup",
           "monitoring",
@@ -6766,6 +6779,12 @@
             }
           },
           "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
             "type": [
               "null",
               "string"
@@ -7185,6 +7204,7 @@
           "urls",
           "ports",
           "path",
+          "data",
           "secrets",
           "backup",
           "monitoring",
@@ -7232,6 +7252,12 @@
             }
           },
           "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
             "type": [
               "null",
               "string"

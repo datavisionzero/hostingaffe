@@ -227,6 +227,13 @@ than as a write that did not happen.
 one is the instance's to refuse and arrives as exit 4 — `ha` keeps no second
 copy of the model.
 
+**An installation is written with two directories**: `--path`, where it lives on
+the machine, and `--data`, where its persistent data lies — the one a backup has
+to take (ADR 0009). `view`, the export tree and `ha machine context` print both.
+`files sync` writes into the directory it is given — which is the installation's
+`path` — and knows nothing of `data`: what lies there is the machine's, and the
+record only says where it is.
+
 **A list is replaced whole**, never patched entry by entry: `--url`, `--secret`
 and `--port` are repeated, what is given is what the list becomes, and the lone
 value `none` clears it. A port is written and read the way a person writes one,

@@ -43,6 +43,8 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal("ex44", installation.GetProperty("machine").GetString());
         Assert.Equal("logaffe", installation.GetProperty("software").GetString());
         Assert.Equal("1.4.0", installation.GetProperty("version").GetString());
+        Assert.Equal("/opt/compose/app-1", installation.GetProperty("path").GetString());
+        Assert.Equal("/srv/services/app-1", installation.GetProperty("data").GetString());
         Assert.Equal(443, installation.GetProperty("ports")[0].GetProperty("port").GetInt32());
 
         var file = await admin.GetFromJsonAsync<JsonElement>(
@@ -423,7 +425,8 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         ["software"] = "logaffe",
         ["environment"] = "production",
         ["role"] = "application",
-        ["path"] = $"/srv/{key}",
+        ["path"] = $"/opt/compose/{key}",
+        ["data"] = $"/srv/services/{key}",
         ["ports"] = new List<object>
         {
             new Dictionary<string, object?> { ["port"] = port, ["protocol"] = "tcp", ["scope"] = "public" },

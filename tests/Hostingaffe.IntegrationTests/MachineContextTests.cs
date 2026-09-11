@@ -44,6 +44,7 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         Assert.Contains("### app-1 — Application one", document, StringComparison.Ordinal);
         Assert.Contains("logaffe 1.4.0 · production · application · active", document, StringComparison.Ordinal);
         Assert.Contains("backup: active · monitoring: external · logging: central", document, StringComparison.Ordinal);
+        Assert.Contains("path: /opt/compose/app-1\ndata: /srv/services/app-1", document, StringComparison.Ordinal);
         Assert.Contains("ports: 443/tcp:public, 5432/tcp:private", document, StringComparison.Ordinal);
         Assert.Contains("secrets: APP_1_DB_PASSWORD", document, StringComparison.Ordinal);
         Assert.Contains("files: .env.example (revision 1), compose.yml (revision 2)", document, StringComparison.Ordinal);
@@ -236,7 +237,8 @@ public sealed class MachineContextTests(PostgresFixture postgres)
                     new { port = 443 + number, protocol = "tcp", scope = "public" },
                     new { port = 5432, protocol = "tcp", scope = "private" },
                 },
-                path = $"/srv/{key}",
+                path = $"/opt/compose/{key}",
+                data = $"/srv/services/{key}",
                 secrets = new[] { $"{key.ToUpperInvariant().Replace('-', '_')}_DB_PASSWORD" },
                 backup = "active",
                 monitoring = "external",

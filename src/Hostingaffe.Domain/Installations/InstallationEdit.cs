@@ -40,6 +40,8 @@ public sealed record InstallationEdit
 
     public string? Path { get; init; }
 
+    public string? Data { get; init; }
+
     public IReadOnlyList<string>? Secrets { get; init; }
 
     public Backup? Backup { get; init; }

@@ -73,6 +73,27 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
         Assert.Equal(1, deployment.GetProperty("number").GetInt32());
     }
 
+    /// <summary>
+    /// Both directories an installation has are searched, and a path is found
+    /// whole: what a backup must take is a field, not a sentence in a
+    /// description (ADR 0009).
+    /// </summary>
+    [Fact]
+    public async Task Where_an_installations_data_lies_is_searched_like_where_it_lives()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin);
+
+        foreach (var directory in new[] { "/opt/compose/logaffe", "/srv/services/logaffe" })
+        {
+            var hit = Assert.Single(await HitsAsync(admin, directory));
+            Assert.Equal("installation", Field(hit, "kind"));
+            Assert.Equal("logaffe-prod", Field(hit, "key"));
+            Assert.Equal("fields", Field(hit, "where"));
+        }
+    }
+
     [Fact]
     public async Task A_deleted_row_is_not_a_hit()
     {
@@ -202,7 +223,8 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
             environment = "production",
             role = "application",
             ports = new object[] { new { port = 18502, protocol = "tcp", scope = "internal" } },
-            path = "/srv/logaffe",
+            path = "/opt/compose/logaffe",
+            data = "/srv/services/logaffe",
         });
 
         await Created(client, "/api/installations/logaffe-prod/files", new

@@ -145,6 +145,42 @@ public sealed class InstallationTests
     public void A_trailing_slash_is_what_a_person_types_and_means_nothing() =>
         Assert.Equal("/srv/logaffe", Installation.NormalizePath("/srv/logaffe/"));
 
+    [Fact]
+    public void Data_is_the_second_directory_and_holds_the_same_shape_as_the_first()
+    {
+        Assert.Equal("/srv/services/logaffe", Installation.NormalizeData("/srv/services/logaffe/"));
+        Assert.Throws<ArgumentException>(() => Installation.NormalizeData("srv/services/logaffe"));
+        Assert.Throws<ArgumentException>(() => Installation.NormalizeData("/srv/../etc"));
+    }
+
+    [Fact]
+    public void An_installation_carries_two_directories_and_nothing_holds_them_apart()
+    {
+        var installation = An();
+
+        var changes = installation.Apply(
+            new InstallationEdit { Path = "/opt/compose/logaffe", Data = "/srv/services/logaffe" },
+            Actor,
+            Now);
+
+        Assert.Equal(
+            [("path", null, "/opt/compose/logaffe"), ("data", null, "/srv/services/logaffe")],
+            changes.Select(change => (change.Field, change.OldValue, change.NewValue)));
+
+        // A host that keeps configuration and state in one directory says the
+        // same thing twice, and that is an answer rather than a contradiction.
+        var together = An();
+        Assert.Equal(
+            2,
+            together.Apply(
+                new InstallationEdit { Path = "/srv/logaffe", Data = "/srv/logaffe" }, Actor, Now).Count);
+        Assert.Equal(together.Path, together.Data);
+
+        // The empty string clears it, like every other text field.
+        Assert.Equal("data", installation.Apply(new InstallationEdit { Data = "" }, Actor, Now).Single().Field);
+        Assert.Null(installation.Data);
+    }
+
     [Theory]
     [InlineData("LOGAFFE_DB_PASSWORD")]
     [InlineData("acme/cloudflare-token")]

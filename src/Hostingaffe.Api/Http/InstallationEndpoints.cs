@@ -43,7 +43,7 @@ public static class InstallationEndpoints
                 var installation = await create.ExecuteAsync(
                     request ?? new CreateInstallationRequest(
                         null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null),
                     note,
                     cancellationToken);
 
@@ -69,7 +69,7 @@ public static class InstallationEndpoints
                     key,
                     request ?? new ChangeInstallationRequest(
                         null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null),
                     http.Headers.IfMatch.ToString(),
                     note,
                     cancellationToken))

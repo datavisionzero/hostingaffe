@@ -81,6 +81,7 @@ export function InstallationView() {
                 <code className="font-mono text-xs">{installation.version}</code>
               )],
               ["Path", installation.path === null ? null : <code className="font-mono text-xs">{installation.path}</code>],
+              ["Data", installation.data === null ? null : <code className="font-mono text-xs">{installation.data}</code>],
               ["Backup", installation.backup],
               ["Monitoring", installation.monitoring],
               ["Logging", installation.logging],

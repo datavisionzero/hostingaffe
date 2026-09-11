@@ -312,6 +312,7 @@ create table installation (
     urls        text[]        not null default '{}',
     ports       -- a table of its own, below
     path        varchar(500),
+    data        varchar(500),
     secrets     text[]        not null default '{}',
     backup      text          not null check (backup in ('none', 'planned', 'active')),
     monitoring  text          not null check (monitoring in ('none', 'external')),
@@ -335,6 +336,14 @@ derived from the deployments and arrives with them; the second is roadmap
 (VISION 15.2), and a nullable column prepared in advance would be a decision
 taken quietly. Both are `unknown-field` in a request body, and the message says
 which of the two reasons applies.
+
+**Two directories, and no constraint between them.** `path` is where the
+installation lives — the directory it is deployed from and the one every file it
+owns lies under — and `data` is where its persistent data lies: what a backup
+has to take (ADR 0009). Both are absolute paths the write path checks and the
+column only bounds, and neither is required to differ from the other: a host
+that keeps configuration and state in one directory says the same thing twice,
+and that is an answer rather than a contradiction.
 
 **Six closed sets, six check constraints.** `environment` and `role` answer two
 different questions — whom the installation serves, and what it is for the
@@ -662,7 +671,7 @@ index over it, generated from its own row:
 |---|---|---|
 | `machine` | `search` | the key, the name and every text field, description included |
 | `software` | `search` | the key, the name, the image, the two URLs, the description |
-| `installation` | `search` | the key, the name, the path, the urls, the secret names, the description |
+| `installation` | `search` | the key, the name, the two directories, the urls, the secret names, the description |
 | `deployment` | `search` | the version, the ref, the ticket, the note |
 | `file` | `search` | the path |
 | `file_revision` | `search` | what that revision said |

@@ -19,10 +19,10 @@ An agent that is about to work on a host has to know what is on it, and the
 usual answer is to read a repository of Markdown into its context and hope the
 fields were spelled the same way on every machine. Here that is **one call that
 returns one document**: the machine and its fields, its installations with the
-version each runs, their ports, paths and file lists, the last deployments, and
-the runbooks and decisions that apply — ordered so the part an agent needs
-first comes first. File contents are not in it; they are one `ha files get`
-away.
+version each runs, their ports, directories and file lists, the last
+deployments, and the runbooks and decisions that apply — ordered so the part an
+agent needs first comes first. File contents are not in it; they are one
+`ha files get` away.
 
 ```sh
 ha machine context caddy                                   # everything before touching the host

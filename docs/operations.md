@@ -114,6 +114,12 @@ ha files sync /srv/logaffe --inst logaffe-prod             # and then do it
 anything came up. It writes files and stops; what to do after it is in the
 runbook of that installation.
 
+**Sync writes where the installation lives, never where its data lies.** An
+installation records two directories — `path`, the one it is deployed from, and
+`data`, the one its persistent data lies in (ADR 0009) — and the second is
+written down rather than written to. What lies there is the machine's, and a
+command that rewrote it would be a restore nobody asked for.
+
 **A machine is not an owner it syncs**, and `--machine` says so as exit 2. A
 machine's files each say which directory on the machine they lie in, and sync
 writes one; `ha files list --machine KEY` is where that question is answered,

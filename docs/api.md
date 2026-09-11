@@ -403,6 +403,15 @@ object. `protocol` is `tcp` or `udp`, `scope` is `public`, `private` or
 address, and a caller who sends two of them means both. `[]` clears a list,
 leaving it out leaves it alone.
 
+**An installation has two directories.** `path` is where it lives on the machine
+— the directory it is deployed from, and the one every file it owns lies under —
+and `data` is where its persistent data lies: what a backup has to take and what
+a `docker compose down -v` does not bring back
+([ADR 0009](adr/0009-an-installation-has-two-directories-and-data-is-the-second.md)).
+Both are absolute, both may be left out, and nothing holds them apart: where a
+host keeps configuration and state in one directory, both carry it. `data` is
+searched like `path`.
+
 `secrets` holds the **names** of the secrets the installation needs and never
 their values — the values live in vaultaffe or on the host. A name is one word;
 anything with a space or an `=` in it is `validation`, which is what keeps a

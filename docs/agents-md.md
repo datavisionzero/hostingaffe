@@ -38,9 +38,14 @@ ha machine context caddy
 ```
 
 One call, one Markdown document: the machine and its fields, its installations
-with the version each runs, their ports, paths and file lists, the last
+with the version each runs, their ports, directories and file lists, the last
 deployments, the software, and every page that applies — the runbooks of that
 host and the decisions that hold on all of them. Read that and nothing else.
+
+An installation has two directories, and the document says both: `path`, where
+it is deployed from and where its files lie, and `data`, where its persistent
+data lies — the one a backup has to take and the one a `docker compose down -v`
+does not bring back. Where a host keeps both in one directory, both say it.
 
 File *contents* are not in it. They are one call away:
 
@@ -107,7 +112,8 @@ Record what you did, in the same session:
 ```sh
 ha deploy logaffe-prod --version 1.4.0 \
    --ref ghcr.io/example/logaffe@sha256:… --ticket OPS-42 --note-file -
-ha inst set logaffe-prod --backup active --note "restic to the offsite bucket"
+ha inst set logaffe-prod --backup active --data /srv/services/logaffe \
+   --note "restic to the offsite bucket"
 ha machine set caddy --os "Ubuntu 26.04 LTS" --measured-at 2026-09-05 --note "dist-upgrade"
 ha page add logaffe-restore --title "Restoring logaffe" --kind runbook \
    --installation logaffe-prod --body-file -

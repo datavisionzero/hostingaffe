@@ -416,6 +416,7 @@ means something else to systemd and to Docker Compose.
 | `urls` | list of URL | where it is reachable, if anywhere |
 | `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network) |
 | `path` | text | where it lives on the machine, `/srv/logaffe` — also where `files sync` writes by default |
+| `data` | text | where its persistent data lies, `/srv/services/logaffe` — what a backup has to take |
 | `secrets` | list of names | the secret *names* it needs, never values |
 | `backup` | `none` · `planned` · `active` | the decision, as in the template |
 | `monitoring` | `none` · `external` | |
@@ -441,6 +442,17 @@ regular expression, "every installation with a public port" would become a text
 search instead of a query, and the generated clients would see a `string` they
 can read nothing out of. `protocol` and `scope` are closed sets like every other
 one here, with the same check constraint in the column.
+
+**An installation has two directories, and both are fields.** The one it is
+deployed from holds the Compose file and the runtime environment; the one its
+data lies in holds the database directories and everything else a `docker
+compose down -v` does not bring back. The separation of configuration and state
+is the usual one, and on the first host migrated it is `/opt/compose/<service>`
+and `/srv/services/<service>`. A record that keeps the first in `path` and the
+second in the description has the fact that decides every backup as prose
+([ADR 0009](docs/adr/0009-an-installation-has-two-directories-and-data-is-the-second.md)).
+Where a host keeps both in one directory, both fields say it, and nothing holds
+them apart: two directories is what the model allows, not what it demands.
 
 The three decision fields — backup, monitoring, logging — are fields rather
 than prose because they are the ones we want to *list*: "every production

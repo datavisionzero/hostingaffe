@@ -111,7 +111,7 @@ func newInstallationView(g *globals) *cobra.Command {
 // because a version after that is a deployment.
 type installationFields struct {
 	name, machine, software, environment, role, status string
-	backup, monitoring, logging, path                  string
+	backup, monitoring, logging, path, data            string
 	description, descriptionFile                       string
 	urls, secrets, ports                               []string
 }
@@ -128,6 +128,7 @@ func (i *installationFields) flags(cmd *cobra.Command) {
 	f.StringVar(&i.monitoring, "monitoring", "", "none or external")
 	f.StringVar(&i.logging, "logging", "", "local or central")
 	f.StringVar(&i.path, "path", "", "where it lives on the machine")
+	f.StringVar(&i.data, "data", "", "where its persistent data lies, and what a backup has to take")
 	f.StringArrayVar(&i.urls, "url", nil, "an address it is reachable at; repeat for more, `none` clears the list")
 	f.StringArrayVar(&i.secrets, "secret", nil, "the *name* of a secret it needs, never a value; repeat for more, `none` clears the list")
 	f.StringArrayVar(&i.ports, "port", nil, "a port as 443/tcp:public; repeat for more, `none` clears the list")
@@ -141,7 +142,7 @@ func (i *installationFields) body(cmd *cobra.Command) (*fields, error) {
 		"name": &i.name, "machine": &i.machine, "software": &i.software,
 		"environment": &i.environment, "role": &i.role, "status": &i.status,
 		"backup": &i.backup, "monitoring": &i.monitoring, "logging": &i.logging,
-		"path": &i.path, "description": &i.description,
+		"path": &i.path, "data": &i.data, "description": &i.description,
 	} {
 		f.take(flag, value)
 	}

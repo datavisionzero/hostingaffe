@@ -204,6 +204,7 @@ func installationMarkdown(installation installationRecord) string {
 		{"monitoring", string(installation.Monitoring)},
 		{"logging", string(installation.Logging)},
 		{"path", value(installation.Path)},
+		{"data", value(installation.Data)},
 		{"ports", render.Ports(installation.Ports)},
 		{"urls", strings.Join(installation.Urls, ", ")},
 		{"secrets", strings.Join(installation.Secrets, ", ")},

@@ -101,8 +101,15 @@ both `platform` and `production`.
 `ports` is a list of objects — `{ "port": 443, "protocol": "tcp", "scope":
 "public" }`. The spelling `443/tcp:public` is what a person reads and types, and
 what a history row carries; it is a rendering, not the field. `secrets` is a
-list of secret **names**, never values. `urls` is a list of URLs, and `path` is
-where the installation lives on the machine.
+list of secret **names**, never values. `urls` is a list of URLs.
+
+**An installation has two directories.** `path` is where it lives on the
+machine — the one it is deployed from, `/opt/compose/logaffe`, and the one every
+file it owns lies under. `data` is where its persistent data lies,
+`/srv/services/logaffe`: what a backup has to take and what a `docker compose
+down -v` does not bring back ([ADR 0009](docs/adr/0009-an-installation-has-two-directories-and-data-is-the-second.md)).
+Where a host keeps configuration and state in one directory, both say the same
+thing, and nothing holds them apart.
 
 `version` is derived: the version of the installation's latest deployment.
 

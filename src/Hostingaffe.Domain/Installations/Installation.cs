@@ -120,8 +120,20 @@ public sealed partial class Installation
     /// </summary>
     public IReadOnlyList<Port> Ports => _ports;
 
-    /// <summary>Where it lives on the machine — <c>/srv/logaffe</c>.</summary>
+    /// <summary>
+    /// Where it lives on the machine — <c>/srv/logaffe</c>: the directory it is
+    /// deployed from, and the one every file it owns lies under.
+    /// </summary>
     public string? Path { get; private set; }
+
+    /// <summary>
+    /// Where its persistent data lies — <c>/srv/services/logaffe</c>: what a
+    /// backup has to take and what a <c>docker compose down -v</c> does not
+    /// bring back. The second of an installation's two directories, and on a
+    /// host that keeps configuration and state together it is the first
+    /// (ADR 0009).
+    /// </summary>
+    public string? Data { get; private set; }
 
     /// <summary>The <em>names</em> of the secrets it needs. Never the values; those live in vaultaffe or on the host.</summary>
     public string[] Secrets { get; private set; } = [];
@@ -191,6 +203,7 @@ public sealed partial class Installation
 
         Fields.Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
         Fields.Text("path", edit.Path, Path, value => Path = value, NormalizePath, changes);
+        Fields.Text("data", edit.Data, Data, value => Data = value, NormalizeData, changes);
 
         Fields.Closed("environment", edit.Environment, Environment, value => Environment = value, changes);
         Fields.Closed("role", edit.Role, Role, value => Role = value, changes);
@@ -298,14 +311,29 @@ public sealed partial class Installation
     /// under.
     /// </summary>
     /// <exception cref="ArgumentException">It is not an absolute path, or it climbs.</exception>
-    public static string NormalizePath(string path)
+    public static string NormalizePath(string path) =>
+        Directory(path, "A path is where the installation lives on the machine, from the root: /srv/logaffe.");
+
+    /// <summary>
+    /// Where the installation's persistent data lies: the same shape as
+    /// <see cref="NormalizePath"/>, and a second directory because an
+    /// installation has two of them (ADR 0009). Nothing holds the two apart —
+    /// one directory may be the other's parent, or the same directory, and on a
+    /// host that keeps configuration and state together it is.
+    /// </summary>
+    /// <exception cref="ArgumentException">It is not an absolute path, or it climbs.</exception>
+    public static string NormalizeData(string path) =>
+        Directory(path, "Data is where the installation's persistent data lies, from the root: /srv/services/logaffe.");
+
+    /// <summary>A directory on the machine: absolute, one line, and it does not climb.</summary>
+    private static string Directory(string path, string said)
     {
         var trimmed = path?.Trim() ?? string.Empty;
         Fields.Line(trimmed, PathMaxLength, "A path");
 
         if (!trimmed.StartsWith('/'))
         {
-            throw new ArgumentException("A path is where the installation lives on the machine, from the root: /srv/logaffe.");
+            throw new ArgumentException(said);
         }
 
         if (trimmed.Split('/').Any(segment => segment is ".."))

@@ -16,7 +16,8 @@ const installation = {
   status: "active",
   urls: ["https://logs.example.test"],
   ports: [{ port: 18502, protocol: "tcp", scope: "private" }],
-  path: "/srv/logaffe",
+  path: "/opt/compose/logaffe",
+  data: "/srv/services/logaffe",
   secrets: ["logaffe/postgres-password"],
   backup: "active",
   monitoring: "external",
@@ -71,6 +72,15 @@ describe("an installation (VISION 6.2)", () => {
 
     expect(await screen.findByRole("link", { name: "web-01" })).toHaveAttribute("href", "/machines/web-01");
     expect(screen.getByRole("link", { name: "logaffe" })).toHaveAttribute("href", "/software/logaffe");
+  });
+
+  // Two directories, because an installation has two: the one it is deployed
+  // from and the one a backup has to take (ADR 0009).
+  it("shows both directories", async () => {
+    view();
+
+    expect(await screen.findByText("/opt/compose/logaffe")).toBeInTheDocument();
+    expect(screen.getByText("/srv/services/logaffe")).toBeInTheDocument();
   });
 
   it("shows the ports and the names of the secrets", async () => {

@@ -185,7 +185,7 @@ func Installation(w io.Writer, i api.Installation) {
 		said("backup", string(i.Backup)),
 		said("monitoring", string(i.Monitoring)),
 		said("logging", string(i.Logging)))
-	line(w, maybe("path", i.Path))
+	line(w, maybe("path", i.Path), maybe("data", i.Data))
 	line(w, said("ports", Ports(i.Ports)))
 	line(w, said("urls", strings.Join(i.Urls, ", ")))
 	line(w, said("secrets", strings.Join(i.Secrets, ", ")))

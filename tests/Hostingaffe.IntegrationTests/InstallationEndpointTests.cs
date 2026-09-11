@@ -37,7 +37,8 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
                     new { port = 443, protocol = "tcp", scope = "public" },
                     new { port = 5432, protocol = "tcp", scope = "private" },
                 },
-                path = "/srv/logaffe",
+                path = "/opt/compose/logaffe",
+                data = "/srv/services/logaffe",
                 secrets = new[] { "LOGAFFE_DB_PASSWORD" },
                 backup = "active",
                 monitoring = "external",
@@ -54,7 +55,8 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
         Assert.Equal("logaffe", installation.GetProperty("software").GetString());
         Assert.Equal("production", installation.GetProperty("environment").GetString());
         Assert.Equal("application", installation.GetProperty("role").GetString());
-        Assert.Equal("/srv/logaffe", installation.GetProperty("path").GetString());
+        Assert.Equal("/opt/compose/logaffe", installation.GetProperty("path").GetString());
+        Assert.Equal("/srv/services/logaffe", installation.GetProperty("data").GetString());
         Assert.Equal(["LOGAFFE_DB_PASSWORD"], installation.GetProperty("secrets").EnumerateArray().Select(s => s.GetString()!));
 
         var ports = installation.GetProperty("ports");
@@ -204,6 +206,44 @@ public sealed class InstallationEndpointTests(PostgresFixture postgres)
             Ct);
         var problem = await Refusals.Problem(given, HttpStatusCode.BadRequest, "validation");
         Assert.Contains("secrets", problem.GetProperty("errors").EnumerateObject().Select(field => field.Name));
+    }
+
+    [Fact]
+    public async Task An_installation_has_two_directories_and_the_second_is_where_its_data_lies()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Installation(admin, "logaffe-prod");
+
+        using var written = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod",
+            new { path = "/opt/compose/logaffe", data = "/srv/services/logaffe/" },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        var installation = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod", Ct);
+        Assert.Equal("/srv/services/logaffe", installation.GetProperty("data").GetString());
+
+        // Relative is refused on the field it arrived in: the two directories
+        // hold the same shape and each answers for itself.
+        using var relative = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { data = "srv/services/logaffe" }, Ct);
+        var problem = await Refusals.Problem(relative, HttpStatusCode.BadRequest, "validation");
+        Assert.Contains("data", problem.GetProperty("errors").EnumerateObject().Select(field => field.Name));
+
+        // The empty string clears it; the history says both moves.
+        using var cleared = await admin.PatchAsJsonAsync(
+            "/api/installations/logaffe-prod", new { data = "" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/history", Ct);
+        var data = history.EnumerateArray()
+            .Where(entry => entry.GetProperty("field").GetString() == "data")
+            .ToArray();
+        Assert.Equal(2, data.Length);
+        Assert.Equal("/srv/services/logaffe", data[0].GetProperty("new_value").GetString());
+        Assert.Equal(JsonValueKind.Null, data[1].GetProperty("new_value").ValueKind);
     }
 
     [Fact]
