@@ -24,20 +24,31 @@ import (
 const Manifest = ".ha-sync.json"
 
 // `ha files sync` is the only command that touches a machine, and it pulls: it
-// runs on the host under the token of the SSH session, writes the owner's
+// runs on the host under the token of the SSH session, writes an installation's
 // current files into place, and stops. It executes nothing — no `docker compose
 // up`, no reload, no check that anything came up (VISION 5, 13). What to do
 // after it is in the runbook, and the agent does it.
+//
+// A machine is not an owner it syncs. A machine's files each say which directory
+// on the machine they lie in, and sync writes one directory; it would have to
+// write into `/etc` and `/usr/local` and remove from them, which is not what
+// this product is for (ADR 0008).
 func newFileSync(g *globals) *cobra.Command {
 	var owner anchor
 	var dry bool
 	cmd := &cobra.Command{
-		Use:   "sync DIR --machine KEY | --installation KEY",
-		Short: "Write the owner's current files into a directory on this host. It executes nothing.",
+		Use:   "sync DIR --installation KEY",
+		Short: "Write an installation's current files into a directory on this host. It executes nothing.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := owner.resolve(); err != nil {
 				return err
+			}
+			if owner.kind == api.AnchorKindMachine {
+				return &config.UsageError{Message: fmt.Sprintf(
+					"a machine's files are not written from here: each one records the directory it lies in on the machine, "+
+						"and sync writes one directory. `ha files list --machine %s` says where each of them belongs, "+
+						"and `ha files get` is what puts one there.", owner.key)}
 			}
 
 			// The directory is settled before a single request goes out: one

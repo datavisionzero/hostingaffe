@@ -391,6 +391,7 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
                     new Dictionary<string, object?>
                     {
                         ["path"] = "sites/app-1.caddy",
+                        ["directory"] = "/etc/caddy",
                         ["content"] = "app-1.example.test {\n  reverse_proxy app-1:8080\n}\n",
                     },
                 },

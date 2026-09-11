@@ -114,6 +114,11 @@ ha files sync /srv/logaffe --inst logaffe-prod             # and then do it
 anything came up. It writes files and stops; what to do after it is in the
 runbook of that installation.
 
+**A machine is not an owner it syncs**, and `--machine` says so as exit 2. A
+machine's files each say which directory on the machine they lie in, and sync
+writes one; `ha files list --machine KEY` is where that question is answered,
+and `ha files get` is what puts one of them in place (ADR 0008).
+
 **Nothing on the host holds a token.** There is no configuration file to leave
 one in — the two environment variables come from the SSH session and go with
 it, which is why a host that is handed on carries no credentials of this

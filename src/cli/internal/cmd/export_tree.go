@@ -178,7 +178,13 @@ func machineMarkdown(machine machineRecord) string {
 	listing(&out, "Installations", links(machine.Installations, func(i installationRecord) (string, string) {
 		return i.Key, fmt.Sprintf("installations/%s/README.md", i.Key)
 	}))
+	// A machine's file also says where on the machine it lies, and the export
+	// is what somebody reads while rebuilding one: a unit without its directory
+	// is a text nobody can put back (ADR 0008).
 	listing(&out, "Files", links(machine.Files, func(f api.File) (string, string) {
+		if f.Directory != nil && *f.Directory != "" {
+			return fmt.Sprintf("%s → %s (revision %d)", f.Path, *f.Directory, f.Revision), "files/" + f.Path
+		}
 		return fmt.Sprintf("%s (revision %d)", f.Path, f.Revision), "files/" + f.Path
 	}))
 

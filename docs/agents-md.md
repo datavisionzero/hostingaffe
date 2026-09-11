@@ -86,6 +86,20 @@ run whatever the runbook says afterwards (`docker compose up -d --wait`, a
 reload) yourself. What sync wrote it clears away when it leaves the record; what
 it never wrote it never touches, and reports `in the way` with exit 5 instead.
 
+**A machine's files are not synced.** Each of them says which directory on the
+machine it lies in — a unit under `/etc/systemd/system`, a script under
+`/usr/local/sbin` — so there is no one directory to sync into, and
+`sync --machine` refuses. Record it with its directory, and put it in place
+yourself:
+
+```sh
+ha files put caddy-host-backup.service --machine caddy \
+   --file ./caddy-host-backup.service --directory /etc/systemd/system --executable=false
+ha files list --machine caddy                    # says where each of them belongs
+ha files get caddy-host-backup.service --machine caddy | \
+   sudo tee /etc/systemd/system/caddy-host-backup.service > /dev/null
+```
+
 ### After the work
 
 Record what you did, in the same session:

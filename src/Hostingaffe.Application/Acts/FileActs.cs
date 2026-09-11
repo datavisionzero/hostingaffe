@@ -19,6 +19,7 @@ namespace Hostingaffe.Application.Acts;
 public sealed record FileSummaryShape(
     AnchorShape Owner,
     string Path,
+    string? Directory,
     bool Executable,
     int Size,
     int Revision,
@@ -32,6 +33,7 @@ public sealed record FileSummaryShape(
 public sealed record FileShape(
     AnchorShape Owner,
     string Path,
+    string? Directory,
     bool Executable,
     string Content,
     int Revision,
@@ -47,19 +49,24 @@ public sealed record FileRevisionShape(
     IdentityRef By,
     DateTimeOffset At);
 
-/// <summary>What a caller sends to put a file under an owner.</summary>
-public sealed record CreateFileRequest(string? Path, string? Content, bool? Executable)
+/// <summary>
+/// What a caller sends to put a file under an owner. A machine's file names the
+/// <c>directory</c> it lies in on the machine; an installation's does not,
+/// because the installation's own path already says it (ADR 0008).
+/// </summary>
+public sealed record CreateFileRequest(string? Path, string? Directory, string? Content, bool? Executable)
 {
     /// <inheritdoc cref="WriteFileRequest.UnknownFields"/>
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
 /// <summary>
-/// What a caller sends to write one: the content, the mode bit, or both. A
-/// field left out stays as it is, and a write that changes neither makes no
-/// revision.
+/// What a caller sends to write one: the content, the mode bit, the directory,
+/// or all of them. A field left out stays as it is, and a write that changes
+/// neither the content nor the mode bit makes no revision. The directory is
+/// never part of a revision: it says where the file lies, not what it says.
 /// </summary>
-public sealed record WriteFileRequest(string? Content, bool? Executable)
+public sealed record WriteFileRequest(string? Content, bool? Executable, string? Directory)
 {
     /// <summary>
     /// Whatever the caller sent that this object does not define. A closed
@@ -87,6 +94,7 @@ public sealed class FileAssembler(IIdentities identities)
             .. rows.Select(row => new FileSummaryShape(
                 AnchorShape.Of(owner),
                 row.Path,
+                row.Directory,
                 row.Executable,
                 row.Size,
                 row.Revision,
@@ -106,6 +114,7 @@ public sealed class FileAssembler(IIdentities identities)
         return new FileShape(
             AnchorShape.Of(owner),
             file.Path,
+            file.Directory,
             revision.Executable,
             revision.Content,
             revision.Number,
@@ -281,9 +290,10 @@ public sealed class CreateFile(
         var file = await transactions.RunAsync(async () =>
         {
             var now = clock.GetUtcNow();
-            var created = Validated.Field(
+            var created = Validated.WhicheverField(
                 "content",
-                () => File.Create(owner, path, request.Content, request.Executable ?? false, caller.Id, now));
+                () => File.Create(
+                    owner, path, request.Directory, request.Content, request.Executable ?? false, caller.Id, now));
 
             files.Add(created);
             history.Add(HistoryEntry.OnFile(created.Id, caller.Id, now, HistoryField.Created, null, path, said));
@@ -348,8 +358,8 @@ public sealed class WriteFile(
 
             var now = clock.GetUtcNow();
 
-            foreach (var change in Validated.Field(
-                "content", () => row.Write(request.Content, request.Executable, caller.Id, now)))
+            foreach (var change in Validated.WhicheverField(
+                "content", () => row.Write(request.Content, request.Executable, request.Directory, caller.Id, now)))
             {
                 history.Add(HistoryEntry.OnFile(
                     row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));

@@ -3069,7 +3069,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Put a file under the machine: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Put a file under the machine: `path` is relative and unique under it, and the content is its first revision. `directory` is where the file lies on the machine — `/etc/systemd/system` — and a machine's file has one, because a machine has no single directory its files lie under. It says where the file lies, not what it says, so changing it makes no revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateMachineFile",
         "parameters": [
           {
@@ -3212,7 +3212,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `directory` is where the file lies on the machine — `/etc/systemd/system` — and a machine's file has one, because a machine has no single directory its files lie under. It says where the file lies, not what it says, so changing it makes no revision. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "WriteMachineFile",
         "parameters": [
           {
@@ -3617,7 +3617,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Put a file under the installation: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Put a file under the installation: `path` is relative and unique under it, and the content is its first revision. A file of an installation carries no `directory`: the installation's own `path` is the one directory all of its files lie under. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "CreateInstallationFile",
         "parameters": [
           {
@@ -3760,7 +3760,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
+        "summary": "Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. A file of an installation carries no `directory`: the installation's own `path` is the one directory all of its files lie under. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).",
         "operationId": "WriteInstallationFile",
         "parameters": [
           {
@@ -5779,6 +5779,12 @@
               "string"
             ]
           },
+          "directory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "content": {
             "type": [
               "null",
@@ -6407,6 +6413,7 @@
         "required": [
           "owner",
           "path",
+          "directory",
           "executable",
           "content",
           "revision",
@@ -6422,6 +6429,12 @@
           },
           "path": {
             "type": "string"
+          },
+          "directory": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "executable": {
             "type": "boolean"
@@ -6478,6 +6491,7 @@
         "required": [
           "owner",
           "path",
+          "directory",
           "executable",
           "size",
           "revision",
@@ -6491,6 +6505,12 @@
           },
           "path": {
             "type": "string"
+          },
+          "directory": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "executable": {
             "type": "boolean"
@@ -6631,12 +6651,19 @@
       "ImportFile": {
         "required": [
           "path",
+          "directory",
           "content",
           "executable"
         ],
         "type": "object",
         "properties": {
           "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "directory": {
             "type": [
               "null",
               "string"
@@ -8346,6 +8373,12 @@
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "directory": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         },

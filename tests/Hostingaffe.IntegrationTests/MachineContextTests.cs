@@ -281,6 +281,7 @@ public sealed class MachineContextTests(PostgresFixture postgres)
             await Created(client, "/api/machines/ex44/files", new
             {
                 path = $"sites/{key}.caddy",
+                directory = "/etc/caddy",
                 content = $"{key}.example.test {{\n  reverse_proxy {key}:8080\n}}\n",
             });
 

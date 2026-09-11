@@ -269,8 +269,32 @@ func TestADirectoryHoldsOneOwnersFiles(t *testing.T) {
 		t.Fatal("code")
 	}
 
-	if code, _, stderr := run(t, server, "files", "sync", dir, "--machine", "ex44"); code != exit.Usage || stderr == "" {
+	if code, _, stderr := run(t, server, "files", "sync", dir, "--inst", "caddy-prod"); code != exit.Usage || stderr == "" {
 		t.Errorf("code %d, stderr %q", code, stderr)
+	}
+}
+
+// A machine's files each say which directory on the machine they lie in, and
+// sync writes one directory. It says so instead of writing the wrong thing
+// somewhere, and it says so before a single request goes out (ADR 0008).
+func TestAMachineIsNotSynced(t *testing.T) {
+	f := syncing(map[string]string{"compose.yml": "one\n"})
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	dir := t.TempDir()
+	code, _, stderr := run(t, server, "files", "sync", dir, "--machine", "ex44")
+	if code != exit.Usage {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(stderr, "ha files list --machine ex44") {
+		t.Errorf("stderr %q says nothing about where to look instead", stderr)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("it wrote %d entries into the directory", len(entries))
+	}
+	if len(f.requests) != 0 {
+		t.Errorf("it asked the instance %d times before refusing", len(f.requests))
 	}
 }
 

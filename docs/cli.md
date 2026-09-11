@@ -418,6 +418,10 @@ ha files put compose.override.yml --inst logaffe-prod --file ./compose.override.
 ha files get compose.override.yml --inst logaffe-prod > compose.override.yml
 ha files list --machine caddy
 ha files diff sites/logaffe.caddy --machine caddy
+
+# a machine's file says which directory on the machine it lies in
+ha files put caddy-host-backup.service --machine caddy \
+    --file ./caddy-host-backup.service --directory /etc/systemd/system
 ```
 
 **`put` writes, and creates what is not there yet.** It writes first and
@@ -425,6 +429,15 @@ creates on a not-found, so nobody has to know which of the two it is — except
 with `--revision`, where a not-found is a not-found, because nobody read a
 revision of a file that does not exist. Every write prints the revision it
 produced.
+
+**`--directory` is where a machine's file lies on the machine**, absolute, and
+a machine's file has one: a machine has no single directory its files lie
+under, the way an installation has its own `path` (ADR 0008). An installation's
+file is refused one. It is not part of a revision, so `put` without `--file`
+moves a file and asks for no text back — and a move of a file that is not there
+stays a not-found rather than creating an empty one. `ha files list --machine
+KEY` prints the directory beside each path; for an installation there is no
+column, because there would be nothing in it.
 
 **`--revision` is the write guard.** It carries the revision last read, and a
 write against a newer one is exit 6 with the instance saying which revision the
@@ -447,10 +460,17 @@ and `--to` it is the last change, which is the question somebody usually has.
 
 **`ha files sync DIR` is the one command that touches a machine, and it
 pulls.** It runs *on* the host, under the token of the SSH session — which is
-why there is no configuration file to leave a token in (VISION 9) — writes the
-owner's current files into `DIR`, and stops. **It executes nothing**: no
+why there is no configuration file to leave a token in (VISION 9) — writes an
+installation's current files into `DIR`, and stops. **It executes nothing**: no
 `docker compose up`, no reload, no check that anything came up. What to do
 after it is in the runbook, and the agent does it.
+
+**A machine is not an owner it syncs.** `--machine` is exit 2, said before a
+single request goes out, and names `ha files list --machine KEY` as what
+answers the question instead: a machine's files each lie in their own
+directory, and sync writes one. `ha files get` is what puts one of them in
+place, and rebuilding a machine is the agent reading the record and writing
+files the way it writes everything else (ADR 0008).
 
 It keeps a **manifest**, `.ha-sync.json`, beside the files. That is the only
 piece of state outside the instance, and it is what makes the command usable at

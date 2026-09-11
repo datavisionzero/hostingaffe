@@ -96,7 +96,7 @@ export function FileView({ owner: kind }: { owner: Anchor["kind"] }) {
             <span className="font-mono">{file.path}</span>
           </span>
         }
-        meta={`revision ${file.revision}`}
+        meta={file.directory ? `revision ${file.revision} · lies in ${file.directory}` : `revision ${file.revision}`}
       >
         {file.executable && <Badge variant="outline">executable</Badge>}
         {/* An old revision is read-only. Writing from one would take the file
@@ -212,11 +212,16 @@ function WriteFile({ owner, file, onDone, onCancel }: {
   onCancel: () => void;
 }) {
   const [content, setContent] = useState(file.content);
+  // Only a machine's file says where on the machine it lies; an installation's
+  // lie under the installation's own path, which it says once for all of them.
+  const places = owner.kind === "machine";
+  const [directory, setDirectory] = useState(file.directory ?? "");
   const [guard, setGuard] = useState(file.revision);
   const [conflict, setConflict] = useState<FileContent>();
   const [saving, setSaving] = useState(false);
   const [why, setWhy] = useState<string>();
-  const { leave, dialog } = useAbandon(content !== file.content, onCancel);
+  const moved = places && directory !== (file.directory ?? "");
+  const { leave, dialog } = useAbandon(content !== file.content || moved, onCancel);
 
   async function save() {
     setSaving(true);
@@ -224,7 +229,9 @@ function WriteFile({ owner, file, onDone, onCancel }: {
     setConflict(undefined);
 
     try {
-      const body = { content, executable: file.executable };
+      // The directory goes along only where it changed: left out, it stays
+      // what it is, and it is never part of a revision.
+      const body = moved ? { content, executable: file.executable, directory } : { content, executable: file.executable };
       const headers = { "If-Match": String(guard) };
       const path = { key: owner.key, path: file.path };
       const answer = owner.kind === "machine"
@@ -256,6 +263,20 @@ function WriteFile({ owner, file, onDone, onCancel }: {
   return (
     <Section title={`Write ${file.path}`}>
       <div className="grid gap-3">
+        {places && (
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">Directory on the machine</span>
+            <input
+              name="directory"
+              aria-label="Directory on the machine"
+              spellCheck={false}
+              placeholder="/etc/systemd/system"
+              value={directory}
+              onChange={(event) => setDirectory(event.target.value)}
+              className="w-full rounded-md border bg-transparent px-3 py-2 font-mono text-xs outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+          </label>
+        )}
         <textarea
           name="content"
           aria-label="File content"

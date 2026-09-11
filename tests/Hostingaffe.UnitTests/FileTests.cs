@@ -19,8 +19,10 @@ public sealed class FileTests
 
     private static readonly Anchor Owner = new(AnchorKind.Installation, Guid.CreateVersion7(), "logaffe-prod");
 
+    private static readonly Anchor Machine = new(AnchorKind.Machine, Guid.CreateVersion7(), "ex44");
+
     private static File A(string path = "compose.override.yml", string content = "services:") =>
-        File.Create(Owner, path, content, executable: false, Actor, Now);
+        File.Create(Owner, path, directory: null, content, executable: false, Actor, Now);
 
     [Fact]
     public void A_new_file_is_its_first_revision()
@@ -38,8 +40,8 @@ public sealed class FileTests
     {
         var file = A();
 
-        file.Write("services: two", null, Actor, Now.AddHours(1));
-        file.Write("services: three", null, Actor, Now.AddHours(2));
+        file.Write("services: two", null, null, Actor, Now.AddHours(1));
+        file.Write("services: three", null, null, Actor, Now.AddHours(2));
 
         Assert.Equal(3, file.Revision);
         Assert.Equal("services: three", file.Content);
@@ -53,11 +55,11 @@ public sealed class FileTests
     {
         var file = A();
 
-        Assert.Empty(file.Write("services:", executable: false, Actor, Now.AddHours(1)));
+        Assert.Empty(file.Write("services:", executable: false, directory: null, Actor, Now.AddHours(1)));
         Assert.Equal(1, file.Revision);
 
         // The mode bit alone is a change, and it is one the history names.
-        var changes = file.Write(null, executable: true, Actor, Now.AddHours(2));
+        var changes = file.Write(null, executable: true, directory: null, Actor, Now.AddHours(2));
         Assert.Equal(["revision", "executable"], changes.Select(change => change.Field));
         Assert.Equal(2, file.Revision);
         Assert.Equal("services:", file.Content);
@@ -66,8 +68,8 @@ public sealed class FileTests
     [Fact]
     public void The_mode_bit_belongs_to_the_revision_so_an_old_one_comes_back_whole()
     {
-        var file = File.Create(Owner, "bin/deploy", "#!/bin/sh", executable: true, Actor, Now);
-        file.Write("#!/bin/sh\nset -e", executable: false, Actor, Now.AddHours(1));
+        var file = File.Create(Owner, "bin/deploy", directory: null, "#!/bin/sh", executable: true, Actor, Now);
+        file.Write("#!/bin/sh\nset -e", executable: false, directory: null, Actor, Now.AddHours(1));
 
         Assert.False(file.Executable);
         Assert.True(file.At(1)!.Executable);
@@ -132,7 +134,7 @@ public sealed class FileTests
 
         // Bytes, not characters — the same count the megabyte is measured with,
         // so that a size somebody reads answers "does this still fit?".
-        file.Write("ä😀", null, Actor, Now.AddHours(1));
+        file.Write("ä😀", null, null, Actor, Now.AddHours(1));
         Assert.Equal(6, file.Size);
 
         // It follows the newest revision, like everything else a file says now.
@@ -147,6 +149,66 @@ public sealed class FileTests
 
         // A whole pair is a character, and characters are welcome.
         Assert.Equal("one😀two", File.NormalizeContent("one😀two"));
+    }
+
+    [Fact]
+    public void A_machines_file_says_which_directory_on_the_machine_it_lies_in()
+    {
+        var unit = File.Create(Machine, "caddy-host-backup.service", "/etc/systemd/system/", "[Unit]", false, Actor, Now);
+
+        // One trailing slash is what a person types and means nothing.
+        Assert.Equal("/etc/systemd/system", unit.Directory);
+    }
+
+    [Fact]
+    public void A_machines_file_without_a_directory_is_refused()
+    {
+        foreach (var directory in new string?[] { null, "", "   ", "etc/systemd/system", "/etc/../root", "/etc/./x" })
+        {
+            Assert.Throws<ArgumentException>(
+                () => File.Create(Machine, "caddy-host-backup.service", directory, "[Unit]", false, Actor, Now));
+        }
+    }
+
+    [Fact]
+    public void An_installations_file_carries_no_directory_of_its_own()
+    {
+        Assert.Null(A().Directory);
+
+        // The installation's own path is the one directory all of its files lie
+        // under, and a second answer here would be the one that drifts.
+        var refused = Assert.Throws<ArgumentException>(
+            () => File.Create(Owner, "compose.override.yml", "/srv/logaffe", "services:", false, Actor, Now));
+
+        Assert.Equal("directory", refused.ParamName);
+    }
+
+    [Fact]
+    public void Moving_a_file_on_the_machine_makes_no_revision()
+    {
+        var unit = File.Create(Machine, "logaffe.service", "/etc/systemd/system", "[Unit]", false, Actor, Now);
+
+        var changes = unit.Write(null, null, "/usr/local/lib/systemd/system", Actor, Now.AddHours(1));
+
+        // Where a file lies is not what it says, so the history names the move
+        // and the revision stays where it was.
+        Assert.Equal(["directory"], changes.Select(change => change.Field));
+        Assert.Equal("/etc/systemd/system", changes[0].OldValue);
+        Assert.Equal("/usr/local/lib/systemd/system", changes[0].NewValue);
+        Assert.Equal("/usr/local/lib/systemd/system", unit.Directory);
+        Assert.Equal(1, unit.Revision);
+
+        // And writing the same one again changes nothing at all.
+        Assert.Empty(unit.Write(null, null, "/usr/local/lib/systemd/system", Actor, Now.AddHours(2)));
+    }
+
+    [Fact]
+    public void A_machines_file_cannot_be_left_without_a_directory_by_a_write()
+    {
+        var unit = File.Create(Machine, "logaffe.service", "/etc/systemd/system", "[Unit]", false, Actor, Now);
+
+        Assert.Throws<ArgumentException>(() => unit.Write(null, null, "", Actor, Now.AddHours(1)));
+        Assert.Equal("/etc/systemd/system", unit.Directory);
     }
 
     [Fact]

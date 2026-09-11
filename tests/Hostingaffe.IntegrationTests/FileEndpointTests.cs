@@ -24,6 +24,7 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
 
         var unit = await Put(admin, "/api/machines/ex44/files", "systemd/logaffe.service", "[Unit]");
         Assert.Equal("machine", unit.GetProperty("owner").GetProperty("kind").GetString());
+        Assert.Equal("/etc/systemd/system", unit.GetProperty("directory").GetString());
         Assert.Equal("ex44", unit.GetProperty("owner").GetProperty("key").GetString());
         Assert.Equal(1, unit.GetProperty("revision").GetInt32());
 
@@ -315,6 +316,83 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
+    /// <summary>
+    /// A machine has no single directory its files lie under, so every one of
+    /// them says which it lies in; an installation has exactly one — its own
+    /// path — so its files say nothing (ADR 0008).
+    /// </summary>
+    [Fact]
+    public async Task Only_a_machines_file_says_which_directory_it_lies_in()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+
+        using var placeless = await admin.PostAsJsonAsync(
+            "/api/machines/ex44/files", new { path = "logaffe.service", content = "[Unit]" }, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, placeless.StatusCode);
+        var refusal = await placeless.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.True(refusal.GetProperty("errors").TryGetProperty("directory", out _));
+
+        using var relative = await admin.PostAsJsonAsync(
+            "/api/machines/ex44/files",
+            new { path = "logaffe.service", directory = "etc/systemd/system", content = "[Unit]" },
+            Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, relative.StatusCode);
+
+        using var misplaced = await admin.PostAsJsonAsync(
+            "/api/installations/logaffe-prod/files",
+            new { path = "compose.override.yml", directory = "/srv/logaffe", content = "services:" },
+            Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, misplaced.StatusCode);
+
+        var compose = await Put(admin, "/api/installations/logaffe-prod/files", "compose.override.yml", "services:");
+        Assert.Null(compose.GetProperty("directory").GetString());
+
+        var unit = await Put(admin, "/api/machines/ex44/files", "logaffe.service", "[Unit]");
+        Assert.Equal("/etc/systemd/system", unit.GetProperty("directory").GetString());
+
+        // A list carries it, so that what is under a machine says where each of
+        // its files belongs without reading every one of them.
+        var list = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/files", Ct);
+        Assert.Equal(["/etc/systemd/system"], list.EnumerateArray().Select(f => f.GetProperty("directory").GetString()!));
+    }
+
+    /// <summary>
+    /// Moving a unit from one root to another is not a second version of the
+    /// unit: the history names the move, and the revision stays where it was.
+    /// </summary>
+    [Fact]
+    public async Task Moving_a_machines_file_is_a_change_and_not_a_revision()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Put(admin, "/api/machines/ex44/files", "logaffe.service", "[Unit]");
+
+        const string address = "/api/machines/ex44/files/logaffe.service";
+
+        using var moved = await admin.PutAsJsonAsync(
+            address, new { directory = "/usr/local/lib/systemd/system" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+
+        var after = await moved.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal("/usr/local/lib/systemd/system", after.GetProperty("directory").GetString());
+        Assert.Equal(1, after.GetProperty("revision").GetInt32());
+        Assert.Equal("[Unit]", after.GetProperty("content").GetString());
+
+        var history = await admin.GetFromJsonAsync<JsonElement>(
+            "/api/machines/ex44/file-history/logaffe.service", Ct);
+        var move = history.EnumerateArray().Last();
+        Assert.Equal("directory", move.GetProperty("field").GetString());
+        Assert.Equal("/etc/systemd/system", move.GetProperty("old_value").GetString());
+        Assert.Equal("/usr/local/lib/systemd/system", move.GetProperty("new_value").GetString());
+
+        // It cannot be taken away again: a machine's file lies somewhere.
+        using var emptied = await admin.PutAsJsonAsync(address, new { directory = "" }, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, emptied.StatusCode);
+    }
+
     private const string Address = "/api/installations/logaffe-prod/files/compose.override.yml";
 
     private static async Task Ground(HttpClient client)
@@ -332,9 +410,17 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Created, installation.StatusCode);
     }
 
+    /// <summary>
+    /// A machine's file names the directory it lies in, an installation's does
+    /// not — so the helper puts one under a machine and leaves it out anywhere
+    /// else (ADR 0008).
+    /// </summary>
     private static async Task<JsonElement> Put(HttpClient client, string under, string path, string content)
     {
-        using var created = await client.PostAsJsonAsync(under, new { path, content }, Ct);
+        using var created = under.StartsWith("/api/machines/", StringComparison.Ordinal)
+            ? await client.PostAsJsonAsync(under, new { path, directory = "/etc/systemd/system", content }, Ct)
+            : await client.PostAsJsonAsync(under, new { path, content }, Ct);
+
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         return await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
     }

@@ -130,6 +130,14 @@ export function Files({ owner }: { owner: Anchor }) {
           {items.map((file) => (
             <Row key={file.path} to={filePath(file.owner, file.path)}>
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.path}</span>
+              {/* Where it lies on the machine. Only a machine's file has one:
+                  an installation's files all lie under the installation's own
+                  path, which the installation says once. */}
+              {file.directory && (
+                <span className="hidden min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground sm:block">
+                  {file.directory}
+                </span>
+              )}
               {file.executable && <Badge variant="outline">executable</Badge>}
               <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{size(file.size)}</span>
               <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">rev {file.revision}</span>

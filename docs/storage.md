@@ -386,12 +386,14 @@ create table file (
     machine_id      uuid         references machine (id),
     installation_id uuid         references installation (id),
     path            varchar(500) not null,
+    directory       varchar(500),
     created_by      uuid         not null references identity (id),
     created_at      timestamptz  not null,
     deleted_at      timestamptz,
     deleted_by      uuid         references identity (id),
 
-    check (num_nonnulls(machine_id, installation_id) = 1)
+    check (num_nonnulls(machine_id, installation_id) = 1),
+    check (directory is null or machine_id is not null)
 );
 
 create unique index file_on_machine      on file (machine_id, path)      where machine_id is not null;
@@ -414,6 +416,16 @@ systemd unit belongs to the machine, a Compose file to the installation, and
 nothing belongs to both or to neither. The two partial unique indexes are what
 makes `path` unique *per owner* and are the order an owner's files are read in;
 they cover deleted rows, so a path stays spent for the grace period.
+
+**`directory` is where a machine's file lies on the machine**, absolute, and
+the second check constraint is what keeps it a machine's alone: an installation
+says once, in its own `path`, where all of its files lie, and a second answer
+per file would be the one that drifts (ADR 0008). It is not `not null`, because
+a machine file recorded before the column existed has no directory to invent —
+the instance refuses a new one without it, and `ha files put --directory` fills
+an old one in. It is on the file and not on the revision: moving a unit from one
+root to another is a change the history names, and the content stays at the
+revision it was at.
 
 **Nothing on `file` says what the file contains.** The content, the mode bit,
 the revision number, its size in bytes and who last wrote it are the newest

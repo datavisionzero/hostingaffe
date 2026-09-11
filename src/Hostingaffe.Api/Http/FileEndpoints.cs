@@ -47,12 +47,12 @@ public static class FileEndpoints
         door.MapPost("/files", async (string key, CreateFileRequest? request, string? note, CreateFile create, CancellationToken cancellationToken) =>
             {
                 var file = await create.ExecuteAsync(
-                    kind, key, request ?? new CreateFileRequest(null, null, null), note, cancellationToken);
+                    kind, key, request ?? new CreateFileRequest(null, null, null, null), note, cancellationToken);
 
                 return Results.Created($"{Routes.Api}/{collection}/{key}/files/{file.Path}", file);
             })
             .WithName($"Create{kind}File")
-            .WithSummary($"Put a file under the {owner}: `path` is relative and unique under it, and the content is its first revision. The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary($"Put a file under the {owner}: `path` is relative and unique under it, and the content is its first revision. {DirectorySays(kind)} The refused paths are `.env` and every `.env.*` but `.env.example`, anything under `secrets/`, and anything outside the owner's directory. `note` goes into the history beside the change (ADR 0004).")
             .Produces<FileShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
@@ -66,12 +66,12 @@ public static class FileEndpoints
                     kind,
                     key,
                     path,
-                    request ?? new WriteFileRequest(null, null),
+                    request ?? new WriteFileRequest(null, null, null),
                     http.Headers.IfMatch.ToString(),
                     note,
                     cancellationToken))
             .WithName($"Write{kind}File")
-            .WithSummary("Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).")
+            .WithSummary($"Write the file: a new revision, unless it already says exactly this. A field left out stays as it is. {DirectorySays(kind)} `If-Match` with the **revision** last read guards the write — a file is numbered, so what it hands back is the number. `note` goes into the history beside the change (ADR 0004).")
             .Produces<FileShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
@@ -102,4 +102,15 @@ public static class FileEndpoints
             .WithName($"Read{kind}FileHistory")
             .WithSummary("Every change to the file, oldest first: who, when, and which revision it became. What each revision said is the revision's, not the history's.");
     }
+
+    /// <summary>
+    /// What the two writing endpoints say about <c>directory</c>, which is the
+    /// one field whose rule differs by owner: a machine has no single directory
+    /// its files lie under, and an installation has exactly one — its own path
+    /// (ADR 0008).
+    /// </summary>
+    private static string DirectorySays(AnchorKind kind) =>
+        kind is AnchorKind.Machine
+            ? "`directory` is where the file lies on the machine — `/etc/systemd/system` — and a machine's file has one, because a machine has no single directory its files lie under. It says where the file lies, not what it says, so changing it makes no revision."
+            : "A file of an installation carries no `directory`: the installation's own `path` is the one directory all of its files lie under.";
 }

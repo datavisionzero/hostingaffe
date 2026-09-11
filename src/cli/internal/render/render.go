@@ -328,17 +328,38 @@ func revisions(files []api.DeploymentFile) string {
 // it can be redirected into a file without a head on top of it.
 func File(w io.Writer, f api.File) {
 	fmt.Fprintf(w, "%s  revision %d  %s\n", f.Path, f.Revision, Anchor(&f.Owner))
-	line(w, said("executable", executable(f.Executable)), said("bytes", fmt.Sprint(len(f.Content))))
+	line(w, maybe("directory", f.Directory),
+		said("executable", executable(f.Executable)), said("bytes", fmt.Sprint(len(f.Content))))
 	fmt.Fprintf(w, "updated: %s by %s  author: %s\n",
 		f.UpdatedAt.Format(time.RFC3339), f.UpdatedBy.Name, f.CreatedBy.Name)
 }
 
-// FileSummaries prints what is under an owner: the path, how big it is, the
-// revision it is at, whether it is executable, and when it last moved.
+// FileSummaries prints what is under an owner: the path, where it lies on the
+// machine, how big it is, the revision it is at, whether it is executable, and
+// when it last moved.
+//
+// The directory is a column only where there is one to print. A machine's files
+// each say where on the machine they lie, and an installation's say nothing,
+// because the installation's own path already said it for all of them — so a
+// column of empty cells is what an installation would get.
 func FileSummaries(w io.Writer, items []api.FileSummary) {
+	placed := false
 	for _, f := range items {
-		fmt.Fprintf(w, "%-40s %10s %-10s %-4s %-16s %s\n",
-			f.Path, size(f.Size), fmt.Sprintf("revision %d", f.Revision), executable(f.Executable),
+		if f.Directory != nil && *f.Directory != "" {
+			placed = true
+		}
+	}
+
+	for _, f := range items {
+		where := ""
+		if placed {
+			if f.Directory != nil {
+				where = *f.Directory
+			}
+			where = fmt.Sprintf("%-30s ", where)
+		}
+		fmt.Fprintf(w, "%-40s %s%10s %-10s %-4s %-16s %s\n",
+			f.Path, where, size(f.Size), fmt.Sprintf("revision %d", f.Revision), executable(f.Executable),
 			f.UpdatedBy.Name, f.UpdatedAt.Format("2006-01-02 15:04"))
 	}
 }

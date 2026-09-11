@@ -51,6 +51,25 @@ public static class Validated
         }
     }
 
+    /// <summary>
+    /// The same, for one call that can refuse more than one field — a file is
+    /// created from its path, its directory and its content at once. The Domain
+    /// says which of them it refused in the exception's parameter name, and only
+    /// where it says nothing does <paramref name="fallback"/> stand in.
+    /// </summary>
+    /// <exception cref="Refusal"><c>validation</c> on whichever field was refused.</exception>
+    public static T WhicheverField<T>(string fallback, Func<T> normalize)
+    {
+        try
+        {
+            return normalize();
+        }
+        catch (ArgumentException refusal)
+        {
+            throw Refusal.Validation(refusal.ParamName ?? fallback, Said(refusal));
+        }
+    }
+
     /// <inheritdoc cref="Field{T}(string, Func{T})"/>
     public static async Task<T> FieldAsync<T>(string field, Func<Task<T>> normalize)
     {

@@ -37,6 +37,7 @@ material value to understanding the decision.
 - [0005 – `ha login` is the device-code flow, and the session lives in the keychain](./0005-ha-login-is-the-device-code-flow-and-the-session-lives-in-the-keychain.md)
 - [0006 – A token never travels over plain HTTP off loopback](./0006-a-token-never-travels-over-plain-http-off-loopback.md)
 - [0007 – A record is linked from Markdown as a scheme and a key](./0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)
+- [0008 – A machine's file says where it lies, and is never synced](./0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)
 
 ## Adopted from planaffe
 

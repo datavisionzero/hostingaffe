@@ -124,6 +124,12 @@ A UTF-8 text file a machine runs with, owned by exactly one installation or one
 machine: a `compose.override.yml`, a Caddy fragment, a systemd unit, a `bin/`
 script. `path` is relative and unique per owner.
 
+`directory` is where the file lies on the machine — `/etc/systemd/system`,
+absolute. A machine's file has one and an installation's has none: an
+installation says once, in its own `path`, where all of its files lie, and a
+machine has no single answer to give (ADR 0008). It is written down, not
+written to: `files sync` takes an installation and refuses a machine.
+
 Files are the one place the history keeps **content** rather than the fact of a
 change, because rolling back a Compose file needs the previous Compose file.
 Each write makes a `revision`, and two revisions can be diffed.

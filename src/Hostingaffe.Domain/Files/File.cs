@@ -25,6 +25,12 @@ namespace Hostingaffe.Domain.Files;
 /// happens on the machine.
 /// </para>
 /// <para>
+/// A machine's file also says which <em>directory</em> on the machine it lies
+/// in, because a machine has no single one the way an installation has its path
+/// (VISION 7, ADR 0008). That one <em>is</em> editable, and it makes no
+/// revision: it says where the file lies, not what it says.
+/// </para>
+/// <para>
 /// The name collides with <c>System.IO.File</c>, which is implicitly imported
 /// everywhere. Every file that needs this one says so with an alias: the model's
 /// word is <c>file</c> (<c>CONTEXT.md</c>), and a type named around the
@@ -43,12 +49,13 @@ public sealed class File
         // EF Core materializes through this; every other route goes through Create.
     }
 
-    private File(Guid id, Anchor owner, string path, Guid createdBy, DateTimeOffset createdAt)
+    private File(Guid id, Anchor owner, string path, string? directory, Guid createdBy, DateTimeOffset createdAt)
     {
         Id = id;
         MachineId = owner.Kind is AnchorKind.Machine ? owner.Id : null;
         InstallationId = owner.Kind is AnchorKind.Installation ? owner.Id : null;
         Path = path;
+        Directory = directory;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
     }
@@ -63,6 +70,13 @@ public sealed class File
 
     /// <summary>Relative to the owner's directory, and unique under it.</summary>
     public string Path { get; private init; } = null!;
+
+    /// <summary>
+    /// Where the file lies on the machine, absolute — set when the owner is a
+    /// machine, and nothing when it is an installation, whose own path is the
+    /// one directory all of its files share (VISION 7, ADR 0008).
+    /// </summary>
+    public string? Directory { get; private set; }
 
     /// <summary>Every write, oldest first, each with the content it wrote.</summary>
     public IReadOnlyList<FileRevision> Revisions => _revisions;
@@ -109,45 +123,102 @@ public sealed class File
     /// <summary>The revision by its number, or nothing where there is none.</summary>
     public FileRevision? At(int revision) => _revisions.SingleOrDefault(entry => entry.Number == revision);
 
-    /// <exception cref="ArgumentException">The path is refused, or the content is not text this holds.</exception>
+    /// <exception cref="ArgumentException">
+    /// The path is refused, the directory does not suit the owner, or the
+    /// content is not text this holds.
+    /// </exception>
     public static File Create(
-        Anchor owner, string path, string? content, bool executable, Guid createdBy, DateTimeOffset createdAt)
+        Anchor owner,
+        string path,
+        string? directory,
+        string? content,
+        bool executable,
+        Guid createdBy,
+        DateTimeOffset createdAt)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var file = new File(Guid.CreateVersion7(), owner, FilePath.Normalize(path), createdBy, createdAt);
+        var file = new File(
+            Guid.CreateVersion7(),
+            owner,
+            FilePath.Normalize(path),
+            DirectoryUnder(owner.Kind, directory),
+            createdBy,
+            createdAt);
+
         file._revisions.Add(new FileRevision(1, NormalizeContent(content), executable, createdBy, createdAt));
 
         return file;
     }
 
     /// <summary>
+    /// The directory a file of this owner may carry: a machine's file says
+    /// where on the machine it lies, and an installation's says nothing,
+    /// because the installation's own path already said it once for all of
+    /// them.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// A machine's file has none, or an installation's file was given one.
+    /// </exception>
+    private static string? DirectoryUnder(AnchorKind kind, string? directory)
+    {
+        if (kind is AnchorKind.Installation)
+        {
+            return directory?.Trim() is { Length: > 0 }
+                ? throw new ArgumentException(
+                    "An installation's files lie under the installation's path; only a machine's file carries a directory of its own.",
+                    "directory")
+                : null;
+        }
+
+        return FileDirectory.Normalize(directory);
+    }
+
+    /// <summary>
     /// A new revision, unless the file already says exactly this. Answers what
     /// changed, in the words the API spells the fields with.
     /// </summary>
-    /// <exception cref="ArgumentException">The content is not text this holds.</exception>
-    public IReadOnlyList<FieldChange> Write(string? content, bool? executable, Guid by, DateTimeOffset at)
+    /// <exception cref="ArgumentException">
+    /// The content is not text this holds, or the directory does not suit the
+    /// owner.
+    /// </exception>
+    public IReadOnlyList<FieldChange> Write(
+        string? content, bool? executable, string? directory, Guid by, DateTimeOffset at)
     {
         var text = content is null ? Content : NormalizeContent(content);
         var bit = executable ?? Executable;
+        var changes = new List<FieldChange>();
 
-        if (text == Content && bit == Executable)
+        if (text != Content || bit != Executable)
         {
-            return [];
+            changes.Add(new FieldChange(
+                "revision",
+                Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                (Revision + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+            if (bit != Executable)
+            {
+                changes.Add(new FieldChange("executable", Executable ? "true" : "false", bit ? "true" : "false"));
+            }
+
+            _revisions.Add(new FileRevision(Revision + 1, text, bit, by, at));
         }
 
-        var changes = new List<FieldChange>
+        // The directory is not part of a revision: it says where the file lies,
+        // not what it says, and moving a unit from one root to another does not
+        // make the unit a second version of itself.
+        if (directory is not null)
         {
-            new("revision", Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                (Revision + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        };
+            var moved = DirectoryUnder(
+                MachineId is not null ? AnchorKind.Machine : AnchorKind.Installation, directory);
 
-        if (bit != Executable)
-        {
-            changes.Add(new FieldChange("executable", Executable ? "true" : "false", bit ? "true" : "false"));
+            if (moved != Directory)
+            {
+                changes.Add(new FieldChange("directory", Directory, moved));
+                Directory = moved;
+            }
         }
 
-        _revisions.Add(new FileRevision(Revision + 1, text, bit, by, at));
         return changes;
     }
 

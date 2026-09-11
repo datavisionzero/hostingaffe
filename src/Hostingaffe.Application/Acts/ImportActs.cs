@@ -87,8 +87,12 @@ public sealed record ImportInstallation(
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
-/// <summary>A file at the content it is at. Its earlier revisions are the source's history.</summary>
-public sealed record ImportFile(string? Path, string? Content, bool? Executable)
+/// <summary>
+/// A file at the content it is at. Its earlier revisions are the source's
+/// history. A machine's file carries the directory it lies in, an
+/// installation's does not (ADR 0008).
+/// </summary>
+public sealed record ImportFile(string? Path, string? Directory, string? Content, bool? Executable)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -351,7 +355,7 @@ public sealed class ImportRecord(
         await createFile.ExecuteAsync(
             kind,
             key ?? string.Empty,
-            new CreateFileRequest(file.Path, file.Content, file.Executable),
+            new CreateFileRequest(file.Path, file.Directory, file.Content, file.Executable),
             note,
             cancellationToken);
     }

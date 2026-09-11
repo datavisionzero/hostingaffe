@@ -5,6 +5,7 @@ using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 
 using File = Hostingaffe.Domain.Files.File;
+using FileDirectory = Hostingaffe.Domain.Files.FileDirectory;
 using FilePath = Hostingaffe.Domain.Files.FilePath;
 using NpgsqlTypes;
 
@@ -25,7 +26,15 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
     public void Configure(EntityTypeBuilder<File> builder)
     {
         builder.ToTable("file", table =>
-            table.HasCheckConstraint("ck_file_owner", "num_nonnulls(machine_id, installation_id) = 1"));
+        {
+            table.HasCheckConstraint("ck_file_owner", "num_nonnulls(machine_id, installation_id) = 1");
+
+            // Only a machine's file says where on the machine it lies. An
+            // installation's directory is the installation's own path, once for
+            // all of its files, and a second answer here would be the one that
+            // drifts (ADR 0008).
+            table.HasCheckConstraint("ck_file_directory", "directory is null or machine_id is not null");
+        });
 
         builder.HasKey(f => f.Id).HasName("pk_file");
         builder.Property(f => f.Id).HasColumnName("id");
@@ -45,6 +54,8 @@ public sealed class FileConfiguration : IEntityTypeConfiguration<File>
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.Property(f => f.Path).HasColumnName("path").HasMaxLength(FilePath.MaxLength).IsRequired();
+
+        builder.Property(f => f.Directory).HasColumnName("directory").HasMaxLength(FileDirectory.MaxLength);
 
         // One index per owner kind, each unique and each the order the files of
         // an owner are read in. They cover deleted rows on purpose, so a restore

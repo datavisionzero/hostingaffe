@@ -469,6 +469,7 @@ Caddy site fragment, a systemd unit and its timer, a `bin/` script, an
 | --- | --- | --- |
 | `owner` | installation key or machine key | exactly one |
 | `path` | relative path | `compose.override.yml`, `sites/logaffe.caddy`, `bin/logaffe-stack`; unique per owner |
+| `directory` | absolute path | where it lies on the machine — `/etc/systemd/system`. A machine's file has one, an installation's has none (ADR 0008) |
 | `executable` | boolean | so that a script arrives runnable |
 | `content` | text | UTF-8, capped at one megabyte |
 | `revision` | derived | one per write; the history keeps every previous content |
@@ -486,12 +487,26 @@ CLI also warns when content looks like a private key or a token. That is a
 guard against accidents, not a security boundary: the operator's secrets live
 in vaultaffe or on the host, never here.
 
+An installation has one directory for every file it owns, and it is the
+installation's own `path`. A machine has none, so each of its files says which
+one it lies in: sixteen units under `/etc/systemd/system`, eleven scripts under
+`/usr/local/sbin`, a `daemon.json` under `/etc/docker` is what one real host
+turned out to hold, and a record that cannot tell them apart holds texts nobody
+can put back.
+
 The files of an installation are a set, and `files sync` writes the whole set.
 There is no partial deployment of files, no per-file "deployed" flag, and no
 record on the server of what a machine holds: the machine holds what the last
 sync wrote — the manifest sync keeps beside the files (6.1) is the machine's
 record, not the server's — and the deployment record (below) says which
 revisions were current when a version went live.
+
+**A machine is not an owner `files sync` writes.** Its files each lie in their
+own directory, and sync writes one; a command that wrote and removed under
+`/etc` as root would make this product a deployment tool, which 5. and 13. say
+it is not. The directory is written down, not written to: the agent acts on the
+machine and the record says what is there
+([ADR 0008](docs/adr/0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)).
 
 **Deliberately left out:** directories as objects, binary content, symlinks,
 ownership and mode beyond the executable bit, templates or variable
@@ -884,10 +899,6 @@ built.
   does a homelab want `desktop` and `sbc`? Closed set either way.
 - **Versions.** Text, or a parsed version for sorting and "newer than"? Text
   until sorting is actually needed.
-- **Machine-level files.** A systemd unit or an sshd snippet belongs to the
-  machine, not to an installation, and `files sync` on a machine would write
-  into `/etc`. Whether that is a sync target at all, or only a record the
-  agent copies from by hand, is decided when the first host is migrated.
 - **Machine-scoped tokens.** In the MVP no token lives on a machine (9.), so a
   host cannot sync its own files without an agent's session. A token that
   reads one machine and writes nothing would allow that without turning a

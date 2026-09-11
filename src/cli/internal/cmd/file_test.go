@@ -208,6 +208,83 @@ func TestPutCreatesWhatIsNotThereYet(t *testing.T) {
 	}
 }
 
+// A machine's file says which directory on the machine it lies in, and `put`
+// carries it. Left off, it is not sent at all, so a write leaves the directory
+// where it is (ADR 0008).
+func TestPutCarriesTheDirectoryOnlyWhenItIsGiven(t *testing.T) {
+	f := fileServer()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	if code, _, stderr := run(t, server, "files", "put", "logaffe.service",
+		"--machine", "ex44", "--file", "-", "--directory", "/etc/systemd/system"); code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	written := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[0]), &written)
+	if written["directory"] != "/etc/systemd/system" {
+		t.Errorf("the write carries the directory: %v", written)
+	}
+
+	if code, _, _ := run(t, server, "files", "put", "logaffe.service",
+		"--machine", "ex44", "--file", "-"); code != exit.OK {
+		t.Fatal("code")
+	}
+
+	kept := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[1]), &kept)
+	if _, sent := kept["directory"]; sent {
+		t.Errorf("a write without --directory sends none: %v", kept)
+	}
+
+	// Moving a file on the machine carries no content: there is nothing to hand
+	// back, and the write makes no revision.
+	if code, _, stderr := run(t, server, "files", "put", "logaffe.service",
+		"--machine", "ex44", "--directory", "/usr/local/lib/systemd/system"); code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	moved := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[2]), &moved)
+	if _, sent := moved["content"]; sent {
+		t.Errorf("a move sends no content: %v", moved)
+	}
+	if moved["directory"] != "/usr/local/lib/systemd/system" {
+		t.Errorf("a move sends the directory: %v", moved)
+	}
+}
+
+// A write that carries nothing at all is a mistake in the arguments, and a move
+// of a file that is not there stays a not-found rather than creating an empty
+// one.
+func TestPutWithoutContentNeedsSomethingElseToWrite(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.Method == http.MethodPut {
+			return 404, `{"type":"/problems/not-found","title":"not-found","status":404,
+			"detail":"No file logaffe.service of machine ex44."}`
+		}
+		return 201, fileJSON
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	if code, _, _ := run(t, server, "files", "put", "logaffe.service", "--machine", "ex44"); code != exit.Usage {
+		t.Fatal("code")
+	}
+
+	code, _, _ := run(t, server, "files", "put", "logaffe.service",
+		"--machine", "ex44", "--directory", "/etc/systemd/system")
+	if code != exit.NotFound {
+		t.Fatalf("code %d", code)
+	}
+	for _, request := range f.requests {
+		if request.Method == http.MethodPost {
+			t.Error("it created a file out of a move")
+		}
+	}
+}
+
 // A refused path is the instance's to refuse, and ha passes it through as exit
 // 4 rather than keeping a second copy of the list.
 func TestARefusedPathIsExitFour(t *testing.T) {

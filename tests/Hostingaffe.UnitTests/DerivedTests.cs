@@ -85,11 +85,11 @@ public sealed class DerivedTests
     {
         var owner = new Anchor(AnchorKind.Installation, Installation, "logaffe-prod");
 
-        var compose = File.Create(owner, "compose.override.yml", "one", false, Actor, Now.AddDays(-10));
-        compose.Write("two", null, Actor, Now.AddDays(-5));
-        compose.Write("three", null, Actor, Now.AddDays(-1));
+        var compose = File.Create(owner, "compose.override.yml", null, "one", false, Actor, Now.AddDays(-10));
+        compose.Write("two", null, null, Actor, Now.AddDays(-5));
+        compose.Write("three", null, null, Actor, Now.AddDays(-1));
 
-        var later = File.Create(owner, "bin/deploy", "#!/bin/sh", true, Actor, Now.AddDays(-2));
+        var later = File.Create(owner, "bin/deploy", null, "#!/bin/sh", true, Actor, Now.AddDays(-2));
 
         var files = new[] { compose, later };
 

@@ -168,7 +168,7 @@ func newFileGet(g *globals) *cobra.Command {
 // first write of a file happens once.
 func newFilePut(g *globals) *cobra.Command {
 	var owner anchor
-	var file, note string
+	var file, note, directory string
 	var revision int32
 	var executable bool
 	cmd := &cobra.Command{
@@ -177,22 +177,30 @@ func newFilePut(g *globals) *cobra.Command {
 			if err := owner.resolve(); err != nil {
 				return err
 			}
-			if file == "" {
+			// The content is what a write usually carries, and the other two
+			// fields can be written on their own: moving a file on the machine
+			// or making it runnable is not a reason to hand the text back.
+			body := map[string]any{}
+			if file != "" {
+				content, err := readContent(cmd.InOrStdin(), file)
+				if err != nil {
+					return err
+				}
+				body["content"] = content
+			} else if !cmd.Flags().Changed("executable") && !cmd.Flags().Changed("directory") {
 				return &config.UsageError{Message: "the content comes from a file or from stdin: --file PATH or --file -."}
 			}
-			content, err := readContent(cmd.InOrStdin(), file)
-			if err != nil {
-				return err
+
+			if cmd.Flags().Changed("executable") {
+				body["executable"] = executable
+			}
+			if cmd.Flags().Changed("directory") {
+				body["directory"] = directory
 			}
 
 			_, c, err := g.load()
 			if err != nil {
 				return err
-			}
-
-			body := map[string]any{"content": content}
-			if cmd.Flags().Changed("executable") {
-				body["executable"] = executable
 			}
 
 			guarded := ""
@@ -206,8 +214,10 @@ func newFilePut(g *globals) *cobra.Command {
 			}
 
 			// Nothing at that path yet, and no revision to write against: this
-			// is the file's first write, which is a create.
-			if isNotFound(written.response) && guarded == "" {
+			// is the file's first write, which is a create. A write that carries
+			// no content is not one — there is no file to move or make runnable
+			// — and the not-found passes through.
+			if isNotFound(written.response) && guarded == "" && file != "" {
 				body["path"] = args[0]
 				created, err := createFile(cmd.Context(), c, owner, body, note)
 				if err != nil {
@@ -231,6 +241,8 @@ func newFilePut(g *globals) *cobra.Command {
 	cmd.Flags().StringVar(&file, "file", "", "the content, from a file or `-` for stdin")
 	cmd.Flags().Int32Var(&revision, "revision", 0, "the revision as last read; refused as stale when somebody wrote since")
 	cmd.Flags().BoolVar(&executable, "executable", false, "the one mode bit there is")
+	cmd.Flags().StringVar(&directory, "directory", "",
+		"where the file lies on the machine, absolute — a machine's file has one, an installation's has none")
 	noteFlag(cmd, &note)
 	return cmd
 }

@@ -443,6 +443,14 @@ already has, with the mode bit it already has, answers the file unchanged. That
 is what keeps `files sync` — which writes the whole set — from numbering the
 history up without saying anything.
 
+**`directory` is where a machine's file lies on the machine** —
+`/etc/systemd/system`, absolute. A file created under a machine names one or is
+refused as `validation` on `directory`; a file created under an installation is
+refused *for* naming one, because the installation's own `path` already says
+where all of its files lie (ADR 0008). It is a field of the file and not of a
+revision: sending it alone moves the file and answers it at the revision it was
+at, and the history names the move.
+
 **The refused paths** (VISION 7, 10), one list, in the Domain, because the API
 is as open as the CLI is:
 
