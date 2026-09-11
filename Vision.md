@@ -518,12 +518,22 @@ sync wrote — the manifest sync keeps beside the files (6.1) is the machine's
 record, not the server's — and the deployment record (below) says which
 revisions were current when a version went live.
 
-**A machine is not an owner `files sync` writes.** Its files each lie in their
-own directory, and sync writes one; a command that wrote and removed under
-`/etc` as root would make this product a deployment tool, which 5. and 13. say
-it is not. The directory is written down, not written to: the agent acts on the
+**`files sync` writes where the directory belongs to what is written into it.**
+That is one rule and not two, and the difference between the two owners follows
+from it rather than being an exception to a principle. An installation owns a
+directory: `path` is one line in the record, the directory it is deployed from,
+and what lies there is its files. So sync writes the whole set into it and
+clears away what has left the record, and the worst it can reach is the
+installation's own. A machine owns none. Its files lie under
+`/etc/systemd/system`, `/usr/local/sbin`, `/etc/docker` — roots that belong to
+the operating system and hold a thousand things this record has never heard of
+— and a sync that removed from them would be removing somebody else's. The
+record is not shy of the disk: 13. says the product writes files into a
+directory and stops there. It is shy of a directory that is not its to sweep.
+So a machine's directory is written down, not written to: the agent acts on the
 machine and the record says what is there
-([ADR 0008](docs/adr/0008-a-machines-file-says-where-it-lies-and-is-never-synced.md)).
+([ADR 0008](docs/adr/0008-a-machines-file-says-where-it-lies-and-is-never-synced.md),
+[ADR 0013](docs/adr/0013-sync-stays-because-a-directory-has-an-owner.md)).
 
 **A file has one owner even where two installations care about it.** A host with
 one reverse proxy in front of everything is the ordinary way to run one, and

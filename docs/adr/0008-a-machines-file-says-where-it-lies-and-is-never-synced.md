@@ -67,3 +67,9 @@ keep a manifest per group — and is not taken now.
   reads the record and writes the files the way it writes everything else.
 - The export tree lists a machine's files with the directory each belongs in,
   because the export is what somebody reads while rebuilding a host.
+- "The directory is written down, not written to" is about a machine, and was
+  read as being about the product.
+  [ADR 0013](0013-sync-stays-because-a-directory-has-an-owner.md) states the
+  rule the other way round — sync writes where the directory belongs to what is
+  written into it — so that an installation's set and a machine's files are one
+  rule rather than a principle with an exception in it.
