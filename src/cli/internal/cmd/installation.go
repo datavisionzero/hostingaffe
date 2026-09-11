@@ -80,7 +80,7 @@ func newInstallationList(g *globals) *cobra.Command {
 	f.StringVar(&role, "role", "", "application or platform")
 	f.StringVar(&status, "status", "", "planned, active or retired")
 	f.StringVar(&backup, "backup", "", "none, planned or active")
-	f.StringVar(&monitoring, "monitoring", "", "none or external")
+	f.StringVar(&monitoring, "monitoring", "", "none, planned or external")
 	f.StringVar(&logging, "logging", "", "local or central")
 	f.BoolVar(&retired, "retired", false, "the retired ones as well, not only what is still there")
 	return cmd
@@ -125,7 +125,7 @@ func (i *installationFields) flags(cmd *cobra.Command) {
 	f.StringVar(&i.role, "role", "", "what it is for the host: application or platform")
 	f.StringVar(&i.status, "status", "", "planned, active or retired")
 	f.StringVar(&i.backup, "backup", "", "none, planned or active")
-	f.StringVar(&i.monitoring, "monitoring", "", "none or external")
+	f.StringVar(&i.monitoring, "monitoring", "", "none, planned or external")
 	f.StringVar(&i.logging, "logging", "", "local or central")
 	f.StringVar(&i.path, "path", "", "where it lives on the machine")
 	f.StringVar(&i.data, "data", "", "where its persistent data lies, and what a backup has to take")

@@ -277,4 +277,18 @@ public sealed class InstallationTests
 
         Assert.Equal("urls", refusal.ParamName);
     }
+
+    [Fact]
+    public void The_closed_sets_are_spelled_the_way_the_contract_spells_them()
+    {
+        Assert.Equal(["production", "staging", "development"], Enum.GetValues<Environment>().Select(Spelling.Of));
+        Assert.Equal(["application", "platform"], Enum.GetValues<Role>().Select(Spelling.Of));
+        Assert.Equal(["planned", "active", "retired"], Enum.GetValues<Status>().Select(Spelling.Of));
+
+        // Two of the three decisions carry the same middle value, and it means
+        // the same thing in both: decided on, not there yet.
+        Assert.Equal(["none", "planned", "active"], Enum.GetValues<Backup>().Select(Spelling.Of));
+        Assert.Equal(["none", "planned", "external"], Enum.GetValues<Monitoring>().Select(Spelling.Of));
+        Assert.Equal(["local", "central"], Enum.GetValues<Logging>().Select(Spelling.Of));
+    }
 }

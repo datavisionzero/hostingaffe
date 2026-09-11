@@ -31,7 +31,7 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             table.HasCheckConstraint("ck_installation_role", "role in ('application', 'platform')");
             table.HasCheckConstraint("ck_installation_status", "status in ('planned', 'active', 'retired')");
             table.HasCheckConstraint("ck_installation_backup", "backup in ('none', 'planned', 'active')");
-            table.HasCheckConstraint("ck_installation_monitoring", "monitoring in ('none', 'external')");
+            table.HasCheckConstraint("ck_installation_monitoring", "monitoring in ('none', 'planned', 'external')");
             table.HasCheckConstraint("ck_installation_logging", "logging in ('local', 'central')");
         });
 

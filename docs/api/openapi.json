@@ -7709,6 +7709,7 @@
       "Monitoring": {
         "enum": [
           "none",
+          "planned",
           "external"
         ],
         "type": "string"

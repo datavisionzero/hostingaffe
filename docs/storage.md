@@ -315,7 +315,7 @@ create table installation (
     data        varchar(500),
     secrets     -- a table of its own, below
     backup      text          not null check (backup in ('none', 'planned', 'active')),
-    monitoring  text          not null check (monitoring in ('none', 'external')),
+    monitoring  text          not null check (monitoring in ('none', 'planned', 'external')),
     logging     text          not null check (logging in ('local', 'central')),
     description text          not null default '',
     created_by  uuid          not null references identity (id),

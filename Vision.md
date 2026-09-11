@@ -419,7 +419,7 @@ means something else to systemd and to Docker Compose.
 | `data` | text | where its persistent data lies, `/srv/services/logaffe` — what a backup has to take |
 | `secrets` | list of objects | `{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }`; the *name* it needs and the file the value lies in, never the value. `path` may be empty, and reads as `NAME@/the/file` ([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)) |
 | `backup` | `none` · `planned` · `active` | the decision, as in the template |
-| `monitoring` | `none` · `external` | |
+| `monitoring` | `none` · `planned` · `external` | the decision, like the backup: `planned` is what was deferred on purpose, `none` what nobody decided |
 | `logging` | `local` · `central` | |
 | `version` | derived | the `version` of its latest deployment by `at` |
 | `description` | Markdown | the runbook: how it is deployed, checked, updated, rolled back, what its data is |
@@ -457,7 +457,9 @@ them apart: two directories is what the model allows, not what it demands.
 The three decision fields — backup, monitoring, logging — are fields rather
 than prose because they are the ones we want to *list*: "every production
 installation without a backup" is a question the product must answer in one
-line.
+line. Backup and monitoring each carry a `planned` for the same reason: a
+decision that was taken and deferred, left in the same bucket as the one nobody
+ever took, makes that list answer the wrong question.
 
 The description is created from a fixed template with the headings our
 service files already have (deployment, health check, persistent data, update

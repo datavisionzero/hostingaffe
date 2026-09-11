@@ -89,7 +89,7 @@ software.
 | `role` | `application` · `platform` |
 | `status` | `planned` · `active` · `retired` |
 | `backup` | `none` · `planned` · `active` |
-| `monitoring` | `none` · `external` |
+| `monitoring` | `none` · `planned` · `external` |
 | `logging` | `local` · `central` |
 | `protocol` (of a port) | `tcp` · `udp` |
 | `scope` (of a port) | `public` · `private` · `internal` |
