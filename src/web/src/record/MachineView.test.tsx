@@ -93,6 +93,23 @@ describe("a machine (VISION 6.2)", () => {
     expect(within(row).getByText("2.8.4")).toBeInTheDocument();
   });
 
+  // The size is the one thing about a file's text a list can say without
+  // carrying it, and it is what tells an operator whether a text has grown.
+  it("lists the files it carries with their size and revision", async () => {
+    view({
+      "GET /api/machines/web-01/files": [{
+        owner: { kind: "machine", key: "web-01" },
+        path: "systemd/logaffe.service", executable: false, size: 412, revision: 3,
+        updated_by: identity, updated_at: "2026-09-02T10:00:00Z",
+      }],
+    });
+
+    const row = await screen.findByRole("link", { name: /systemd\/logaffe.service/ });
+    expect(row).toHaveAttribute("href", "/machines/web-01/files/systemd/logaffe.service");
+    expect(within(row).getByText("412 B")).toBeInTheDocument();
+    expect(within(row).getByText("rev 3")).toBeInTheDocument();
+  });
+
   it("asks only for the installations of this machine", async () => {
     const instance = view();
 

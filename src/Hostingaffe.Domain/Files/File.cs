@@ -92,6 +92,14 @@ public sealed class File
     /// <summary>Whether it arrives runnable.</summary>
     public bool Executable => Current.Executable;
 
+    /// <summary>
+    /// How many bytes of UTF-8 the file is — derived from the newest revision's
+    /// content like everything else about it, and counted the way
+    /// <see cref="NormalizeContent"/> counts against <see cref="ContentMaxBytes"/>,
+    /// so that what a list shows is the number a write is refused against.
+    /// </summary>
+    public int Size => Encoding.UTF8.GetByteCount(Content);
+
     /// <summary>Who wrote it last — the newest revision's author.</summary>
     public Guid UpdatedBy => Current.By;
 

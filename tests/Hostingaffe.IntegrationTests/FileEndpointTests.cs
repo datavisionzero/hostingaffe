@@ -148,6 +148,30 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
         await Refusals.Problem(withNull, HttpStatusCode.BadRequest, "validation");
     }
 
+    /// <summary>
+    /// The list carries the size so that the texts a host runs with can be
+    /// looked over without opening each of them — in bytes of UTF-8, the same
+    /// count the megabyte cap is measured with.
+    /// </summary>
+    [Fact]
+    public async Task A_listed_file_says_how_big_it_is_in_bytes_of_utf_8()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Ground(admin);
+        await Put(admin, "/api/installations/logaffe-prod/files", "compose.override.yml", "services:");
+
+        var listed = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/files", Ct);
+        Assert.Equal(9, listed[0].GetProperty("size").GetInt32());
+
+        // It is the newest revision's, like the content and the mode bit, and it
+        // counts what a character costs rather than the characters.
+        await Write(admin, "ä😀");
+
+        var again = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/files", Ct);
+        Assert.Equal(6, again[0].GetProperty("size").GetInt32());
+    }
+
     [Fact]
     public async Task A_path_is_unique_per_owner()
     {

@@ -9,6 +9,7 @@ import { useAbandon } from "@/shared/abandon";
 import { stale } from "@/shared/stale";
 import { useAsk, type Asked } from "@/shared/ask";
 import { Nothing, Section } from "@/shared/Detail";
+import { size } from "@/shared/size";
 import { day, moment } from "@/shared/when";
 import { filePath, installationPath } from "./addresses";
 
@@ -110,7 +111,7 @@ export function Installations({ of }: { of: { machine: string } | { software: st
   );
 }
 
-/** The files a machine or an installation carries, newest write first shown by revision. */
+/** The files a machine or an installation carries, with the size and the revision each is at. */
 export function Files({ owner }: { owner: Anchor }) {
   const { asked } = useAsk<FileSummary[]>(`files:${owner.kind}:${owner.key}`, (signal) =>
     owner.kind === "machine"
@@ -130,6 +131,7 @@ export function Files({ owner }: { owner: Anchor }) {
             <Row key={file.path} to={filePath(file.owner, file.path)}>
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.path}</span>
               {file.executable && <Badge variant="outline">executable</Badge>}
+              <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{size(file.size)}</span>
               <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">rev {file.revision}</span>
               <span className="hidden w-40 shrink-0 truncate text-right text-xs text-muted-foreground md:block">
                 {day(file.updated_at)} · {file.updated_by.name}

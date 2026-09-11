@@ -11,14 +11,16 @@ using FilePath = Hostingaffe.Domain.Files.FilePath;
 namespace Hostingaffe.Application.Acts;
 
 /// <summary>
-/// The slim file every list returns: where it is, what it is, and how often it
-/// has been written. The content is what would make it expensive, and the
-/// content is not in it (ADR 0012).
+/// The slim file every list returns: where it is, what it is, how big it is,
+/// and how often it has been written. The content is what would make it
+/// expensive, and the content is not in it (ADR 0012) — its size is, because
+/// that is the one thing about the text a list can say without carrying it.
 /// </summary>
 public sealed record FileSummaryShape(
     AnchorShape Owner,
     string Path,
     bool Executable,
+    int Size,
     int Revision,
     IdentityRef UpdatedBy,
     DateTimeOffset UpdatedAt);
@@ -86,6 +88,7 @@ public sealed class FileAssembler(IIdentities identities)
                 AnchorShape.Of(owner),
                 row.Path,
                 row.Executable,
+                row.Size,
                 row.Revision,
                 IdentityRef.Of(people[row.UpdatedBy]),
                 row.UpdatedAt)),

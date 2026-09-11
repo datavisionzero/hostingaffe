@@ -125,6 +125,21 @@ public sealed class FileTests
     }
 
     [Fact]
+    public void The_size_is_the_newest_revision_in_bytes_of_utf_8()
+    {
+        var file = A(content: "services:");
+        Assert.Equal(9, file.Size);
+
+        // Bytes, not characters — the same count the megabyte is measured with,
+        // so that a size somebody reads answers "does this still fit?".
+        file.Write("ä😀", null, Actor, Now.AddHours(1));
+        Assert.Equal(6, file.Size);
+
+        // It follows the newest revision, like everything else a file says now.
+        Assert.Equal(9, System.Text.Encoding.UTF8.GetByteCount(file.At(1)!.Content));
+    }
+
+    [Fact]
     public void What_is_not_text_is_refused_rather_than_replaced()
     {
         Assert.Throws<ArgumentException>(() => File.NormalizeContent("one\0two"));

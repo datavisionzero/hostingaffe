@@ -416,9 +416,12 @@ makes `path` unique *per owner* and are the order an owner's files are read in;
 they cover deleted rows, so a path stays spent for the grace period.
 
 **Nothing on `file` says what the file contains.** The content, the mode bit,
-the revision number and who last wrote it are the newest revision's, computed on
-read. A column repeating any of them would be the second truth a write has to
-remember to refresh — the same rule the derived version follows.
+the revision number, its size in bytes and who last wrote it are the newest
+revision's, computed on read. A column repeating any of them would be the second
+truth a write has to remember to refresh — the same rule the derived version
+follows. The size in particular is counted off the newest revision's content in
+bytes of UTF-8, the same count the megabyte cap is measured with, so that what a
+list shows is the number a write is refused against.
 
 **Every write is a revision, and every earlier content stays.** That is what
 makes rolling back a Compose file possible, which is the whole reason files are

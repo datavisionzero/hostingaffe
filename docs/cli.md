@@ -390,6 +390,10 @@ file is at. Without it the write wins and the history says so. An agent that
 read before it writes passes what it read; one that puts a new file has nothing
 to pass.
 
+**`list` says how big each file is**, in bytes of UTF-8 and exactly — the same
+count the one-megabyte cap is measured with, so the number beside a path is the
+one a write is refused against.
+
 **`get` is the content, byte for byte**, so that `ha files get … > file` writes
 what the machine runs and not one line more. The revision that a write hands
 back is in `--json`, which prints the record instead, and in `ha files list`.

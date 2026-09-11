@@ -458,6 +458,12 @@ Content is UTF-8 and capped at one megabyte; what is not text is `validation`,
 not a replaced byte. `executable` is the only mode bit there is, and it belongs
 to the revision, so reading an old one gives the file as it was.
 
+**`size` is the newest revision's content in bytes of UTF-8**, derived on read
+like the content, the mode bit and the revision number, and the one thing about
+the text a `FileSummary` says without carrying it. Bytes and not characters,
+because that is what the megabyte is measured with: a size a list shows answers
+"does this still fit?" with the number a write is refused against.
+
 `path`, `revision` and `owner` are `unknown-field` in a write body. A file does
 not move — it is put at the new path and the old one deleted — a revision is
 made by writing, and the owner is the address it was written to. The revision a

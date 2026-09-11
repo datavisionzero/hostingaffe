@@ -6479,6 +6479,7 @@
           "owner",
           "path",
           "executable",
+          "size",
           "revision",
           "updated_by",
           "updated_at"
@@ -6493,6 +6494,10 @@
           },
           "executable": {
             "type": "boolean"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
           },
           "revision": {
             "type": "integer",

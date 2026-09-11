@@ -333,14 +333,22 @@ func File(w io.Writer, f api.File) {
 		f.UpdatedAt.Format(time.RFC3339), f.UpdatedBy.Name, f.CreatedBy.Name)
 }
 
-// FileSummaries prints what is under an owner: the path, the revision it is at,
-// whether it is executable, and when it last moved.
+// FileSummaries prints what is under an owner: the path, how big it is, the
+// revision it is at, whether it is executable, and when it last moved.
 func FileSummaries(w io.Writer, items []api.FileSummary) {
 	for _, f := range items {
-		fmt.Fprintf(w, "%-40s %-10s %-4s %-16s %s\n",
-			f.Path, fmt.Sprintf("revision %d", f.Revision), executable(f.Executable),
+		fmt.Fprintf(w, "%-40s %10s %-10s %-4s %-16s %s\n",
+			f.Path, size(f.Size), fmt.Sprintf("revision %d", f.Revision), executable(f.Executable),
 			f.UpdatedBy.Name, f.UpdatedAt.Format("2006-01-02 15:04"))
 	}
+}
+
+// size spells a file's size the way the instance counts it: exactly, in bytes
+// of UTF-8, because the number a write is refused against is a number of bytes
+// and a rounded one would answer "does this still fit?" with a different
+// figure.
+func size(bytes int32) string {
+	return fmt.Sprintf("%d B", bytes)
 }
 
 // FileRevisions prints every write of one file, newest first, without what each
