@@ -21,6 +21,7 @@ public sealed record MachineSummaryShape(
     string? Location,
     Arch? Arch,
     DateTimeOffset? MeasuredAt,
+    DateTimeOffset? LastSeen,
     DateTimeOffset UpdatedAt);
 
 /// <summary>The complete machine: every field of VISION 7, and who touched it.</summary>
@@ -44,6 +45,8 @@ public sealed record MachineShape(
     string? Ssh,
     Status Status,
     DateTimeOffset? MeasuredAt,
+    DateTimeOffset? LastSeen,
+    IReadOnlyList<DriftShape> Drift,
     string Description,
     IdentityRef CreatedBy,
     IdentityRef UpdatedBy,
@@ -116,10 +119,19 @@ public sealed record ChangeMachineRequest(
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
-/// <summary>Turns machine rows into the two shapes, resolving identities and hosts once for the whole list.</summary>
-public sealed class MachineAssembler(IIdentities identities, IMachines machines)
+/// <summary>
+/// Turns machine rows into the two shapes, resolving identities, hosts and
+/// <c>last_seen</c> once for the whole list.
+/// </summary>
+/// <remarks>
+/// <c>last_seen</c> is the <c>received_at</c> of the machine's latest report,
+/// derived on read and never a column (ADR 0015). The whole list is answered
+/// from one query, because an overview that asked once per row would be the
+/// reason somebody turned the column off.
+/// </remarks>
+public sealed class MachineAssembler(IIdentities identities, IMachines machines, IReports reports, DriftFinder drift)
 {
-    public static MachineSummaryShape Summary(Machine machine)
+    public static MachineSummaryShape Summary(Machine machine, DateTimeOffset? lastSeen)
     {
         ArgumentNullException.ThrowIfNull(machine);
 
@@ -132,13 +144,22 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines)
             machine.Location,
             machine.Arch,
             machine.MeasuredAt,
+            lastSeen,
             machine.UpdatedAt);
     }
 
-    public static IReadOnlyList<MachineSummaryShape> Summaries(IReadOnlyList<Machine> rows)
+    public async Task<IReadOnlyList<MachineSummaryShape>> SummariesAsync(
+        IReadOnlyList<Machine> rows, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        return [.. rows.Select(Summary)];
+
+        var latest = await reports.LatestManyAsync(rows.Select(row => row.Id), cancellationToken);
+
+        return
+        [
+            .. rows.Select(row => Summary(
+                row, latest.TryGetValue(row.Id, out var report) ? report.ReceivedAt : null)),
+        ];
     }
 
     public async Task<MachineShape> CompleteAsync(Machine machine, CancellationToken cancellationToken)
@@ -149,6 +170,7 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines)
         var host = machine.HostId is { } id
             ? (await machines.KeysAsync([id], cancellationToken)).GetValueOrDefault(id)
             : null;
+        var latest = await reports.LatestAsync(machine.Id, cancellationToken);
 
         return new MachineShape(
             machine.Key,
@@ -170,6 +192,11 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines)
             machine.Ssh,
             machine.Status,
             machine.MeasuredAt,
+            latest?.ReceivedAt,
+            // What the record above and the machine's own last word disagree
+            // about, computed here so that no client builds it twice
+            // (ADR 0015).
+            latest is null ? [] : await drift.BetweenAsync(machine, latest, cancellationToken),
             machine.Description,
             IdentityRef.Of(people[machine.CreatedBy]),
             IdentityRef.Of(people[machine.UpdatedBy]),
@@ -217,15 +244,17 @@ public static class MachineLookup
 /// everything, but a default list is what is still there; <c>retired=true</c>
 /// puts them back, and <c>status=retired</c> asks for exactly them.
 /// </remarks>
-public sealed class ListMachines(IMachines machines)
+public sealed class ListMachines(IMachines machines, MachineAssembler assembler)
 {
     public async Task<IReadOnlyList<MachineSummaryShape>> ExecuteAsync(
         string? status, string? kind, bool retired, CancellationToken cancellationToken) =>
-        MachineAssembler.Summaries(await machines.ListAsync(
-            Validated.Field("status", () => Spelling.Read<Status>(status, "status")),
-            Validated.Field("kind", () => Spelling.Read<MachineKind>(kind, "kind")),
-            retired,
-            cancellationToken));
+        await assembler.SummariesAsync(
+            await machines.ListAsync(
+                Validated.Field("status", () => Spelling.Read<Status>(status, "status")),
+                Validated.Field("kind", () => Spelling.Read<MachineKind>(kind, "kind")),
+                retired,
+                cancellationToken),
+            cancellationToken);
 }
 
 public sealed class ReadMachine(IMachines machines, MachineAssembler assembler, InstanceSettings settings)

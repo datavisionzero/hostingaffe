@@ -89,6 +89,41 @@ public static class MachineEndpoints
             .Produces<MachineShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // The key a machine holds so that it can report, and the three things a
+        // person does with it. Reading says whether there is one and what became
+        // of the last; issuing and revoking are a user's, never an agent's
+        // (ADR 0016).
+        door.MapGet("/{key}/token", (string key, ReadMachineToken read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, cancellationToken))
+            .WithName("ReadMachineToken")
+            .WithSummary("Whether this machine has a token, its prefix, who issued it and when it was last used — and, where it has none, what became of the last one it had. No secret is in it, ever: only the hash is kept. An agent may read this.")
+            .Produces<MachineTokenShape>();
+
+        door.MapPost(
+                "/{key}/token",
+                async (string key, bool? rotate, string? note, IssueMachineToken issue, CancellationToken cancellationToken) =>
+                {
+                    var issued = await issue.ExecuteAsync(key, rotate ?? false, note, cancellationToken);
+                    return Results.Created($"{Routes.Api}/machines/{key}/token", issued);
+                })
+            .WithName("IssueMachineToken")
+            .WithSummary("Issue the machine's token. **The secret is in this answer and nowhere afterwards.** A machine that already has one is `transition` unless `rotate=true` says so, and rotating revokes the old one in the same move — the cron on the host then fails visibly at its next run instead of quietly carrying on. A user's act: an agent administers no keys.")
+            .Produces<IssuedMachineToken>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        door.MapDelete(
+                "/{key}/token",
+                async (string key, string? note, RevokeMachineToken revoke, CancellationToken cancellationToken) =>
+                {
+                    await revoke.ExecuteAsync(key, note, cancellationToken);
+                    return Results.NoContent();
+                })
+            .WithName("RevokeMachineToken")
+            .WithSummary("Revoke the machine's token. It takes effect at once and the row stays, so that who took it back and when is still readable. A user's act.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         return endpoints;
     }
 }

@@ -572,6 +572,106 @@ index everything derived reads by.
 `ticket` stays a string: it is a planaffe key like `LOG-42`, a reference to the
 other product and not a word of this model.
 
+## Reports
+
+What a machine said about itself at a moment (`CONTEXT.md`, Report). A sample
+beside the record, never a field of it
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+```sql
+create table machine_report (
+    id           uuid          not null primary key,
+    machine_id   uuid          not null references machine (id),
+    number       int           not null check (number >= 1),
+    collected_at timestamptz   not null,
+    received_at  timestamptz   not null,
+    agent        varchar(64),
+    body         jsonb         not null
+);
+
+create unique index machine_report_number on machine_report (machine_id, number);
+create        index machine_report_when   on machine_report (machine_id, received_at desc);
+```
+
+**There is no `updated_at` and no `deleted_at`.** A report is never edited, so
+there is no version for a guarded write to compare against; and it is reachable
+only through its machine, so it needs no deletion of its own — a deleted
+machine's reports are invisible for as long as the machine is, a restore brings
+them back with it, and the purge takes them with the row. That is the one place
+the deletion cascade does not stamp what it takes, and the reason is that
+stamping a month of samples one at a time would buy nothing a join does not
+already give.
+
+**A report has no key.** The instance numbers it per machine, counted from one,
+and `machine_report_number` is what makes that number an address. The next
+number counts past swept rows too, so a number is never handed out twice.
+
+**`collected_at` is the host's clock and `received_at` is the instance's.** The
+order of reports and a machine's `last_seen` are read from `received_at` alone;
+`collected_at` is kept as it came and trusted for nothing, and one far in the
+future is stored rather than refused, because refusing it would deny a machine
+with a wrong clock its sign of life.
+
+**The body is `jsonb`**, and it holds the closed set of sections — `host`,
+`memory`, `disks`, `containers` — plus `missing`, the sections the collector
+could not determine, each with its reason. `jsonb` because the sections are
+nested and optional and none of them is ever filtered or ordered by: a body is
+read whole. That it is `jsonb` does not mean any JSON is accepted — the shape is
+the Domain's, and the write path refuses a field the contract does not know, the
+way every other request object is closed (`api.md`).
+
+**Nothing derivable is in the body.** How many containers run of how many is
+counted where it is read, not stored beside the list it can be counted from.
+
+**Reports are swept after thirty days**, except the latest report of a machine,
+which is kept however old it is (`operations.md`,
+`HOSTINGAFFE_REPORT_RETENTION_DAYS`). The sweep runs in the purge at the end of
+a write transaction, like everything else that is cleared away — and a report is
+itself a write, so it runs once per arriving report and clears twenty for every
+one that comes in.
+
+## Machine tokens
+
+The one key a machine may hold, which hands in a report for that machine and
+reads nothing at all
+([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+
+```sql
+create table machine_token (
+    id           uuid        not null primary key,
+    machine_id   uuid        not null references machine (id),
+    prefix       text        not null,
+    secret_hash  bytea       not null,
+    issued_by    uuid        not null references identity (id),
+    issued_at    timestamptz not null,
+    last_used_at timestamptz,
+    revoked_at   timestamptz,
+    revoked_by   uuid        references identity (id)
+);
+
+create unique index machine_token_machine     on machine_token (machine_id) where revoked_at is null;
+create unique index machine_token_secret_hash on machine_token (secret_hash);
+```
+
+**It is not an identity**, so it is not in `identity` and not in `token`: no
+user, no agent, no role, and nothing it does is attributed to a who. It sits
+beside the machine because that is what it belongs to.
+
+**What is stored of the secret is what is stored of every other one**: the
+SHA-256 and the first eight characters, and `machine_token_secret_hash` is the
+lookup authentication runs on. The secret itself appears once, in the answer to
+the call that issued it.
+
+**One live token per machine**, held by a partial unique index over the
+unrevoked rows. A revoked row stays, so that "there was one, and who took it
+back when" has an answer; rotating issues a new one and revokes the old in the
+same move, and the cron on the host then fails visibly at its next run.
+
+**`last_used_at` moves on every delivery** — one write per report per machine,
+and the only way to see afterwards whether a token is still in use.
+
+**It goes with its machine**, like a report and for the same reason.
+
 ## Pages
 
 The instance's flat wiki, addressed by a slug rather than a key
@@ -836,7 +936,7 @@ a file of a deleted machine, a deployment of a deleted installation.
 ## What is derived rather than stored
 
 Derived means **computed on read, at one place, never a column that a write has
-to remember to refresh**. There is one such place so far and one more coming.
+to remember to refresh**.
 
 **A file's content, mode bit, revision number and last author** are the newest
 revision's. `file` holds who put the file there and where it sits; everything it
@@ -852,6 +952,12 @@ All three are ordered by `at` and never by the order of recording — counting b
 recording order moves the present every time somebody backfills the past, which
 is the mistake VISION 7 names. `at` can repeat, so the number breaks the tie and
 is the only thing that does.
+
+**A machine's `last_seen`** is the `received_at` of its latest report, and
+there is no column for it: a column would be one write away from disagreeing
+with the reports it summarises, which is the reason `needed_by` is derived as
+well. A machine that has never reported has none, and that is the ordinary state
+of a machine on which no cron has been set up.
 
 **The rule lives in one place**, `Derived`, and every read goes through it. That
 is also why the deployment store hands back rows rather than an answer: a query
@@ -882,6 +988,17 @@ page of the instance.
 approved, refused or never answered, it is worth nothing ten minutes after it
 was made, and the day's grace is so that somebody who ran `ha login` and walked
 away still reads why it failed.
+
+**Reports past the retention window go in the same stroke**, twenty at a time,
+and never the latest of a machine (`operations.md`,
+`HOSTINGAFFE_REPORT_RETENTION_DAYS`). That is not a deletion with a grace
+period: a report is a sample and is simply older than what is kept.
+
+**A machine's reports and its token go with it**, and not one at a time. Both
+are reached only through the machine, so neither carries a `deleted_at`: they
+are removed whole for every machine whose grace has passed, before the machine
+row itself is taken. A month of samples is a few thousand narrow rows, and
+leaving half of them behind would only hold the machine back for another write.
 
 **The history is not purged, and neither are the assigned keys.** That is what
 VISION 7 asks for twice over: the history of a deleted machine still says that

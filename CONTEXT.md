@@ -18,9 +18,10 @@ Flat, and closed:
 Instance
 ├── Machine            the computer
 │   ├── File           host-level configuration
-│   └── Installation   one software installed once on one machine
-│       ├── Deployment one version change
-│       └── File       what the installation runs with
+│   ├── Installation   one software installed once on one machine
+│   │   ├── Deployment one version change
+│   │   └── File       what the installation runs with
+│   └── Report         what the machine said about itself, at a moment
 ├── Software           what an installation is an installation of
 ├── Page               Markdown, on a machine, an installation or the instance
 ├── History            every change, written by the instance
@@ -61,6 +62,12 @@ are text rather than numbers, `arch` excepted: machines are compared by eye,
 and "2×512G NVMe ZFS mirror" is truer than a number. `measured_at` says when
 the facts were last verified — a machine nobody has looked at for a year says
 so.
+
+`last_seen` is derived and never written: the moment the instance received the
+machine's latest report. It stands beside `measured_at` and answers a different
+question — `measured_at` is when a person last checked the facts, `last_seen`
+is when the machine last spoke for itself. A machine that has never reported
+has none.
 
 ## Software
 
@@ -153,6 +160,53 @@ ordered by `at`, never by the order of recording, so backfilling history never
 moves the present. A deployment has no key: the instance numbers it per
 installation.
 
+## Report
+
+What a machine said about itself at a moment. A collector on the host gathers
+it and hands it in; the instance never reaches out to a machine.
+
+A report **belongs to exactly one machine, has no key** — the instance numbers
+it per machine, as it does a deployment — **and is never edited**. It is a
+sample beside the record, never a field of it: a report sets nothing, and
+whatever it says that the record contradicts is drift for a person or an agent
+to resolve
+([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+What a report carries is a closed set of sections, each of which may be
+missing:
+
+| section | what is in it |
+|---|---|
+| `host` | hostname, os, kernel, arch, boot time, load 1·5·15 |
+| `memory` | total, used, available, swap |
+| `disks` | per real mount: mount, device, size, used, percent |
+| `containers` | per container: name, image **with its tag**, state, status, health, restarts, started_at, ports, and how many of how many run |
+
+Beside them: `collected_at`, the host's clock as it came; `received_at`, the
+instance's clock, which is what the order and `last_seen` are read from; the
+version of the `ha` that collected it; and `missing`, the sections the
+collector could not determine, each with its reason. A host without Docker
+reports no containers and says why.
+
+A container's `image` carries its **tag**, where a software's `image` carries
+none: the tag is what the report is compared against, and the software's
+belongs to the deployment.
+
+**No secrets, ever** — no container environment, no process command lines, no
+file contents. It is the rule the record already follows, and it holds here
+because the material is the machine's own.
+
+**Drift** is where the two sides disagree, computed on read and stored nowhere:
+the tag of a container's image against the version of the installation's latest
+deployment (`version`), an installation the record calls active whose container
+is not running (`container`), and `os` and `arch` against the machine's own
+fields (`fact`). Every drift names both sides and how old each is; which of them
+is right the product does not say. Where the assignment of a container to an
+installation is ambiguous, nothing is claimed.
+
+Reports are swept after thirty days, except the latest of a machine, which is
+kept however old it is.
+
 ## File
 
 A UTF-8 text file a machine runs with, owned by exactly one installation or one
@@ -232,6 +286,12 @@ Deployments are not history entries. They are records of their own, because a
 deployment is what an operator wants to *read*, while the history is what they
 consult when something looks wrong.
 
+**A report is not a history entry either.** The history is who changed the
+record; a cron reporting every quarter of an hour has changed nothing, and a
+report that wrote a row would bury every real change under ninety-six of them
+a day. What *is* a history entry is issuing or revoking a machine's token —
+that is a person changing the record.
+
 ## Identity
 
 A **user** is a human; an **agent** is what work runs under. Both are
@@ -243,6 +303,17 @@ a name, is never an administrator, and administers no identities. Every token
 reads everything and writes what it is told to: one instance holds one team's
 infrastructure, and there is no role beyond the administrator who manages
 users, agents and tokens.
+
+A **machine token** is none of that. It belongs to one machine and can do one
+thing: hand in a report for that machine. It reads nothing — no installation,
+no file, no page, no report, not even its own machine — and it is **not an
+identity**: no user, no agent, no role, absent from `ha me` and from every
+history row. A report is attributed to the machine, and a machine is not a who
+([ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+One per machine, hashed like every other token, issued and revoked by a person;
+an agent may see that one exists and never issue or revoke one. Issuing and
+revoking are history rows on the machine, because that is a person changing the
+record.
 
 A **device login** is one `ha login` in flight: the machine with no browser
 holds a **device code** and polls with it, and the person reads out a **user
@@ -267,11 +338,16 @@ What a deletion takes:
 
 | deleting a | takes | and |
 |---|---|---|
-| machine | its files, its installations (with theirs), the vms it hosts | its pages stay |
+| machine | its files, its installations (with theirs), the vms it hosts, its reports and its token | its pages stay |
 | installation | its files, its deployments | its pages stay |
 | software | nothing | it is **refused** while installations still hang on it, with a count |
 | file | its revisions | |
 | deployment | nothing | |
+
+Reports and a machine's token are the one thing a cascade does not stamp: they
+are reached only through the machine, so they are invisible while it is
+deleted, come back with it, and are taken by the purge with the row
+(`docs/storage.md`, Reports).
 
 **A restore brings back what that deletion took, and nothing else.** Every row a
 cascade touches carries the moment of the deletion, and a restore brings back
@@ -295,6 +371,9 @@ a second time, not even after the purge has taken the row that held it.
 | **project** | nothing. There are no projects. One instance holds one team's infrastructure and every user sees all of it. |
 | **host** | **machine**, except in one place: the `host` of a `vm` is the machine it runs on. "Host" as a synonym for machine is what the word does everywhere else, and that is exactly why it needs the narrow sense here. |
 | **server** | **machine**. A machine may be a VPS, a dedicated box, a VM or the computer under a desk, and "server" reads as only the first two. |
+| **metric** | **report**. A report is a sample somebody may read, not a number kept for a graph, and the moment there are metrics there are thresholds and alerts, which this product does not have. |
+| **heartbeat** | **report**. The sign of life is a consequence of a report arriving, not a thing of its own, and there is no second, smaller message beside it. |
+| **monitoring** | the name of an installation's decision field, `none · planned · external`, and nothing else. It never becomes the name of the area reports live in, and no `internal` is added to it. |
 | **issue**, **epic**, **release**, **label**, **claim** | nothing. They are planaffe's ticket model, which this product was cut free of. A type of one of those names here means something was copied that should not have been. |
 
 `ticket` survives as a field on a deployment, and it is a planaffe key like

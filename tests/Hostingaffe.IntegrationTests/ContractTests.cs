@@ -60,7 +60,9 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/machines/{key}/file-history/{path}",
                 "/api/machines/{key}/file-restore/{path}", "/api/machines/{key}/file-revisions/{path}",
                 "/api/machines/{key}/files", "/api/machines/{key}/files/{path}",
-                "/api/machines/{key}/history", "/api/machines/{key}/restore",
+                "/api/machines/{key}/history", "/api/machines/{key}/reports",
+                "/api/machines/{key}/reports/latest", "/api/machines/{key}/reports/{number}",
+                "/api/machines/{key}/restore", "/api/machines/{key}/token",
                 "/api/me", "/api/me/email", "/api/me/metadata", "/api/me/password",
                 "/api/pages", "/api/pages/{slug}", "/api/pages/{slug}/history", "/api/pages/{slug}/restore",
                 "/api/password-recovery", "/api/password-recovery/complete",
@@ -87,6 +89,14 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Deployment", schemas);
         Assert.Contains("DeploymentSummary", schemas);
         Assert.Contains("DeploymentFile", schemas);
+        Assert.Contains("ReportReceipt", schemas);
+        Assert.Contains("Report", schemas);
+        Assert.Contains("ReportSummary", schemas);
+        Assert.Contains("ReportPage", schemas);
+        Assert.Contains("MachineToken", schemas);
+        Assert.Contains("IssuedMachineToken", schemas);
+        Assert.Contains("Drift", schemas);
+        Assert.Contains("DriftKind", schemas);
         Assert.Contains("File", schemas);
         Assert.Contains("FileSummary", schemas);
         Assert.Contains("FileRevision", schemas);

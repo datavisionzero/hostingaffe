@@ -143,16 +143,23 @@ permission matrix.
 ## 5. Non-Goals (Deliberate Boundaries)
 
 - **No discovery.** No agent on the machine, no SSH scanning, no SNMP, no
-  container-registry polling. The record is written, not observed (a small
-  assisted measurement is a roadmap item, 15.1 — it still writes only what it
-  is told to).
+  container-registry polling. The record is written, not observed. A machine
+  that **reports** what it knows about itself (7) is not an exception to that:
+  a report is handed in, never fetched, and it writes nothing into the record
+  ([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md)).
 - **No deployment engine.** hostingaffe writes an installation's files onto
   the machine when asked and records that a deployment happened. It does not
   run Compose, restart anything, or watch whether it worked. It does not
   become Ansible.
-- **No monitoring, no metrics, no alerts.** Uptime Kuma, Beszel and logaffe do
-  that. An installation *names* where its logs and monitors are; it does not
-  receive them.
+- **No monitoring, no metrics, no alerts.** No time series, no graphs, no
+  thresholds, no alerts, no notifications, no application metrics, no logs —
+  Uptime Kuma, Beszel and logaffe do that, and an installation *names* where
+  its logs and monitors are rather than receiving them. What a machine may do
+  is report what it knows about itself, and the instance keeps the last few
+  weeks of that beside the record (7, 15.1). An installation's `monitoring`
+  keeps the three values it has — `none · planned · external` — and an
+  `internal` is deliberately not added: a report is a sample somebody may
+  read, not a monitor that watches.
 - **No secret values.** An installation lists the *names* of the secrets it
   needs and the file each one lies in on the machine. The values are
   vaultaffe's, or wherever the operator keeps them. hostingaffe refuses the
@@ -320,9 +327,10 @@ Deliberately flat, and closed:
 Instance
 ├── Machine            (the computer: VPS, dedicated, VM, local box)
 │   ├── File           (host-level configuration: a systemd unit, an sshd snippet)
-│   └── Installation   (one software installed once on one machine)
-│       ├── Deployment (one version change — the history of the installation)
-│       └── File       (what the installation runs with: Compose, Caddy fragment, script)
+│   ├── Installation   (one software installed once on one machine)
+│   │   ├── Deployment (one version change — the history of the installation)
+│   │   └── File       (what the installation runs with: Compose, Caddy fragment, script)
+│   └── Report         (what the machine said about itself, at a moment)
 ├── Software           (what an installation is an installation of)
 ├── Page               (Markdown, attached to a machine, an installation, or the instance)
 ├── History            (every change, written by the system)
@@ -607,6 +615,59 @@ wrong one, so the rule for correcting is fixed: `ref`, `ticket`, `note` and
 `installation` cannot, because they are what the record *is* — a deployment
 with the wrong version is deleted (below) and recorded again.
 
+### The Report
+
+A report is what a machine said about itself at a moment: a sign of life, plus
+the handful of things that can be determined on any host in a standard way —
+disk usage, memory, load, and what Docker runs. A collector on the host gathers
+them and hands them in, every quarter of an hour, under a token that can do
+nothing else (9). Nothing reaches out to the machine.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `machine` | machine key | exactly one, and the one the token belongs to |
+| `number` | derived | the instance numbers a report per machine, as it does a deployment |
+| `collected_at` | timestamp | the host's clock, kept as it came |
+| `received_at` | timestamp | the instance's clock, and what the order and "last seen" are read from |
+| `agent` | text | the version of `ha` that collected it |
+| `host` | section | hostname, os, kernel, arch, boot time, load 1·5·15 |
+| `memory` | section | total, used, available, swap |
+| `disks` | section | per real mount: mount, device, size, used, percent |
+| `containers` | section | per container: name, image *with its tag*, state, status, health, restarts, started_at, ports |
+| `missing` | list | the sections the collector could not determine, each with its reason |
+
+A report **belongs to exactly one machine, has no key, and is never edited**.
+It is a sample beside the record, not a field of it: nothing in it is ever
+written into a machine or an installation, and it makes no history row — the
+history is who changed the record, and a cron reporting every quarter of an
+hour has changed nothing
+([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+The sections are a **closed set**, like every other shape the contract carries,
+and there is no free-form field beside them: that is how a record turns into a
+metric database in six months. Every section may be missing, and a host without
+Docker reports no containers instead of failing.
+
+**No secrets, ever.** No container environment, no process command lines, no
+file contents. It is the same line that keeps secret values out of the record
+(5), and it is written down rather than only implemented, so that it can be
+checked without reading the code.
+
+Where the two sides disagree — the record says 1.4.0 and the machine reports
+1.3.2 — that is **drift**, and it is the point of the whole thing. The product
+shows both sides with their dates and says which is which; which one is right
+is a person's or an agent's decision, and there is no button that pulls the
+record after the report.
+
+Derived on the machine: **`last_seen`**, the `received_at` of its latest
+report. It stands beside `measured_at` and means something else —
+`measured_at` is when a person last verified the facts, `last_seen` is when the
+machine last spoke.
+
+**Deliberately left out:** time series, graphs, thresholds, alerts, aggregates,
+and any report older than the retention window, which is thirty days by
+default.
+
 ### The Page
 
 A page is Markdown with a slug, attached to a machine, an installation, or to
@@ -713,12 +774,23 @@ The identity model is planaffe's, minus the project dimension:
 - **An agent token is the agent.** It has a name, it is never an
   administrator, and an agent cannot create or read tokens. Every token reads
   everything and writes what it is told to.
-- **No token lives on a machine.** `files sync` runs under the token of the
-  agent that opened the SSH session, handed in as `HOSTINGAFFE_TOKEN` for that
-  session and written to no file on the host. A token stored on a machine
-  would hand whoever takes that machine the map of every other one, and a
-  read-only token would not change that — it still reads everything. A token
-  scoped to one machine is the roadmap answer (17.).
+- **No token that reads lives on a machine.** `files sync` runs under the
+  token of the agent that opened the SSH session, handed in as
+  `HOSTINGAFFE_TOKEN` for that session and written to no file on the host. A
+  token stored on a machine would hand whoever takes that machine the map of
+  every other one, and a read-only token would not change that — it still
+  reads everything.
+- **A machine token is the one exception, and it reads nothing.** It belongs
+  to exactly one machine and can do exactly one thing: hand in a report for
+  that machine (7). It reads no installation, no file, no page, no report, not
+  even its own machine. The criterion the rule above states is therefore still
+  met: whoever takes the machine gains the ability to lie about that machine,
+  which they already had, and nothing else. It is not an identity — no user,
+  no agent, no role; it appears in no `ha me` and in no history row, and a
+  report is attributed to the **machine**, which is not a who. One per
+  machine, stored hashed like every other token, issued and revoked by a
+  person and never by an agent
+  ([ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 - Sign-in, browser sessions, invitation and password recovery are what planaffe
   has, built the same way. What is this product's own is the **device login**:
   `ha login` prints a code, a user approves it at `/device` in a browser, and
@@ -757,8 +829,15 @@ attack surface, configuration included. Consequences:
   refuses, and the CLI warns when Markdown or a file on stdin contains
   something that looks like a private key or a token. That is a guard against
   accidents, not a security boundary.
-- No token is stored on a machine (9.). The one command that runs on a host
-  borrows the session's token and leaves nothing behind.
+- No token that reads is stored on a machine (9.). The one command that reads
+  and runs on a host, `files sync`, borrows the session's token and leaves
+  nothing behind. The one token that does live on a host, the machine token,
+  writes a report for its own machine and reads nothing at all, so a
+  compromised host is worth no more of the map than it was before — what it
+  buys an attacker is false reports about the machine they already hold, which
+  is why a report never changes the record
+  ([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md),
+  [ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 
 ## 11. What It Is Next To
 
@@ -885,16 +964,26 @@ is what the host runs, verbatim, so that what is stored is what is true.
 
 ### 15.1 Measuring instead of typing
 
-`ha machine facts`, run *on* the machine, collects what `current-state.md`
-asks for today — `hostnamectl`, `lscpu`, `free`, `df`, the Docker versions,
-the listening ports — and prints JSON that `ha machine set <key> --facts -`
-accepts for `hostname`, `arch`, `os`, `cpu`, `memory`, `disk` and the
-addresses. Nothing is discovered unasked; the agent runs one command instead of
-seven and copies nothing by hand. The same output compared against the record
-is the cheapest possible drift check: "the machine says Docker 29.7.2, the
-record says 29.1.2, measured 40 days ago." The same idea applied to files —
-`ha files sync --check` reporting where the directory on the host differs from
-the record — is the drift check for configuration.
+**Shipped**, as the **Report** (7), and by the machine itself rather than by an
+agent passing through.
+
+The idea was `ha machine facts`, run *on* the machine, collecting what
+`current-state.md` asks for today and printing JSON that `ha machine set` would
+accept for `hostname`, `arch`, `os`, `cpu`, `memory`, `disk` and the addresses.
+What shipped keeps the collecting — `ha report collect` prints exactly that
+JSON, and prints it without sending anything — and drops the writing: a report
+never sets a field
+([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+The reason is the sentence this section ended on. The measurement compared
+against the record is the cheapest possible drift check — "the machine says
+Docker 29.7.2, the record says 29.1.2, measured 40 days ago" — and a
+measurement that writes itself into the record deletes the comparison it was
+worth having. So `ha report send` hands it in on a cron, both sides stay, and
+the drift is a sentence the product shows and does not resolve.
+
+Still open: the same idea applied to files. `ha files sync --check`, reporting
+where the directory on the host differs from the record, is the drift check for
+configuration, and it needs a token that reads (17.).
 
 ### 15.2 An installation depends on an installation
 
@@ -972,12 +1061,14 @@ built.
   does a homelab want `desktop` and `sbc`? Closed set either way.
 - **Versions.** Text, or a parsed version for sorting and "newer than"? Text
   until sorting is actually needed.
-- **Machine-scoped tokens.** In the MVP no token lives on a machine (9.), so a
-  host cannot sync its own files without an agent's session. A token that
-  reads one machine and writes nothing would allow that without turning a
-  compromised host into a map of the others. A merely read-only token would
-  not — it still reads everything. Whether the scoped kind is worth its
-  explanation is decided after the MVP.
+- **A machine-scoped token that reads.** Decided for the writing half and
+  still open for the reading one. A machine token exists, and it hands in a
+  report and reads nothing (9.,
+  [ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+  What that does not answer is `files sync` from the host itself, which needs a
+  token that reads one machine and its installations. The question is whether
+  that narrower kind is worth its explanation, or whether syncing from a host
+  without an agent's session is simply not something this product does.
 - **Cost.** A single `monthly_cost` on the machine is cheap and often asked
   for, and it is the first step onto a slope (currency, billing period,
   contracts). Deferred, not refused.

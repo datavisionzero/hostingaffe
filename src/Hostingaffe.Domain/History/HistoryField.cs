@@ -27,4 +27,12 @@ public static class HistoryField
 
     /// <summary>Brought back inside the grace period (ADR 0013).</summary>
     public const string Restored = "restored";
+
+    /// <summary>
+    /// A machine's token, issued or revoked: the prefix from and the prefix to,
+    /// and never a secret. It is the one thing around reports that reaches the
+    /// history, because it is a person changing what the machine may do — the
+    /// report itself stays out (ADR 0015).
+    /// </summary>
+    public const string Token = "token";
 }

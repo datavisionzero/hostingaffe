@@ -6,6 +6,7 @@ using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
+using Hostingaffe.Domain.Reports;
 
 using File = Hostingaffe.Domain.Files.File;
 
@@ -53,7 +54,10 @@ public sealed class ReadMachineContext(
     IFiles files,
     IDeployments deployments,
     IPages pages,
-    InstanceSettings settings)
+    IReports reports,
+    DriftFinder drift,
+    InstanceSettings settings,
+    TimeProvider clock)
 {
     /// <summary>
     /// How many deployments of an installation the document carries. What ran
@@ -61,6 +65,22 @@ public sealed class ReadMachineContext(
     /// `ha deploy view`.
     /// </summary>
     public const int RecentDeployments = 5;
+
+    /// <summary>
+    /// How many containers the report section names one by one before it only
+    /// counts them. A host with thirty containers would otherwise spend the
+    /// budget of VISION 16 on a list that changes no decision; what is always
+    /// named is every container that is <em>not</em> running, because that is
+    /// the one an agent about to work here has to know about.
+    /// </summary>
+    public const int NamedContainers = 12;
+
+    /// <summary>
+    /// Past this, a report is given with its age and not set down as the
+    /// present. An agent that concluded from a three-week-old report what is
+    /// running now would be worse off than one that knew nothing.
+    /// </summary>
+    public static readonly TimeSpan Recent = TimeSpan.FromDays(1);
 
     public async Task<MachineContextShape> ExecuteAsync(string key, CancellationToken cancellationToken)
     {
@@ -91,8 +111,14 @@ public sealed class ReadMachineContext(
             .OrderBy(page => page.Slug, StringComparer.Ordinal)
             .ToArray();
 
+        var latest = await reports.LatestAsync(machine.Id, cancellationToken);
+        var disagreements = latest is null
+            ? []
+            : await drift.BetweenAsync(machine, latest, cancellationToken);
+
         var document = new StringBuilder();
         Head(document, machine, hostKey);
+        Reported(document, latest, disagreements, clock.GetUtcNow());
         Installations(document, installed, programs, recorded, underInstallations, edge);
         Software(document, programs);
         MachineFiles(document, machine, underMachine);
@@ -231,6 +257,105 @@ public sealed class ReadMachineContext(
 
         Description(document, machine.Description);
     }
+
+    /// <summary>
+    /// What the machine last said about itself, short and near the top — an
+    /// agent about to type `docker compose up` has to read it before, not
+    /// after (ADR 0015).
+    /// </summary>
+    /// <remarks>
+    /// What is in it: when it last reported, the disks in one line, how many
+    /// containers run of how many, every container that is <em>not</em>
+    /// running, and every drift. What is not: the full container table, memory
+    /// and load in detail, and any older report. Those are one `ha report show`
+    /// away, and they are exactly the sort of content that fills a context
+    /// window without changing a decision (VISION 16).
+    /// </remarks>
+    private static void Reported(
+        StringBuilder document,
+        Report? report,
+        IReadOnlyList<DriftShape> drift,
+        DateTimeOffset now)
+    {
+        document.Append("## Reported\n\n");
+
+        if (report is null)
+        {
+            document.Append(
+                "This machine does not report. Nothing here is measured; every field above is what somebody "
+                + "wrote down. `docs/operations.md` says how a host hands in a report.\n\n");
+            return;
+        }
+
+        var age = now - report.ReceivedAt;
+        document.Append("The machine last reported **").Append(Ago(age)).Append("** (")
+            .Append(Fields.Stamp(report.ReceivedAt)).Append(").");
+
+        if (age > Recent)
+        {
+            document.Append(" **That is not now**: what follows is what was true then, and the machine may "
+                + "have been doing something else since.");
+        }
+
+        document.Append("\n\n");
+
+        if (report.Body.Disks is { Count: > 0 } disks)
+        {
+            document.Append("Disks: ")
+                .Append(string.Join(
+                    ", ",
+                    disks.Select(disk => $"{disk.Mount} {disk.Percent?.ToString(CultureInfo.InvariantCulture) ?? "?"}%")))
+                .Append("\n\n");
+        }
+
+        if (report.Body.Containers is { } containers)
+        {
+            var running = containers.Where(one => one.State is "running").ToArray();
+            var stopped = containers.Where(one => one.State is not "running").ToArray();
+
+            document.Append("Containers: ").Append(running.Length).Append(" of ").Append(containers.Count)
+                .Append(" running").Append(stopped.Length == 0 ? "." : ".").Append("\n\n");
+
+            if (stopped.Length > 0)
+            {
+                document.Append("Not running: ")
+                    .Append(string.Join(", ", stopped.Take(NamedContainers).Select(one => $"`{one.Name}` ({one.State})")))
+                    .Append(stopped.Length > NamedContainers ? $", and {stopped.Length - NamedContainers} more" : string.Empty)
+                    .Append(".\n\n");
+            }
+        }
+
+        foreach (var missing in report.Body.Missing)
+        {
+            document.Append("`").Append(missing.Section).Append("` was not determined (")
+                .Append(missing.Reason).Append(").\n\n");
+        }
+
+        if (drift.Count > 0)
+        {
+            document.Append("**Drift** — what the record above and this report disagree about. "
+                + "Which side is right is your decision; nothing here has changed the record.\n\n");
+
+            foreach (var one in drift)
+            {
+                document.Append("- ").Append(one.Subject).Append(' ').Append(one.Field)
+                    .Append(": the record says ").Append(one.Record ?? "nothing")
+                    .Append(one.RecordAt is { } at ? $" (since {Fields.Stamp(at)})" : string.Empty)
+                    .Append(", the machine reported ").Append(one.Reported ?? "nothing").Append(".\n");
+            }
+
+            document.Append('\n');
+        }
+    }
+
+    /// <summary>How long ago, in the one unit that says it.</summary>
+    private static string Ago(TimeSpan age) => age switch
+    {
+        { TotalMinutes: < 2 } => "just now",
+        { TotalHours: < 2 } => $"{(int)age.TotalMinutes} minutes ago",
+        { TotalDays: < 2 } => $"{(int)age.TotalHours} hours ago",
+        _ => $"{(int)age.TotalDays} days ago",
+    };
 
     private static void Installations(
         StringBuilder document,

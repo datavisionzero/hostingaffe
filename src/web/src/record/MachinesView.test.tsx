@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { installInstance, renderAt } from "@/shared/testing";
 import { MachinesView } from "./MachinesView";
 
-function aMachine(key: string, status = "active", kind = "vps") {
+function aMachine(key: string, status = "active", kind = "vps", lastSeen: string | null = null) {
   return {
     key,
     name: key,
@@ -14,6 +14,7 @@ function aMachine(key: string, status = "active", kind = "vps") {
     location: "fsn1",
     arch: "amd64",
     measured_at: null,
+    last_seen: lastSeen,
     updated_at: "2026-09-02T10:00:00Z",
   };
 }
@@ -79,5 +80,45 @@ describe("the machines (VISION 6.2)", () => {
 
     expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
     expect(screen.queryByText(/rents or owns/)).not.toBeInTheDocument();
+  });
+});
+
+describe("when each machine last spoke (VISION 7, ADR 0015)", () => {
+  it("says how long ago, and nothing where nothing ever came", async () => {
+    installInstance({
+      "GET /api/machines": [
+        aMachine("ex44", "active", "dedicated", new Date(Date.now() - 12 * 60 * 1000).toISOString()),
+        aMachine("cx22"),
+      ],
+    });
+
+    renderAt("/machines", <MachinesView />);
+
+    expect(await screen.findByRole("link", { name: /ex44/ })).toBeInTheDocument();
+    // Relative, because the question is "how long has it been quiet" and not
+    // "what was the timestamp".
+    expect(screen.getByText(/minutes ago/)).toBeInTheDocument();
+
+    // No threshold, no colour, no badge: a machine that never reported says
+    // nothing rather than being called anything.
+    for (const judgement of ["stale", "silent", "down", "offline"]) {
+      expect(screen.queryByText(new RegExp(judgement, "i"))).not.toBeInTheDocument();
+    }
+  });
+
+  it("puts the quietest first when asked, and never before a month ago", async () => {
+    installInstance({
+      "GET /api/machines": [
+        aMachine("a-loud", "active", "vps", new Date(Date.now() - 60 * 1000).toISOString()),
+        aMachine("b-quiet", "active", "vps", new Date(Date.now() - 30 * 86400 * 1000).toISOString()),
+        aMachine("c-never"),
+      ],
+    });
+
+    renderAt("/machines?quietest=yes", <MachinesView />);
+
+    await screen.findByRole("link", { name: /a-loud/ });
+    const rows = screen.getAllByRole("link").map((row) => row.getAttribute("href"));
+    expect(rows).toEqual(["/machines/c-never", "/machines/b-quiet", "/machines/a-loud"]);
   });
 });

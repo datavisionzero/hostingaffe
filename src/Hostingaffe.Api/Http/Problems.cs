@@ -37,7 +37,9 @@ public static class Problems
             StatusCodes.Status409Conflict,
         RefusalCode.SecretExpired => StatusCodes.Status410Gone,
         RefusalCode.Stale => StatusCodes.Status412PreconditionFailed,
+        RefusalCode.TooLarge => StatusCodes.Status413PayloadTooLarge,
         RefusalCode.Transition or RefusalCode.SmtpNotConfigured => StatusCodes.Status422UnprocessableEntity,
+        RefusalCode.RateLimited => StatusCodes.Status429TooManyRequests,
         RefusalCode.Internal => StatusCodes.Status500InternalServerError,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "A refusal code without a status."),
     };
@@ -62,6 +64,8 @@ public static class Problems
         RefusalCode.DeviceDenied => "A user refused this login",
         RefusalCode.DeviceExpired => "This login is no longer waiting to be approved",
         RefusalCode.LastAdministrator => "The instance must keep one active administrator",
+        RefusalCode.TooLarge => "The request body is larger than this endpoint takes",
+        RefusalCode.RateLimited => "That arrived again too soon",
         RefusalCode.Internal => "Something went wrong on the server",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "A refusal code without a title."),
     };

@@ -2,7 +2,7 @@ import { Link, useSearchParams } from "react-router";
 import { api, type Schemas } from "@/api/client";
 import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
-import { day } from "@/shared/when";
+import { ago, day } from "@/shared/when";
 import { machinePath } from "./addresses";
 import { Filters, type Filter } from "@/shared/Filters";
 import { StatusBadge } from "./Parts";
@@ -30,6 +30,10 @@ export function MachinesView() {
   const status = params.get("status") ?? undefined;
   const kind = params.get("kind") ?? undefined;
   const retired = params.get("retired") === "yes";
+  // "Which machine has said nothing for longest" is one click, and it is done
+  // here rather than by the endpoint: one team's machines are a screenful, and
+  // an order is not a filter.
+  const byLastSeen = params.get("quietest") === "yes";
   const at = `${status ?? ""}|${kind ?? ""}|${retired}`;
 
   const { asked } = useAsk<MachineSummary[]>(at, (signal) =>
@@ -50,7 +54,10 @@ export function MachinesView() {
         filters={filters}
         params={params}
         setParams={setParams}
-        also={{ name: "retired", label: "Include retired", on: retired }}
+        also={[
+          { name: "retired", label: "Include retired", on: retired },
+          { name: "quietest", label: "Quietest first", on: byLastSeen },
+        ]}
       />
 
       {asked.at === "asking" && <p aria-busy className="p-4 text-sm text-muted-foreground">Loading…</p>}
@@ -71,7 +78,7 @@ export function MachinesView() {
 
       {asked.at === "known" && asked.value.length > 0 && (
         <ul className="divide-y">
-          {asked.value.map((machine) => (
+          {ordered(asked.value, byLastSeen).map((machine) => (
             <li key={machine.key}>
               <Link to={machinePath(machine.key)} className="flex min-h-10 items-center gap-3 px-4 py-1 hover:bg-accent">
                 <span className="w-48 shrink-0 truncate font-mono text-xs text-muted-foreground">{machine.key}</span>
@@ -90,6 +97,11 @@ export function MachinesView() {
                       itself, which is not when the row was last edited. */}
                   {machine.measured_at === null ? "never measured" : day(machine.measured_at)}
                 </span>
+                <span className="hidden w-32 shrink-0 truncate text-right text-xs text-muted-foreground md:block">
+                  {/* When the machine last spoke for itself. No threshold, no
+                      colour, no badge: the reader judges (VISION 5). */}
+                  {machine.last_seen === null ? "" : ago(machine.last_seen)}
+                </span>
                 <StatusBadge status={machine.status} />
               </Link>
             </li>
@@ -98,4 +110,20 @@ export function MachinesView() {
       )}
     </>
   );
+}
+
+/**
+ * The order of the list: by key, as the instance answers, or the quietest
+ * first — a machine that has never reported before one that reported a month
+ * ago, because never is longer than a month.
+ */
+function ordered(machines: MachineSummary[], byLastSeen: boolean): MachineSummary[] {
+  if (!byLastSeen) return machines;
+
+  return [...machines].sort((a, b) => {
+    if (a.last_seen === b.last_seen) return a.key.localeCompare(b.key);
+    if (a.last_seen === null) return -1;
+    if (b.last_seen === null) return 1;
+    return a.last_seen.localeCompare(b.last_seen);
+  });
 }

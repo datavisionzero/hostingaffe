@@ -32,19 +32,21 @@ Api ──────► Application ──────► Domain
 ```
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
-browser session, one-time secret, device login), `Machines`, `Installations`
-(with the port and its two closed sets, the secret and the file it lies in, and
-the dependency on another installation), `Files` (with the one list of refused
-paths), `Deployments` (with `Derived`, which says what "latest" means), `Pages`,
-`History`, and at the root what belongs to more than one of them — `Key`, the
-handle an operator chooses; `AssignedKey`, the register that makes a key never
-reusable; `Status`, the lifecycle a machine and an installation share; `Anchor`,
-the machine-or-installation a file is owned by and a page attached to;
-`Spelling`, which turns a closed set's value into the word the contract, the
-column and the history all use; `Link`, how a Markdown body names another thing
-of the record; `Fields`, the shapes every editable field shares; and `Refusal`
-with `RefusalCode`, the one list of every way the product says no, which the
-CLI derives its exit code from.
+browser session, one-time secret, device login), `Machines` (with the machine
+token, which is a key and not an identity), `Installations` (with the port and
+its two closed sets, the secret and the file it lies in, and the dependency on
+another installation), `Files` (with the one list of refused paths),
+`Deployments` (with `Derived`, which says what "latest" means), `Reports` (the
+closed set of sections a machine reports about itself), `Pages`, `History`, and
+at the root what belongs to more than one of them — `Key`, the handle an
+operator chooses; `AssignedKey`, the register that makes a key never reusable;
+`Status`, the lifecycle a machine and an installation share; `Anchor`, the
+machine-or-installation a file is owned by and a page attached to; `Spelling`,
+which turns a closed set's value into the word the contract, the column and the
+history all use; `Link`, how a Markdown body names another thing of the record;
+`Fields`, the shapes every editable field shares; and `Refusal` with
+`RefusalCode`, the one list of every way the product says no, which the CLI
+derives its exit code from.
 
 `Software` is at the root too, and for a different reason: the word is
 uncountable, so there is no plural to name a folder with, and a namespace
@@ -94,6 +96,7 @@ generated from `docs/api/openapi.json` (planaffe ADR 0003, 0005).
 ```
 cmd/ha              the binary
 internal/cmd        the command tree, one file per object
+internal/collect    what a host says about itself, gathered on the host
 internal/client     the HTTP client, idempotency keys, version skew
 internal/config     which instance, and as whom: the two ladders (ADR 0005)
 internal/keychain   where a person's session lives, and nowhere else quietly
@@ -125,7 +128,9 @@ src/api         the generated client and its wrapper
 
 `src/record` is the product's own screens (VISION 6.2): a list and a detail for
 each of the machines, the software and the installations, and one file screen
-serving both of the things a file can hang on. `Parts.tsx` holds the sections
+serving both of the things a file can hang on. `Reports.tsx` is the machine
+screen's other half — what the machine says about itself, the series of it, and
+the token it reports under. `Parts.tsx` holds the sections
 they share — a file list, the pages attached to something, the history, the
 guarded description — because those screens are the same screen several times
 over and a section that drifted on one of them would read like another product.

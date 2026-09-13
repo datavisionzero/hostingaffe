@@ -68,6 +68,8 @@ to message on `validation`.
 | `stale` | 412 | `If-Match` did not match; `current` carries the object |
 | `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many), deleting an installation or a machine that others depend on (`dependents` says how many) |
 | `smtp-not-configured` | 422 | the act needs a mail and the instance sends none |
+| `too-large` | 413 | the body is over what that endpoint takes; `limit` says what that was |
+| `rate-limited` | 429 | that arrived again too soon; `retry_after` says in how many seconds |
 | `internal` | 500 | a bug; the document carries nothing else |
 
 ### Exit codes of the CLI
@@ -157,6 +159,11 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
   token never carries the administrator role.
 - An administrator invites users, grants and revokes the administrator role,
   deactivates and reactivates, and configures the instance.
+- **A machine token is not an identity and reads nothing.** It authenticates
+  one call — handing in a report for its own machine — and every other endpoint
+  refuses it, reads included. A user token and an agent token are refused at
+  that one call in turn, so the two doors never fall through to each other
+  ([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 
 ## Retiring, and deleting
 
@@ -289,6 +296,9 @@ collected in time is expired rather than approved.
 | `GET /api/machines/{key}/context` | everything recorded about it, as one Markdown document |
 | `GET /api/machines/{key}/history` | who changed what, oldest first |
 | `DELETE /api/machines/{key}`, `POST /api/machines/{key}/restore` | soft, with the cascade above |
+| `GET /api/machines/{key}/token` | whether it has a machine token, and what became of the last one |
+| `POST /api/machines/{key}/token` | issue one; `rotate=true` replaces an existing one |
+| `DELETE /api/machines/{key}/token` | revoke it |
 
 The key is the address and is **immutable**: `key` in a change body is
 `unknown-field`, not a rename. Both request objects are closed — a field they
@@ -314,13 +324,43 @@ Retiring, and deleting.
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
 
+**The machine token is the key a host reports under** and can do nothing else
+([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+`POST` answers `{ "machine", "prefix", "secret", "issued_at" }`, and **the
+secret is in that answer and nowhere afterwards** — only the hash is kept, so
+whoever loses it issues a new one. A machine that already has a token is
+`transition` unless the call says `rotate=true`; rotating revokes the old one
+in the same move, so the cron on the host fails visibly at its next run instead
+of quietly carrying on under a key somebody meant to replace.
+
+**Issuing and revoking are a user's acts**, `forbidden` for an agent, which
+administers no keys. Reading is not: `GET` carries no secret, only `present`,
+the prefix, who issued it and when, and when it was last used — and where there
+is no live token it describes the last one there was, so that "is this machine
+still reporting, and is that the token's doing" has one answer. Both writes
+**make a history row on the machine**, which is the one thing around reports
+that belongs in the history: a person changed what the machine may do. The
+report itself stays out
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
 **`context` is the one call an agent makes before it touches a host.** It
 answers `{ "key", "document" }`, and the document is Markdown, in this order:
-the machine and its fields; its installations, each with the version it runs,
-its ports, its file list and the last five deployments; the software those are
-installations of; the machine's own files; the pages that hang on the machine or
-on any of its installations; and the instance's `decision` pages — the rules
-that hold on every host.
+the machine and its fields; **what it last reported** and every drift; its
+installations, each with the version it runs, its ports, its file list and the
+last five deployments; the software those are installations of; the machine's
+own files; the pages that hang on the machine or on any of its installations;
+and the instance's `decision` pages — the rules that hold on every host.
+
+**The report comes second, and short.** An agent about to type `docker compose
+up` has to read it before, not after: when the machine last reported, the disks
+in one line, how many containers run of how many, every container that is *not*
+running, and the drift. What stays out is the full container table, memory and
+load in detail, and every older report — one `ha report show` away, and exactly
+the sort of content that fills a context window without changing a decision. A
+report **older than a day** is given with its age and said not to be the
+present, because an agent concluding from a three-week-old report what runs now
+is worse off than one that knows nothing. A machine that has never reported gets
+a sentence rather than an empty section.
 
 **File contents are not in it.** They are one read of a file away, and they are
 what would fill a context window. The measure is VISION 16: well under ten
@@ -574,6 +614,147 @@ again. So are `number`, `previous`, `files` and `status`.
 deployment is not necessarily who deployed. `ticket` is a planaffe key like
 `LOG-42` and stays a string: a reference to the other product, not a word of
 this model.
+
+### Reports
+
+What a machine said about itself at a moment: a sample beside the record, and
+never a field of it
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+| | |
+|---|---|
+| `POST /api/machines/{key}/reports` | hand one in; **the machine's token and nothing else** |
+| `GET /api/machines/{key}/reports` | the series, newest first, as slim `ReportSummary`; `limit` defaults to 50 and never exceeds 200, `offset` walks back |
+| `GET /api/machines/{key}/reports/latest` | the latest one, whole |
+| `GET /api/machines/{key}/reports/{number}` | one by its number, whole |
+
+**The one write of the feature, and the narrowest door in the API.** It is
+authenticated with the machine token of that machine: a user token and an agent
+token are `unauthenticated` here, because somebody who could post a report by
+hand could forge the drift comparison with nothing showing anywhere. A machine
+token for another machine is refused too, and the answer does not distinguish
+"there is no such machine" from "that one is not yours" — a token that could
+enumerate keys would read something, and this one reads nothing.
+
+```json
+{
+  "collected_at": "2026-09-13T08:00:07Z",
+  "agent": "0.4.0",
+  "host": { "hostname": "ex44", "os": "Ubuntu 26.04 LTS", "kernel": "6.14.0-27-generic",
+            "arch": "x86_64", "uptime_seconds": 1893244, "load1": 0.14, "load5": 0.2, "load15": 0.18 },
+  "memory": { "total_bytes": 67430400000, "used_bytes": 19204000000,
+              "available_bytes": 46900000000, "swap_total_bytes": 0, "swap_used_bytes": 0 },
+  "disks": [ { "mount": "/", "device": "/dev/nvme0n1p2",
+               "size_bytes": 502000000000, "used_bytes": 301000000000, "percent": 60 } ],
+  "containers": [ { "name": "logaffe", "image": "ghcr.io/datavisionzero/logaffe:1.4.0",
+                    "state": "running", "status": "Up 3 days", "health": "healthy",
+                    "restarts": 0, "started_at": "2026-09-10T09:12:00Z",
+                    "ports": ["127.0.0.1:18502->8080/tcp"] } ],
+  "missing": []
+}
+```
+
+**Every section may be left out**, and a host without Docker reports no
+containers instead of failing — it says so in `missing`, as
+`{"section": "containers", "reason": "docker is not installed"}`. The shape is
+**closed, section by section**: a field the contract does not define is
+`unknown-field` rather than ignored, which is what keeps the body from becoming
+a collecting bin.
+
+**Numbers are numbers** — bytes, never `42G` — and times are RFC 3339 like
+everywhere else. A container's `image` carries its **tag**, where a software's
+`image` carries none: the tag is the thing worth comparing.
+
+**The instance sets `received_at` itself** and does not trust the host's clock.
+`collected_at` is kept as it came, and the order of reports and a machine's
+`last_seen` are read from `received_at`. A `collected_at` far in the future is
+stored rather than refused: denying a machine with a wrong clock its sign of
+life would be the worse answer.
+
+**At the door:** a body over **64 KB** is `too-large`, with `limit` saying what
+it was, and more than **one report per machine per minute** is `rate-limited`,
+with `retry_after` saying how long. Neither guards against an attacker holding a
+valid token — it can lie about its own machine whatever it does — they guard
+against a cron running amok and a collector that appended something large.
+
+**Nothing else happens.** No field of the machine is set, no history row is
+written, no deployment appears, nothing on an installation is touched. The
+answer is `{ "number", "received_at" }`, which is all a cron has any use for.
+
+**Reading is ordinary.** The three `GET`s take a user or agent token like
+everything else, because everyone in the instance sees everything
+([VISION 9](../Vision.md#9-users-and-permissions)). A **machine token reaches
+none of them**, its own machine's reports included.
+
+The series answers `{ "total", "reports" }`, and a `ReportSummary` is what a
+list makes a line of: `number`, `received_at`, `collected_at`, how many
+containers run of how many, the highest disk percentage, and `load1`. All of it
+is counted from the body on read; none of it is stored beside the body it is
+counted from. That is enough for "on the 3rd the disk went from 60 to 91 per
+cent" without fetching two hundred whole bodies to see it.
+
+A machine that has never reported answers `not-found` on `latest` and an
+**empty list** on the series. That is not an error: it is the ordinary state of
+a machine on which no cron has been set up.
+
+**`last_seen` is on the machine**, in `GET /api/machines/{key}` and in the
+`MachineSummary` of the list, so that an overview does not ask once per row. It
+is the `received_at` of the latest report, derived and never written, and it is
+absent where a machine has never reported. It stands beside `measured_at` and
+means something else — `measured_at` is when a person last checked the facts.
+
+### Drift
+
+**Because both sides are there, they can be compared** — and that is why a
+report stands beside the record instead of in it
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+`drift` comes with the whole report (`latest` and one by number) and with
+`GET /api/machines/{key}`, where it is computed from that machine's latest
+report. It is served here rather than assembled by each client, which is what
+keeps the web application and `ha` from saying different things about one host.
+
+```json
+{"kind": "version", "subject": "logaffe-prod", "field": "version",
+ "record": "1.4.0", "record_at": "2026-09-08T19:12:00Z",
+ "reported": "1.3.2", "reported_at": "2026-09-13T08:00:09Z"}
+```
+
+`kind` is one of three:
+
+- **`version`** — the tag of a container's image against the version of the
+  installation's latest deployment. The most valuable line of the whole
+  feature: "the record says logaffe-prod runs 1.4.0, the machine reports
+  1.3.2."
+- **`container`** — an installation the record calls `active` whose container
+  the machine reports as `exited`. A statement, not an alarm.
+- **`fact`** — `os` or `arch` against the machine's own fields, with
+  `record_at` the `measured_at` beside them. This is
+  [VISION 15.1](../Vision.md#151-measuring-instead-of-typing) word for word.
+
+**Which side is right the product does not say.** Every drift names both sides
+and how old each is, and the decision is a person's or an agent's. No field is
+set, nothing is "reconciled", and there is no call that pulls the record after
+the report — that would be discovery through the back door, and it is
+deliberately not here.
+
+**Where the assignment is ambiguous, nothing is claimed.** A container is
+matched to an installation by the image name *without* its tag, which the
+software already carries, plus the machine it lies on. Two installations of the
+same software on one machine, or two containers out of one image, produce no
+drift at all: the report is shown and the reader compares the two rows. A wrong
+sentence is worse than none. So does a software whose `image` is empty, an
+installation with no container, and a container with no installation.
+
+**Disk, memory and load make no drift.** They have no other side in the record,
+so they are shown and not compared, and "91 per cent full" is a number a person
+reads rather than a disagreement.
+
+**What is not here:** no filter over the contents of a body, no aggregate, no
+time window beyond the ordinary paging, and no search in reports. `GET
+/api/search` goes over the record, and a report is not the record; whoever wants
+an evaluation has a monitoring tool for it
+([VISION 5](../Vision.md#5-non-goals-deliberate-boundaries)).
 
 ### Importing
 

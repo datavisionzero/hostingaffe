@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
  */
 export type Filter = { name: string; label: string; values: string[] };
 
+/** A switch beside the filters: one question with a yes and nothing else. */
+export type Switch = { name: string; label: string; on: boolean };
+
 /**
  * The narrowing above a list, written into the address bar.
  *
@@ -24,9 +27,13 @@ export function Filters({ filters, params, setParams, also }: {
   filters: Filter[];
   params: URLSearchParams;
   setParams: SetURLSearchParams;
-  /** A switch beside them, where the list has one: retired rows, deleted rows. */
-  also?: { name: string; label: string; on: boolean };
+  /**
+   * The switches beside them, where the list has any: retired rows, an order
+   * other than the default. One or several, because a list may want both.
+   */
+  also?: Switch | Switch[];
 }) {
+  const switches = also === undefined ? [] : Array.isArray(also) ? also : [also];
   const set = (name: string, value: string | undefined) => {
     const kept = new URLSearchParams(params);
     if (value === undefined) kept.delete(name);
@@ -65,18 +72,18 @@ export function Filters({ filters, params, setParams, also }: {
         );
       })}
 
-      {also !== undefined && (
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      {switches.map((one) => (
+        <label key={one.name} className="flex items-center gap-2 text-xs text-muted-foreground">
           <input
             type="checkbox"
-            name={also.name}
-            checked={also.on}
-            onChange={(event) => set(also.name, event.target.checked ? "yes" : undefined)}
+            name={one.name}
+            checked={one.on}
+            onChange={(event) => set(one.name, event.target.checked ? "yes" : undefined)}
             className="size-3.5 accent-brand"
           />
-          {also.label}
+          {one.label}
         </label>
-      )}
+      ))}
     </div>
   );
 }

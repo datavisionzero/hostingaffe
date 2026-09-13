@@ -70,6 +70,12 @@ public enum RefusalCode
     /// <summary>Deactivation or demotion would leave no active administrator.</summary>
     LastAdministrator,
 
+    /// <summary>The request body is over the limit that endpoint states; <c>limit</c> says what it was.</summary>
+    TooLarge,
+
+    /// <summary>Too many of this in too short a time; <c>retry_after</c> says in how many seconds.</summary>
+    RateLimited,
+
     /// <summary>A bug; the response carries nothing else.</summary>
     Internal,
 }

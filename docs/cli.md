@@ -156,7 +156,7 @@ a number rather than on a sentence:
 | 1 | unexpected: a 500, an answer `ha` cannot parse, a bug in `ha` |
 | 2 | usage: bad arguments, no instance, no token, a malformed address, a token file others can read |
 | 3 | not found, deleted included |
-| 4 | refused: validation, and every 422 |
+| 4 | refused: validation, every 422, a body over an endpoint's limit, and one that arrived again too soon |
 | 5 | conflict: `idempotency-mismatch`, `email-exists`, `last-administrator` |
 | 6 | stale: `If-Match` did not match |
 | 7 | denied: 401, 403, and a device login somebody refused or let expire |
@@ -191,11 +191,12 @@ user's own repository.
 
 | object | verbs |
 |---|---|
-| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context` |
+| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context`, `token` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
+| `ha report` | `collect` and `send` on the host itself; `show` and `list` from anywhere |
 | `ha search` | one call over every field, every Markdown body and every file |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history`, `check` |
@@ -282,6 +283,118 @@ on all three rows. `ha <object> history KEY` is where it is read back.
 from a file or from `-`, and naming both is exit 2. `view` prints the fields
 that are filled in and then the description as it is stored, so the output can
 be piped straight back into `--description-file -`.
+
+## Reporting from a host
+
+```sh
+ha report collect                      # gather and print; nothing is sent
+ha report send [KEY] [--quiet]         # gather and hand in
+```
+
+These two run **on** the machine they are about, and they are the only commands
+that do besides `ha files sync`. `collect` is the transparency path and comes
+first for that reason: it prints exactly what `send` would hand in, needs
+neither token nor instance, and runs on a host with no network.
+
+**What is never collected: no container environment, no process command lines,
+no file contents, no labels of arbitrary content.** That is not a convenience
+rule — it is the line that keeps secret values out of the record, and it is
+written here so that somebody can check it against `ha report collect` without
+reading the code.
+
+The collector needs no root beyond the docker group for the socket, installs
+nothing, and uses only what lies on every Linux host: `/proc/uptime`,
+`/proc/loadavg`, `/proc/meminfo`, `/proc/mounts`, `/etc/os-release`, `uname`,
+`df`, and `docker ps` where there is a Docker. Where `/proc` can answer, `/proc`
+is read rather than a command run, and every command has a short timeout so that
+a hanging `docker` cannot hold the run.
+
+**A section it could not determine is not a failure.** A host without Docker
+reports no containers, says why in `missing`, and `send` still exits 0: the sign
+of life is the point, and a cron that failed over a missing section is one
+somebody switches off within a fortnight.
+
+`send` reads the machine token from `HOSTINGAFFE_TOKEN` or from the file
+`--token-file` names, and touches no keychain — a server has none. Which machine
+this host is comes from the argument or from `HOSTINGAFFE_MACHINE` beside the
+token; the token cannot say, because it reads nothing at all. `--quiet` says
+nothing on success so that a cron writes no mail every quarter of an hour, and
+errors go to stderr regardless: exit 7 for a token the instance will not take,
+10 for an instance it could not reach, 9 for a version skew.
+
+**A failed run is not caught up.** No buffer, no queue, no file of unsent
+reports: the next run is a quarter of an hour away and is the more current one
+anyway.
+
+**`ha` writes no crontab entry and no systemd unit.** Files end where execution
+begins (VISION 13); `operations.md` shows both ways to set it up, to copy.
+
+## Reading what a machine said
+
+```sh
+ha report show ex44 [--number N]       # the last report, or one of the series
+ha report list ex44 [--limit N]        # the series, newest first
+```
+
+`show` sets the report out the way `ha machine view` sets out a machine: the
+sections one under the other, sizes in what a person reads rather than in bytes,
+percentages as percentages, times relative with the exact one beside them, and
+the containers as a table — name, image with its tag, state, since when, how
+often it restarted. A section the collector could not determine stands there
+with its reason: `disks: not determined (df is not on the PATH)`. The line at
+the top answers the question somebody came with — when this report arrived.
+`--json` prints the body as the API answered it, like everywhere else.
+
+`list` is one line per report out of the summary the API serves: when, how many
+containers ran of how many, the highest disk percentage, and the load. Enough to
+see that something changed on the 3rd, and then `show --number` to look.
+
+**The drift stands under the report**, and under the machine in
+`ha machine view`: one line per disagreement, naming both sides and how old each
+is — "the record says logaffe-prod 1.4.0, the machine reported 1.3.2". **Which
+side is right `ha` does not say**; that is the decision a person or an agent
+makes, and there is no verb that pulls the record after the report.
+
+**`last seen` is on `ha machine list` and `ha machine view`**, relative — "12
+minutes ago", "6 days ago" — and empty where nothing ever came. In `view` it
+stands beside `measured`, because the two mean different things: `measured` is
+when a person last checked the facts, `last seen` is when the machine last spoke
+for itself.
+
+**No threshold, no colour, no judgement.** `ha` does not say "stale" and does
+not say "silent"; it says when. Whoever set up a quarter of an hour sees what
+"6 days ago" means, and a line the product drew would be the wrong one for the
+next host (VISION 5).
+
+## The key a machine reports under
+
+```sh
+ha machine token issue ex44 [--rotate]
+ha machine token show ex44
+ha machine token revoke ex44
+```
+
+A **machine token** belongs to one machine and does one thing: hand in a report
+for that machine ([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+It reads nothing at all — not an installation, not a file, not even its own
+machine — which is why it is the one token that may lie on a host.
+
+`issue` prints the secret on **stdout** and the sentence about it on **stderr**,
+so that what a pipe carries into a file on the host is the token and nothing
+else. It is shown once: only the hash is kept, and whoever loses it issues a new
+one. A machine that already has a token is refused — exit 4 — unless `--rotate`
+says so, and rotating revokes the old one at once, so the cron on the host fails
+visibly at its next run rather than quietly carrying on under a key somebody
+meant to replace.
+
+`show` never shows a secret. It says whether there is a token, its prefix, who
+issued it and when it was last used — which is the answer to "is this machine
+still reporting, and is that the token's doing" — and where there is none, what
+became of the last one there was.
+
+**Issuing and revoking are a person's**, exit 7 for an agent, which administers
+no keys; `show` is open to both. Where the token belongs on the host, and the
+cron line that uses it, are in `operations.md`.
 
 **Retiring is not deleting** (`CONTEXT.md`, Retired and deleted). The normal end
 of a machine or an installation is `set KEY --status retired`, which keeps

@@ -3,8 +3,9 @@ import { api, type Schemas } from "@/api/client";
 import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { Failed, Fields, Section, Waiting } from "@/shared/Detail";
-import { moment } from "@/shared/when";
+import { ago, moment } from "@/shared/when";
 import { About, Attached, Description, Files, History, Installations, StatusBadge } from "./Parts";
+import { DriftList, LastReport, ReportHistory, ReportingToken } from "./Reports";
 
 type Machine = Schemas["Machine"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -104,18 +105,40 @@ export function MachineView() {
             })}
         />
 
+        {/* What the record above and the machine's own last word disagree
+            about, where somebody reads the fields it contradicts. Which side is
+            right the product does not say (ADR 0015). */}
+        {machine.drift.length > 0 && (
+          <Section title="Drift">
+            <DriftList drift={machine.drift} />
+          </Section>
+        )}
+
         <Installations of={{ machine: machine.key }} />
+
+        {/* What the machine says about itself, beside what the record says
+            about it. A report never writes into the fields above (ADR 0015). */}
+        <LastReport machine={machine.key} />
+
         <Files owner={{ kind: "machine", key: machine.key }} />
         <Attached to={{ kind: "machine", key: machine.key }} />
         <History asked={history.asked} />
+        <ReportHistory machine={machine.key} />
+        <ReportingToken machine={machine.key} />
 
         <Section title="Measured">
-          {/* The one field about the fields: when they were last confirmed
-              against the machine itself rather than against somebody's memory. */}
+          {/* Two dates that answer two questions: when a person last confirmed
+              the fields against the machine, and when the machine last spoke for
+              itself (CONTEXT.md, Machine). */}
           <p className="text-sm">
             {machine.measured_at === null
               ? "These fields have never been measured against the machine itself."
               : `Last measured ${moment(machine.measured_at)}.`}
+          </p>
+          <p className="text-sm">
+            {machine.last_seen === null
+              ? "This machine has never reported."
+              : <>Last seen <time title={moment(machine.last_seen)}>{ago(machine.last_seen)}</time>.</>}
           </p>
         </Section>
 

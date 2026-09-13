@@ -399,4 +399,124 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         4 => "four",
         _ => "five",
     };
+
+    /// <summary>
+    /// An agent that is about to type `docker compose up` has to know before,
+    /// not after, whether the machine is alive and what is running on it
+    /// (ADR 0015).
+    /// </summary>
+    [Fact]
+    public async Task The_report_is_near_the_top_and_says_what_is_not_running()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 2);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                disks = new[]
+                {
+                    new { mount = "/", percent = 91 },
+                    new { mount = "/srv", percent = 12 },
+                },
+                containers = new[]
+                {
+                    new { name = "app-1", image = "ghcr.io/example/app-1:1.0.0", state = "running" },
+                    new { name = "app-2", image = "ghcr.io/example/app-2:1.0.0", state = "exited" },
+                },
+            },
+            Ct);
+        Assert.Equal(System.Net.HttpStatusCode.Created, handed.StatusCode);
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        Assert.Contains("## Reported", document, StringComparison.Ordinal);
+        Assert.Contains("/ 91%, /srv 12%", document, StringComparison.Ordinal);
+        Assert.Contains("Containers: 1 of 2 running", document, StringComparison.Ordinal);
+        Assert.Contains("Not running: `app-2` (exited)", document, StringComparison.Ordinal);
+
+        // Near the top: before the installations, because it is read before
+        // anything is touched.
+        Assert.True(
+            document.IndexOf("## Reported", StringComparison.Ordinal)
+                < document.IndexOf("## Installations", StringComparison.Ordinal),
+            document);
+
+        // What is one `ha report show` away stays there: the full container
+        // table, memory and load in detail, and every older report.
+        Assert.DoesNotContain("load", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ghcr.io/example/app-1:1.0.0", document, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_machine_that_never_reported_gets_a_sentence()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 1);
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        Assert.Contains("This machine does not report.", document, StringComparison.Ordinal);
+        Assert.Contains("every field above is what somebody wrote down", document, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A report older than a day is given with its age and not set down as the
+    /// present: an agent concluding from a three-week-old report what is
+    /// running now is worse off than one that knows nothing.
+    /// </summary>
+    [Fact]
+    public async Task An_old_report_says_that_it_is_old()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 1);
+
+        await instance.AddReportsAsync("ex44", DateTimeOffset.UtcNow.AddDays(-21), 1);
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        Assert.Contains("21 days ago", document, StringComparison.Ordinal);
+        Assert.Contains("**That is not now**", document, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A host with thirty containers must not spend the budget on a list that
+    /// changes no decision: what is always named is every container that is not
+    /// running.
+    /// </summary>
+    [Fact]
+    public async Task Many_containers_are_counted_and_the_quiet_ones_named()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 5);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                containers = Enumerable.Range(1, 30)
+                    .Select(i => new { name = $"c-{i}", image = $"example/c-{i}:1.0", state = i == 30 ? "exited" : "running" })
+                    .ToArray(),
+            },
+            Ct);
+        Assert.Equal(System.Net.HttpStatusCode.Created, handed.StatusCode);
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        Assert.Contains("Containers: 29 of 30 running", document, StringComparison.Ordinal);
+        Assert.Contains("Not running: `c-30` (exited)", document, StringComparison.Ordinal);
+        Assert.DoesNotContain("`c-1` ", document, StringComparison.Ordinal);
+
+        var tokens = document.Length / CharactersPerToken;
+        Assert.True(tokens < TokenBudget / 2, $"about {tokens} tokens with thirty containers:\n{document}");
+    }
 }

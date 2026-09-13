@@ -2087,6 +2087,199 @@
         }
       }
     },
+    "/api/machines/{key}/token": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Whether this machine has a token, its prefix, who issued it and when it was last used — and, where it has none, what became of the last one it had. No secret is in it, ever: only the hash is kept. An agent may read this.",
+        "operationId": "ReadMachineToken",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineToken"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Issue the machine's token. **The secret is in this answer and nowhere afterwards.** A machine that already has one is `transition` unless `rotate=true` says so, and rotating revokes the old one in the same move — the cron on the host then fails visibly at its next run instead of quietly carrying on. A user's act: an agent administers no keys.",
+        "operationId": "IssueMachineToken",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rotate",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedMachineToken"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Revoke the machine's token. It takes effect at once and the row stays, so that who took it back and when is still readable. A user's act.",
+        "operationId": "RevokeMachineToken",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "note",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/software": {
       "get": {
         "tags": [
@@ -4568,6 +4761,284 @@
         }
       }
     },
+    "/api/machines/{key}/reports": {
+      "post": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Hand in a report for the machine the presented machine token belongs to. Authenticated with that token and with nothing else: a user token and an agent token are refused here, because someone who could post a report by hand could forge the drift comparison. Every section may be left out; what the collector could not determine goes in `missing`, with its reason. At most one report per machine per minute, and at most 64 KB.",
+        "operationId": "HandInReport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandInReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The machine's reports, newest by `received_at` first, as the slim summary a list makes a line of. `limit` defaults to 50 and never exceeds 200; `offset` walks back. A machine that has never reported answers with an empty list, which is the ordinary state of one on which no cron has been set up.",
+        "operationId": "ListReports",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/reports/latest": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The machine's latest report, whole. A machine that has never reported is `not-found` here.",
+        "operationId": "ReadLatestReport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/reports/{number}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "One report by its number, whole. A number the sweep has taken is `not-found`, and numbers are never handed out twice.",
+        "operationId": "ReadReport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pages": {
       "get": {
         "tags": [
@@ -5740,6 +6211,120 @@
         },
         "additionalProperties": false
       },
+      "ContainerRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "health": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "restarts": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "started_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContainerState": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "health": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "restarts": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "started_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "CorrectDeploymentRequest": {
         "type": "object",
         "properties": {
@@ -6417,6 +7002,134 @@
         ],
         "type": "string"
       },
+      "DiskRequest": {
+        "type": "object",
+        "properties": {
+          "mount": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "device": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "size_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "percent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiskUsage": {
+        "type": "object",
+        "properties": {
+          "mount": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "size_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "percent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "Drift": {
+        "required": [
+          "kind",
+          "subject",
+          "field",
+          "record",
+          "record_at",
+          "reported",
+          "reported_at"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DriftKind"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "record": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "record_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "reported": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DriftKind": {
+        "enum": [
+          "version",
+          "container",
+          "fact"
+        ],
+        "type": "string"
+      },
       "EmailChangeRequest": {
         "required": [
           "email"
@@ -6562,6 +7275,72 @@
           }
         }
       },
+      "HandInReportRequest": {
+        "type": "object",
+        "properties": {
+          "collected_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "agent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "host": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HostSectionRequest"
+              }
+            ]
+          },
+          "memory": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MemorySectionRequest"
+              }
+            ]
+          },
+          "disks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DiskRequest"
+            }
+          },
+          "containers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ContainerRequest"
+            }
+          },
+          "missing": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/MissingRequest"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "HistoryEntry": {
         "required": [
           "id",
@@ -6607,6 +7386,121 @@
             ]
           }
         }
+      },
+      "HostSection": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kernel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "uptime_seconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "load1": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load5": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load15": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "HostSectionRequest": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kernel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "uptime_seconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "load1": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load5": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load15": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
       },
       "IdentityKind": {
         "enum": [
@@ -7404,6 +8298,30 @@
           }
         }
       },
+      "IssuedMachineToken": {
+        "required": [
+          "machine",
+          "prefix",
+          "secret",
+          "issued_at"
+        ],
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IssuedToken": {
         "required": [
           "id",
@@ -7457,6 +8375,8 @@
           "ssh",
           "status",
           "measured_at",
+          "last_seen",
+          "drift",
           "description",
           "created_by",
           "updated_by",
@@ -7572,6 +8492,19 @@
             ],
             "format": "date-time"
           },
+          "last_seen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "drift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
+            }
+          },
           "description": {
             "type": "string"
           },
@@ -7625,6 +8558,7 @@
           "location",
           "arch",
           "measured_at",
+          "last_seen",
           "updated_at"
         ],
         "type": "object",
@@ -7670,8 +8604,79 @@
             ],
             "format": "date-time"
           },
+          "last_seen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "updated_at": {
             "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MachineToken": {
+        "required": [
+          "present",
+          "prefix",
+          "issued_by",
+          "issued_at",
+          "last_used_at",
+          "revoked_by",
+          "revoked_at"
+        ],
+        "type": "object",
+        "properties": {
+          "present": {
+            "type": "boolean"
+          },
+          "prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "issued_by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/IdentityRef"
+              }
+            ]
+          },
+          "issued_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "revoked_by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/IdentityRef"
+              }
+            ]
+          },
+          "revoked_at": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           }
         }
@@ -7745,6 +8750,116 @@
               "string"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "MemorySection": {
+        "type": "object",
+        "properties": {
+          "total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "available_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "MemorySectionRequest": {
+        "type": "object",
+        "properties": {
+          "total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "available_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissingRequest": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissingSection": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -8049,6 +9164,185 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "Report": {
+        "required": [
+          "machine",
+          "number",
+          "received_at",
+          "collected_at",
+          "agent",
+          "host",
+          "memory",
+          "disks",
+          "containers",
+          "missing",
+          "drift"
+        ],
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "host": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HostSection"
+              }
+            ]
+          },
+          "memory": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MemorySection"
+              }
+            ]
+          },
+          "disks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DiskUsage"
+            }
+          },
+          "containers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ContainerState"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingSection"
+            }
+          },
+          "drift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
+            }
+          }
+        }
+      },
+      "ReportPage": {
+        "required": [
+          "total",
+          "reports"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSummary"
+            }
+          }
+        }
+      },
+      "ReportReceipt": {
+        "required": [
+          "number",
+          "received_at"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReportSummary": {
+        "required": [
+          "number",
+          "received_at",
+          "collected_at",
+          "containers_running",
+          "containers_total",
+          "disk_percent",
+          "load1"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "containers_running": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "containers_total": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "disk_percent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "load1": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         }
       },

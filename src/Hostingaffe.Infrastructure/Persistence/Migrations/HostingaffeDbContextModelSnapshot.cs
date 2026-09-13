@@ -915,6 +915,62 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Hostingaffe.Domain.Machines.MachineToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid>("IssuedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<Guid>("MachineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("machine_id");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("prefix");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("secret_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_machine_token");
+
+                    b.HasIndex("MachineId")
+                        .IsUnique()
+                        .HasDatabaseName("machine_token_machine")
+                        .HasFilter("revoked_at is null");
+
+                    b.HasIndex("SecretHash")
+                        .IsUnique()
+                        .HasDatabaseName("machine_token_secret_hash");
+
+                    b.ToTable("machine_token", (string)null);
+                });
+
             modelBuilder.Entity("Hostingaffe.Domain.Pages.Page", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1019,6 +1075,56 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_page_attached_to", "num_nonnulls(machine_id, installation_id) <= 1");
 
                             t.HasCheckConstraint("ck_page_kind", "kind in ('runbook', 'decision', 'note')");
+                        });
+                });
+
+            modelBuilder.Entity("Hostingaffe.Domain.Reports.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Agent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("agent");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CollectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("collected_at");
+
+                    b.Property<Guid>("MachineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("machine_id");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_machine_report");
+
+                    b.HasIndex("MachineId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("machine_report_number");
+
+                    b.HasIndex("MachineId", "ReceivedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("machine_report_when");
+
+                    b.ToTable("machine_report", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_machine_report_number", "number >= 1");
                         });
                 });
 
@@ -1624,6 +1730,29 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_machine_updated_by");
                 });
 
+            modelBuilder.Entity("Hostingaffe.Domain.Machines.MachineToken", b =>
+                {
+                    b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("IssuedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_token_issued_by");
+
+                    b.HasOne("Hostingaffe.Domain.Machines.Machine", null)
+                        .WithMany()
+                        .HasForeignKey("MachineId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_token_machine");
+
+                    b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("fk_machine_token_revoked_by");
+                });
+
             modelBuilder.Entity("Hostingaffe.Domain.Pages.Page", b =>
                 {
                     b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
@@ -1657,6 +1786,16 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("fk_page_updated_by");
+                });
+
+            modelBuilder.Entity("Hostingaffe.Domain.Reports.Report", b =>
+                {
+                    b.HasOne("Hostingaffe.Domain.Machines.Machine", null)
+                        .WithMany()
+                        .HasForeignKey("MachineId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_report_machine");
                 });
 
             modelBuilder.Entity("Hostingaffe.Domain.Software", b =>

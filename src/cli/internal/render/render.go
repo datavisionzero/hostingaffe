@@ -140,20 +140,41 @@ func Machine(w io.Writer, m api.Machine) {
 	line(w, maybe("hostname", m.Hostname), maybe("ssh", m.Ssh))
 	line(w, maybe("ipv4", m.Ipv4), maybe("ipv6", m.Ipv6), maybe("private ip", m.PrivateIp))
 	line(w, maybe("os", m.Os), maybe("cpu", m.Cpu), maybe("memory", m.Memory), maybe("disk", m.Disk))
+	// `measured` is when a person last checked the facts; `last seen` is when
+	// the machine last spoke for itself. The two mean different things, and
+	// standing beside each other is what makes that readable (CONTEXT.md).
+	fields := []field{}
 	if m.MeasuredAt != nil {
-		line(w, said("measured", m.MeasuredAt.Format(time.RFC3339)))
+		fields = append(fields, said("measured", m.MeasuredAt.Format(time.RFC3339)))
 	}
+	if m.LastSeen != nil {
+		fields = append(fields, said("last seen", Ago(time.Now(), *m.LastSeen)+" ("+m.LastSeen.Format(time.RFC3339)+")"))
+	}
+	line(w, fields...)
 	touched(w, m.UpdatedAt, m.UpdatedBy, m.CreatedBy)
+
+	// What the record above and the machine's own last word disagree about. It
+	// is here, at the machine, because that is where somebody reads the fields
+	// it contradicts (ADR 0015).
+	Drift(w, m.Drift)
+
 	body(w, m.Description)
 }
 
 // MachineSummaries prints the fleet: the key, what kind of thing it is, whether
 // it is still there, where it stands, and what it is called.
 func MachineSummaries(w io.Writer, items []api.MachineSummary) {
+	now := time.Now()
 	for _, m := range items {
-		fmt.Fprintf(w, "%-16s %-9s %-8s %-12s %-12s %-6s %-10s %s\n",
+		// No threshold, no colour, no word of judgement: when it last spoke,
+		// and the person reads it (VISION 5).
+		seen := "-"
+		if m.LastSeen != nil {
+			seen = Ago(now, *m.LastSeen)
+		}
+		fmt.Fprintf(w, "%-16s %-9s %-8s %-12s %-12s %-6s %-15s %-10s %s\n",
 			m.Key, m.Kind, m.Status, or(m.Provider), or(m.Location), or((*string)(m.Arch)),
-			m.UpdatedAt.Format("2006-01-02"), m.Name)
+			seen, m.UpdatedAt.Format("2006-01-02"), m.Name)
 	}
 }
 
@@ -431,5 +452,241 @@ func SearchHits(w io.Writer, hits []api.SearchHit) {
 		}
 		fmt.Fprintf(w, "%-13s %-40s %-10s %-26s %s\n",
 			hit.Kind, address, hit.Where, Anchor(hit.Owner), hit.Name)
+	}
+}
+
+// Ago is how long ago something happened, as a person reads it: "12 minutes
+// ago", "6 days ago". No threshold and no judgement — `ha` says when, never
+// "stale" and never "silent", because a line the product drew would be the
+// wrong one for the next host (VISION 5).
+func Ago(now, at time.Time) string {
+	d := now.Sub(at)
+	if d < 0 {
+		return "just now"
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < 2*time.Minute:
+		return "1 minute ago"
+	case d < time.Hour:
+		return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+	case d < 2*time.Hour:
+		return "1 hour ago"
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d hours ago", int(d.Hours()))
+	case d < 48*time.Hour:
+		return "1 day ago"
+	default:
+		return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+	}
+}
+
+// MachineToken prints what a person asks when a machine has gone quiet: is
+// there a key, which one, who gave it out, and when it was last used. Never a
+// secret — only the hash is kept (ADR 0016).
+func MachineToken(w io.Writer, key string, t api.MachineToken) {
+	if !t.Present && t.RevokedAt == nil {
+		fmt.Fprintf(w, "%s has no token, and has never had one.\n", key)
+		return
+	}
+
+	now := time.Now()
+	if t.Present {
+		fmt.Fprintf(w, "%s  token %s…\n", key, *t.Prefix)
+	} else {
+		fmt.Fprintf(w, "%s  token %s… revoked\n", key, *t.Prefix)
+	}
+
+	fields := []field{said("issued", t.IssuedAt.Format(time.RFC3339))}
+	if t.IssuedBy != nil {
+		fields = append(fields, said("by", t.IssuedBy.Name))
+	}
+	line(w, fields...)
+
+	if t.LastUsedAt != nil {
+		line(w, said("last used", Ago(now, *t.LastUsedAt)+" ("+t.LastUsedAt.Format(time.RFC3339)+")"))
+	} else {
+		line(w, said("last used", "never"))
+	}
+
+	if t.RevokedAt != nil {
+		revoked := []field{said("revoked", t.RevokedAt.Format(time.RFC3339))}
+		if t.RevokedBy != nil {
+			revoked = append(revoked, said("by", t.RevokedBy.Name))
+		}
+		line(w, revoked...)
+	}
+}
+
+// Bytes is a size as a person reads it: GB and MB, one decimal where that says
+// something. The report carries bytes because the instance stores numbers; this
+// is the rendering, and `--json` is where the numbers are.
+func Bytes(n int64) string {
+	const unit = 1000
+	switch {
+	case n < unit:
+		return fmt.Sprintf("%dB", n)
+	case n < unit*unit:
+		return fmt.Sprintf("%.0fkB", float64(n)/unit)
+	case n < unit*unit*unit:
+		return fmt.Sprintf("%.0fMB", float64(n)/(unit*unit))
+	case n < unit*unit*unit*unit:
+		return fmt.Sprintf("%.1fGB", float64(n)/(unit*unit*unit))
+	default:
+		return fmt.Sprintf("%.1fTB", float64(n)/(unit*unit*unit*unit))
+	}
+}
+
+// Uptime is how long the machine has been up, in the two units that say it.
+func Uptime(seconds int64) string {
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh", days, hours)
+	}
+	return fmt.Sprintf("%dh %dm", hours, (seconds%3600)/60)
+}
+
+// Report prints what a machine said about itself: the sections one under the
+// other, sizes in what a person reads, times relative with the exact one beside
+// them. A section the collector could not determine stands there with its
+// reason rather than being passed over in silence.
+func Report(w io.Writer, r api.Report) {
+	now := time.Now()
+
+	// The line that answers the question somebody came with.
+	fmt.Fprintf(w, "%s  report %d  received %s (%s)\n",
+		r.Machine, r.Number, Ago(now, r.ReceivedAt), r.ReceivedAt.Format(time.RFC3339))
+
+	agent := ""
+	if r.Agent != nil {
+		agent = "ha " + *r.Agent
+	}
+	line(w, said("collected", r.CollectedAt.Format(time.RFC3339)), said("by", agent))
+
+	if h := r.Host; h != nil {
+		fmt.Fprintln(w)
+		line(w, maybe("hostname", h.Hostname), maybe("os", h.Os), maybe("kernel", h.Kernel), maybe("arch", h.Arch))
+		fields := []field{}
+		if h.UptimeSeconds != nil {
+			fields = append(fields, said("up", Uptime(*h.UptimeSeconds)))
+		}
+		if h.Load1 != nil && h.Load5 != nil && h.Load15 != nil {
+			fields = append(fields, said("load", fmt.Sprintf("%.2f %.2f %.2f", *h.Load1, *h.Load5, *h.Load15)))
+		}
+		line(w, fields...)
+	}
+
+	if m := r.Memory; m != nil {
+		fields := []field{}
+		if m.TotalBytes != nil && m.UsedBytes != nil {
+			fields = append(fields, said("memory", fmt.Sprintf("%s of %s used", Bytes(*m.UsedBytes), Bytes(*m.TotalBytes))))
+		} else if m.TotalBytes != nil {
+			fields = append(fields, said("memory", Bytes(*m.TotalBytes)))
+		}
+		if m.SwapTotalBytes != nil && *m.SwapTotalBytes > 0 && m.SwapUsedBytes != nil {
+			fields = append(fields, said("swap", fmt.Sprintf("%s of %s", Bytes(*m.SwapUsedBytes), Bytes(*m.SwapTotalBytes))))
+		}
+		line(w, fields...)
+	}
+
+	if r.Disks != nil && len(*r.Disks) > 0 {
+		fmt.Fprintln(w)
+		for _, disk := range *r.Disks {
+			percent := "  -"
+			if disk.Percent != nil {
+				percent = fmt.Sprintf("%3d%%", *disk.Percent)
+			}
+			size := ""
+			if disk.UsedBytes != nil && disk.SizeBytes != nil {
+				size = fmt.Sprintf("%s of %s", Bytes(*disk.UsedBytes), Bytes(*disk.SizeBytes))
+			}
+			fmt.Fprintf(w, "%s  %-24s %-20s %s\n", percent, or(disk.Mount), size, or(disk.Device))
+		}
+	}
+
+	if r.Containers != nil {
+		fmt.Fprintln(w)
+		running := 0
+		for _, container := range *r.Containers {
+			if container.State != nil && *container.State == "running" {
+				running++
+			}
+		}
+		fmt.Fprintf(w, "containers: %d of %d running\n", running, len(*r.Containers))
+		for _, container := range *r.Containers {
+			state := or(container.State)
+			if container.Health != nil && *container.Health != "" {
+				state += " (" + *container.Health + ")"
+			}
+			started := "-"
+			if container.StartedAt != nil {
+				started = Ago(now, *container.StartedAt)
+			}
+			restarts := "-"
+			if container.Restarts != nil {
+				restarts = fmt.Sprintf("%d", *container.Restarts)
+			}
+			fmt.Fprintf(w, "  %-20s %-44s %-20s %-16s restarts: %s\n",
+				or(container.Name), or(container.Image), state, started, restarts)
+		}
+	}
+
+	// What the collector could not determine is said, not swallowed: a report
+	// that quietly left something out would be read as a machine that has it
+	// not.
+	if len(r.Missing) > 0 {
+		fmt.Fprintln(w)
+		for _, missing := range r.Missing {
+			fmt.Fprintf(w, "%s: not determined (%s)\n", or(missing.Section), or(missing.Reason))
+		}
+	}
+
+	Drift(w, r.Drift)
+}
+
+// ReportSummaries prints the series: one line per report, enough to see when
+// something changed and then look into that one with `ha report show --number`.
+func ReportSummaries(w io.Writer, page api.ReportPage) {
+	now := time.Now()
+	for _, r := range page.Reports {
+		containers := "-"
+		if r.ContainersTotal != nil && r.ContainersRunning != nil {
+			containers = fmt.Sprintf("%d/%d", *r.ContainersRunning, *r.ContainersTotal)
+		}
+		disk := "-"
+		if r.DiskPercent != nil {
+			disk = fmt.Sprintf("%d%%", *r.DiskPercent)
+		}
+		load := "-"
+		if r.Load1 != nil {
+			load = fmt.Sprintf("%.2f", *r.Load1)
+		}
+		fmt.Fprintf(w, "%-6d %-20s %-8s %-6s %-6s %s\n",
+			r.Number, r.ReceivedAt.Format("2006-01-02 15:04"), containers, disk, load, Ago(now, r.ReceivedAt))
+	}
+}
+
+// Drift prints what the record and the machine disagree about: one sentence
+// per disagreement, naming both sides and how old each is.
+//
+// **Which side is right, ha does not say.** That is the decision ADR 0015
+// leaves to a person or an agent, and a CLI that picked one would be making it
+// for them.
+func Drift(w io.Writer, drift []api.Drift) {
+	if len(drift) == 0 {
+		return
+	}
+
+	now := time.Now()
+	fmt.Fprintln(w)
+	for _, one := range drift {
+		record := or(one.Record)
+		if one.RecordAt != nil {
+			record += " (" + Ago(now, *one.RecordAt) + ")"
+		}
+		fmt.Fprintf(w, "drift  %s %s: the record says %s, the machine reported %s (%s)\n",
+			one.Subject, one.Field, record, or(one.Reported), Ago(now, one.ReportedAt))
 	}
 }
