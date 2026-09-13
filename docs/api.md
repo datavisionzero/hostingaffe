@@ -345,11 +345,22 @@ report itself stays out
 
 **`context` is the one call an agent makes before it touches a host.** It
 answers `{ "key", "document" }`, and the document is Markdown, in this order:
-the machine and its fields; its installations, each with the version it runs,
-its ports, its file list and the last five deployments; the software those are
-installations of; the machine's own files; the pages that hang on the machine or
-on any of its installations; and the instance's `decision` pages — the rules
-that hold on every host.
+the machine and its fields; **what it last reported** and every drift; its
+installations, each with the version it runs, its ports, its file list and the
+last five deployments; the software those are installations of; the machine's
+own files; the pages that hang on the machine or on any of its installations;
+and the instance's `decision` pages — the rules that hold on every host.
+
+**The report comes second, and short.** An agent about to type `docker compose
+up` has to read it before, not after: when the machine last reported, the disks
+in one line, how many containers run of how many, every container that is *not*
+running, and the drift. What stays out is the full container table, memory and
+load in detail, and every older report — one `ha report show` away, and exactly
+the sort of content that fills a context window without changing a decision. A
+report **older than a day** is given with its age and said not to be the
+present, because an agent concluding from a three-week-old report what runs now
+is worse off than one that knows nothing. A machine that has never reported gets
+a sentence rather than an empty section.
 
 **File contents are not in it.** They are one read of a file away, and they are
 what would fill a context window. The measure is VISION 16: well under ten
