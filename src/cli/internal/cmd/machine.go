@@ -20,7 +20,8 @@ func newMachine(g *globals) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newMachineList(g), newMachineView(g), newMachineAdd(g), newMachineSet(g),
-		newMachineDelete(g), newMachineRestore(g), newMachineHistory(g), newMachineContext(g))
+		newMachineDelete(g), newMachineRestore(g), newMachineHistory(g), newMachineContext(g),
+		newMachineToken(g))
 	return cmd
 }
 

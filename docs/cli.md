@@ -191,7 +191,7 @@ user's own repository.
 
 | object | verbs |
 |---|---|
-| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context` |
+| `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context`, `token` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
@@ -282,6 +282,36 @@ on all three rows. `ha <object> history KEY` is where it is read back.
 from a file or from `-`, and naming both is exit 2. `view` prints the fields
 that are filled in and then the description as it is stored, so the output can
 be piped straight back into `--description-file -`.
+
+## The key a machine reports under
+
+```sh
+ha machine token issue ex44 [--rotate]
+ha machine token show ex44
+ha machine token revoke ex44
+```
+
+A **machine token** belongs to one machine and does one thing: hand in a report
+for that machine ([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+It reads nothing at all — not an installation, not a file, not even its own
+machine — which is why it is the one token that may lie on a host.
+
+`issue` prints the secret on **stdout** and the sentence about it on **stderr**,
+so that what a pipe carries into a file on the host is the token and nothing
+else. It is shown once: only the hash is kept, and whoever loses it issues a new
+one. A machine that already has a token is refused — exit 4 — unless `--rotate`
+says so, and rotating revokes the old one at once, so the cron on the host fails
+visibly at its next run rather than quietly carrying on under a key somebody
+meant to replace.
+
+`show` never shows a secret. It says whether there is a token, its prefix, who
+issued it and when it was last used — which is the answer to "is this machine
+still reporting, and is that the token's doing" — and where there is none, what
+became of the last one there was.
+
+**Issuing and revoking are a person's**, exit 7 for an agent, which administers
+no keys; `show` is open to both. Where the token belongs on the host, and the
+cron line that uses it, are in `operations.md`.
 
 **Retiring is not deleting** (`CONTEXT.md`, Retired and deleted). The normal end
 of a machine or an installation is `set KEY --status retired`, which keeps

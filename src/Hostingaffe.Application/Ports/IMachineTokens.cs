@@ -19,6 +19,13 @@ public interface IMachineTokens
     /// <summary>The live token of this machine, tracked, or nothing where it has none.</summary>
     Task<MachineToken?> LiveForAsync(Guid machineId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The live token of this machine, or the last one it had where there is
+    /// none: "is it still reporting, and is that the token's doing" is one
+    /// question, and a revoked row is half of the answer.
+    /// </summary>
+    Task<MachineToken?> MostRecentAsync(Guid machineId, CancellationToken cancellationToken);
+
     void Add(MachineToken token);
 
     Task SaveAsync(CancellationToken cancellationToken);

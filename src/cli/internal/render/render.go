@@ -433,3 +433,67 @@ func SearchHits(w io.Writer, hits []api.SearchHit) {
 			hit.Kind, address, hit.Where, Anchor(hit.Owner), hit.Name)
 	}
 }
+
+// Ago is how long ago something happened, as a person reads it: "12 minutes
+// ago", "6 days ago". No threshold and no judgement — `ha` says when, never
+// "stale" and never "silent", because a line the product drew would be the
+// wrong one for the next host (VISION 5).
+func Ago(now, at time.Time) string {
+	d := now.Sub(at)
+	if d < 0 {
+		return "just now"
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < 2*time.Minute:
+		return "1 minute ago"
+	case d < time.Hour:
+		return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+	case d < 2*time.Hour:
+		return "1 hour ago"
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d hours ago", int(d.Hours()))
+	case d < 48*time.Hour:
+		return "1 day ago"
+	default:
+		return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+	}
+}
+
+// MachineToken prints what a person asks when a machine has gone quiet: is
+// there a key, which one, who gave it out, and when it was last used. Never a
+// secret — only the hash is kept (ADR 0016).
+func MachineToken(w io.Writer, key string, t api.MachineToken) {
+	if !t.Present && t.RevokedAt == nil {
+		fmt.Fprintf(w, "%s has no token, and has never had one.\n", key)
+		return
+	}
+
+	now := time.Now()
+	if t.Present {
+		fmt.Fprintf(w, "%s  token %s…\n", key, *t.Prefix)
+	} else {
+		fmt.Fprintf(w, "%s  token %s… revoked\n", key, *t.Prefix)
+	}
+
+	fields := []field{said("issued", t.IssuedAt.Format(time.RFC3339))}
+	if t.IssuedBy != nil {
+		fields = append(fields, said("by", t.IssuedBy.Name))
+	}
+	line(w, fields...)
+
+	if t.LastUsedAt != nil {
+		line(w, said("last used", Ago(now, *t.LastUsedAt)+" ("+t.LastUsedAt.Format(time.RFC3339)+")"))
+	} else {
+		line(w, said("last used", "never"))
+	}
+
+	if t.RevokedAt != nil {
+		revoked := []field{said("revoked", t.RevokedAt.Format(time.RFC3339))}
+		if t.RevokedBy != nil {
+			revoked = append(revoked, said("by", t.RevokedBy.Name))
+		}
+		line(w, revoked...)
+	}
+}

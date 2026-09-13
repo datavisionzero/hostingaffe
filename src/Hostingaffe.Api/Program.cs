@@ -198,6 +198,9 @@ builder.Services.AddScoped<HandInReport>();
 builder.Services.AddScoped<ListReports>();
 builder.Services.AddScoped<ReadLatestReport>();
 builder.Services.AddScoped<ReadReport>();
+builder.Services.AddScoped<ReadMachineToken>();
+builder.Services.AddScoped<IssueMachineToken>();
+builder.Services.AddScoped<RevokeMachineToken>();
 
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();

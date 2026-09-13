@@ -31,6 +31,13 @@ public sealed class MachineTokens(HostingaffeDbContext context) : IMachineTokens
         context.MachineTokens.SingleOrDefaultAsync(
             token => token.MachineId == machineId && token.RevokedAt == null, cancellationToken);
 
+    public Task<MachineToken?> MostRecentAsync(Guid machineId, CancellationToken cancellationToken) =>
+        context.MachineTokens
+            .Where(token => token.MachineId == machineId)
+            .OrderByDescending(token => token.RevokedAt == null)
+            .ThenByDescending(token => token.IssuedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public void Add(MachineToken token) => context.MachineTokens.Add(token);
 
     public Task SaveAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);

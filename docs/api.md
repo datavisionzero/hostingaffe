@@ -296,6 +296,9 @@ collected in time is expired rather than approved.
 | `GET /api/machines/{key}/context` | everything recorded about it, as one Markdown document |
 | `GET /api/machines/{key}/history` | who changed what, oldest first |
 | `DELETE /api/machines/{key}`, `POST /api/machines/{key}/restore` | soft, with the cascade above |
+| `GET /api/machines/{key}/token` | whether it has a machine token, and what became of the last one |
+| `POST /api/machines/{key}/token` | issue one; `rotate=true` replaces an existing one |
+| `DELETE /api/machines/{key}/token` | revoke it |
 
 The key is the address and is **immutable**: `key` in a change body is
 `unknown-field`, not a rename. Both request objects are closed — a field they
@@ -320,6 +323,25 @@ Retiring, and deleting.
 
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
+
+**The machine token is the key a host reports under** and can do nothing else
+([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+`POST` answers `{ "machine", "prefix", "secret", "issued_at" }`, and **the
+secret is in that answer and nowhere afterwards** — only the hash is kept, so
+whoever loses it issues a new one. A machine that already has a token is
+`transition` unless the call says `rotate=true`; rotating revokes the old one
+in the same move, so the cron on the host fails visibly at its next run instead
+of quietly carrying on under a key somebody meant to replace.
+
+**Issuing and revoking are a user's acts**, `forbidden` for an agent, which
+administers no keys. Reading is not: `GET` carries no secret, only `present`,
+the prefix, who issued it and when, and when it was last used — and where there
+is no live token it describes the last one there was, so that "is this machine
+still reporting, and is that the token's doing" has one answer. Both writes
+**make a history row on the machine**, which is the one thing around reports
+that belongs in the history: a person changed what the machine may do. The
+report itself stays out
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
 
 **`context` is the one call an agent makes before it touches a host.** It
 answers `{ "key", "document" }`, and the document is Markdown, in this order:
