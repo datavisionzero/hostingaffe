@@ -45,6 +45,7 @@ material value to understanding the decision.
 - [0013 – Sync stays, because a directory has an owner](./0013-sync-stays-because-a-directory-has-an-owner.md)
 - [0014 – An installation depends on an installation, and the reverse is derived](./0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)
 - [0015 – A machine reports, and the record stays written](./0015-a-machine-reports-and-the-record-stays-written.md)
+- [0016 – A machine token posts one report and reads nothing](./0016-a-machine-token-posts-one-report-and-reads-nothing.md)
 
 ## Adopted from planaffe
 

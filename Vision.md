@@ -774,12 +774,23 @@ The identity model is planaffe's, minus the project dimension:
 - **An agent token is the agent.** It has a name, it is never an
   administrator, and an agent cannot create or read tokens. Every token reads
   everything and writes what it is told to.
-- **No token lives on a machine.** `files sync` runs under the token of the
-  agent that opened the SSH session, handed in as `HOSTINGAFFE_TOKEN` for that
-  session and written to no file on the host. A token stored on a machine
-  would hand whoever takes that machine the map of every other one, and a
-  read-only token would not change that — it still reads everything. A token
-  scoped to one machine is the roadmap answer (17.).
+- **No token that reads lives on a machine.** `files sync` runs under the
+  token of the agent that opened the SSH session, handed in as
+  `HOSTINGAFFE_TOKEN` for that session and written to no file on the host. A
+  token stored on a machine would hand whoever takes that machine the map of
+  every other one, and a read-only token would not change that — it still
+  reads everything.
+- **A machine token is the one exception, and it reads nothing.** It belongs
+  to exactly one machine and can do exactly one thing: hand in a report for
+  that machine (7). It reads no installation, no file, no page, no report, not
+  even its own machine. The criterion the rule above states is therefore still
+  met: whoever takes the machine gains the ability to lie about that machine,
+  which they already had, and nothing else. It is not an identity — no user,
+  no agent, no role; it appears in no `ha me` and in no history row, and a
+  report is attributed to the **machine**, which is not a who. One per
+  machine, stored hashed like every other token, issued and revoked by a
+  person and never by an agent
+  ([ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 - Sign-in, browser sessions, invitation and password recovery are what planaffe
   has, built the same way. What is this product's own is the **device login**:
   `ha login` prints a code, a user approves it at `/device` in a browser, and
@@ -818,8 +829,15 @@ attack surface, configuration included. Consequences:
   refuses, and the CLI warns when Markdown or a file on stdin contains
   something that looks like a private key or a token. That is a guard against
   accidents, not a security boundary.
-- No token is stored on a machine (9.). The one command that runs on a host
-  borrows the session's token and leaves nothing behind.
+- No token that reads is stored on a machine (9.). The one command that reads
+  and runs on a host, `files sync`, borrows the session's token and leaves
+  nothing behind. The one token that does live on a host, the machine token,
+  writes a report for its own machine and reads nothing at all, so a
+  compromised host is worth no more of the map than it was before — what it
+  buys an attacker is false reports about the machine they already hold, which
+  is why a report never changes the record
+  ([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md),
+  [ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 
 ## 11. What It Is Next To
 
@@ -1043,12 +1061,14 @@ built.
   does a homelab want `desktop` and `sbc`? Closed set either way.
 - **Versions.** Text, or a parsed version for sorting and "newer than"? Text
   until sorting is actually needed.
-- **Machine-scoped tokens.** In the MVP no token lives on a machine (9.), so a
-  host cannot sync its own files without an agent's session. A token that
-  reads one machine and writes nothing would allow that without turning a
-  compromised host into a map of the others. A merely read-only token would
-  not — it still reads everything. Whether the scoped kind is worth its
-  explanation is decided after the MVP.
+- **A machine-scoped token that reads.** Decided for the writing half and
+  still open for the reading one. A machine token exists, and it hands in a
+  report and reads nothing (9.,
+  [ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+  What that does not answer is `files sync` from the host itself, which needs a
+  token that reads one machine and its installations. The question is whether
+  that narrower kind is worth its explanation, or whether syncing from a host
+  without an agent's session is simply not something this product does.
 - **Cost.** A single `monthly_cost` on the machine is cheap and often asked
   for, and it is the first step onto a slope (currency, billing period,
   contracts). Deferred, not refused.

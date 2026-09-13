@@ -296,6 +296,17 @@ reads everything and writes what it is told to: one instance holds one team's
 infrastructure, and there is no role beyond the administrator who manages
 users, agents and tokens.
 
+A **machine token** is none of that. It belongs to one machine and can do one
+thing: hand in a report for that machine. It reads nothing — no installation,
+no file, no page, no report, not even its own machine — and it is **not an
+identity**: no user, no agent, no role, absent from `ha me` and from every
+history row. A report is attributed to the machine, and a machine is not a who
+([ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
+One per machine, hashed like every other token, issued and revoked by a person;
+an agent may see that one exists and never issue or revoke one. Issuing and
+revoking are history rows on the machine, because that is a person changing the
+record.
+
 A **device login** is one `ha login` in flight: the machine with no browser
 holds a **device code** and polls with it, and the person reads out a **user
 code** and approves it in a browser somewhere else
