@@ -128,7 +128,9 @@ src/api         the generated client and its wrapper
 
 `src/record` is the product's own screens (VISION 6.2): a list and a detail for
 each of the machines, the software and the installations, and one file screen
-serving both of the things a file can hang on. `Parts.tsx` holds the sections
+serving both of the things a file can hang on. `Reports.tsx` is the machine
+screen's other half — what the machine says about itself, the series of it, and
+the token it reports under. `Parts.tsx` holds the sections
 they share — a file list, the pages attached to something, the history, the
 guarded description — because those screens are the same screen several times
 over and a section that drifted on one of them would read like another product.

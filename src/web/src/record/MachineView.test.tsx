@@ -27,6 +27,7 @@ const machine = {
   ssh: "root@192.0.2.10",
   status: "active",
   measured_at: null,
+  last_seen: null,
   description: "The one that answers the website.",
   created_by: identity,
   updated_by: identity,
@@ -41,6 +42,12 @@ function view(routes: Parameters<typeof installInstance>[0] = {}) {
     "GET /api/machines/web-01/files": [],
     "GET /api/installations": [],
     "GET /api/pages": [],
+    "GET /api/machines/web-01/reports": { total: 0, reports: [] },
+    "GET /api/machines/web-01/reports/latest": { status: 404, body: { detail: "web-01 has never reported." } },
+    "GET /api/machines/web-01/token": {
+      present: false, prefix: null, issued_by: null, issued_at: null,
+      last_used_at: null, revoked_by: null, revoked_at: null,
+    },
     ...routes,
   });
 
