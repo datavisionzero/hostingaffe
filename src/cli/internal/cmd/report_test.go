@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // `collect` needs no token and no instance: it is the transparency path, and it
@@ -146,5 +147,136 @@ func TestReportSendRefusesATokenFileOthersCanRead(t *testing.T) {
 	}
 	if code, _, stderr := runWithout(t, server, "report", "send", "ex44", "--token-file", path); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+}
+
+const aStoredReport = `{"machine":"ex44","number":7,"received_at":"2026-09-13T08:00:09Z","collected_at":"2026-09-13T08:00:07Z","agent":"0.4.0",
+"host":{"hostname":"ex44","os":"Ubuntu 26.04 LTS","kernel":"6.14.0-27-generic","arch":"x86_64","uptime_seconds":1893244,"load1":0.14,"load5":0.2,"load15":0.18},
+"memory":{"total_bytes":67430400000,"used_bytes":19204000000,"available_bytes":46900000000,"swap_total_bytes":0,"swap_used_bytes":0},
+"disks":[{"mount":"/","device":"/dev/nvme0n1p2","size_bytes":502000000000,"used_bytes":301000000000,"percent":60}],
+"containers":[{"name":"logaffe","image":"ghcr.io/datavisionzero/logaffe:1.4.0","state":"running","status":"Up 3 days","health":"healthy","restarts":0,"started_at":"2026-09-10T09:12:00Z","ports":["127.0.0.1:18502->8080/tcp"]},
+{"name":"caddy","image":"caddy:2.10","state":"exited","status":"Exited (0)","health":null,"restarts":3,"started_at":null,"ports":[]}],
+"missing":[{"section":"disks","reason":"df is not on the PATH"}]}`
+
+func TestReportShowSetsTheSectionsOutForAPerson(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.URL.Path != "/api/machines/ex44/reports/latest" {
+			t.Fatalf("asked %s", r.URL.Path)
+		}
+		return 200, aStoredReport
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "report", "show", "ex44")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+
+	for _, want := range []string{
+		"ex44", "report 7", "Ubuntu 26.04 LTS", "load: 0.14 0.20 0.18",
+		"GB", "60%", "/dev/nvme0n1p2", "1 of 2 running",
+		"ghcr.io/datavisionzero/logaffe:1.4.0", "running (healthy)", "restarts: 3",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("%q is not in the output:\n%s", want, stdout)
+		}
+	}
+
+	// A section the collector could not determine is said, not swallowed.
+	if !strings.Contains(stdout, "disks: not determined (df is not on the PATH)") {
+		t.Fatalf("the missing section was passed over:\n%s", stdout)
+	}
+
+	// Sizes are what a person reads; the numbers are one --json away.
+	if strings.Contains(stdout, "502000000000") {
+		t.Fatalf("bytes reached a person's screen:\n%s", stdout)
+	}
+}
+
+func TestReportShowByNumberAsksForThatOne(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.URL.Path != "/api/machines/ex44/reports/3" {
+			t.Fatalf("asked %s", r.URL.Path)
+		}
+		return 200, aStoredReport
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	if code, _, stderr := run(t, server, "report", "show", "ex44", "--number", "3"); code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+}
+
+func TestReportListIsOneLinePerReport(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(r *http.Request) (int, string) {
+		if r.URL.Path != "/api/machines/ex44/reports" || r.URL.Query().Get("limit") != "2" {
+			t.Fatalf("asked %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		return 200, `{"total":2,"reports":[
+			{"number":7,"received_at":"2026-09-13T08:00:09Z","collected_at":"2026-09-13T08:00:07Z","containers_running":4,"containers_total":5,"disk_percent":91,"load1":0.14},
+			{"number":6,"received_at":"2026-09-13T07:45:09Z","collected_at":"2026-09-13T07:45:07Z","containers_running":5,"containers_total":5,"disk_percent":60,"load1":0.2}]}`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "report", "list", "ex44", "--limit", "2")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, want := range []string{"4/5", "91%", "5/5", "60%"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("%q is not in the output:\n%s", want, stdout)
+		}
+	}
+	if lines := strings.Count(strings.TrimSpace(stdout), "\n") + 1; lines != 2 {
+		t.Fatalf("%d lines for two reports:\n%s", lines, stdout)
+	}
+}
+
+// A machine that has never reported is not an error, and the sentence about it
+// goes to stderr so that a pipeline reads nothing on stdout.
+func TestReportListOfAMachineThatNeverReported(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
+		return 200, `{"total":0,"reports":[]}`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "report", "list", "ex44")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if strings.TrimSpace(stdout) != "" {
+		t.Fatalf("stdout said %q", stdout)
+	}
+	if !strings.Contains(stderr, "never reported") {
+		t.Fatalf("stderr said %q", stderr)
+	}
+}
+
+// `last seen` is a time and never a judgement: no threshold, no word like
+// "stale" (VISION 5).
+func TestMachineListSaysWhenEachLastSpoke(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
+		return 200, `[{"key":"ex44","name":"ex44","kind":"dedicated","status":"active","provider":"hetzner","location":"fsn1-dc14","arch":"amd64","measured_at":null,"last_seen":"` +
+			time.Now().Add(-12*time.Minute).UTC().Format(time.RFC3339) + `","updated_at":"2026-09-13T08:00:00Z"},
+			{"key":"cx22","name":"cx22","kind":"vps","status":"active","provider":null,"location":null,"arch":null,"measured_at":null,"last_seen":null,"updated_at":"2026-09-13T08:00:00Z"}]`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "machine", "list")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "12 minutes ago") {
+		t.Fatalf("nothing said about when ex44 last spoke:\n%s", stdout)
+	}
+	for _, judgement := range []string{"stale", "silent", "down", "OK"} {
+		if strings.Contains(stdout, judgement) {
+			t.Fatalf("%q is a judgement, and the CLI makes none:\n%s", judgement, stdout)
+		}
 	}
 }

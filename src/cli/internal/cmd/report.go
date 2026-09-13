@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/api"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/client"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/collect"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/config"
@@ -26,7 +27,7 @@ func newReport(g *globals) *cobra.Command {
 		Short:   "What a machine says about itself: collected on the host, handed in, and read back.",
 		Aliases: []string{"reports"},
 	}
-	cmd.AddCommand(newReportCollect(g), newReportSend(g))
+	cmd.AddCommand(newReportCollect(g), newReportSend(g), newReportShow(g), newReportList(g))
 	return cmd
 }
 
@@ -143,4 +144,94 @@ func (g *globals) reporting(tokenFile string) (*client.Client, error) {
 	}
 
 	return client.New(address, token, g.httpClient())
+}
+
+// newReportShow is what somebody reads when they want to know how a machine was
+// doing: the last report, or one of the series by its number.
+func newReportShow(g *globals) *cobra.Command {
+	var number int
+	cmd := &cobra.Command{
+		Use: "show KEY", Short: "The machine's last report, set out for a person. --number reads one of the series.", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, c, err := g.load()
+			if err != nil {
+				return err
+			}
+
+			var report *api.Report
+			if cmd.Flags().Changed("number") {
+				resp, err := c.ReadReportWithResponse(cmd.Context(), args[0], int32(number))
+				if err != nil {
+					return client.Transport(err)
+				}
+				if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+					return err
+				}
+				report = resp.JSON200
+			} else {
+				resp, err := c.ReadLatestReportWithResponse(cmd.Context(), args[0])
+				if err != nil {
+					return client.Transport(err)
+				}
+				if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+					return err
+				}
+				report = resp.JSON200
+			}
+
+			if g.json {
+				return render.JSON(cmd.OutOrStdout(), report)
+			}
+			render.Report(cmd.OutOrStdout(), *report)
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&number, "number", 0, "one report of the series rather than the last one")
+	return cmd
+}
+
+// newReportList is the series: one line per report, enough to see when
+// something changed and then look into that one.
+func newReportList(g *globals) *cobra.Command {
+	var limit, offset int
+	cmd := &cobra.Command{
+		Use: "list KEY", Short: "The machine's reports, newest first: when, how many containers ran, how full, how busy.", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, c, err := g.load()
+			if err != nil {
+				return err
+			}
+
+			params := &api.ListReportsParams{}
+			if cmd.Flags().Changed("limit") {
+				narrowed := int32(limit)
+				params.Limit = &narrowed
+			}
+			if cmd.Flags().Changed("offset") {
+				skipped := int32(offset)
+				params.Offset = &skipped
+			}
+
+			resp, err := c.ListReportsWithResponse(cmd.Context(), args[0], params)
+			if err != nil {
+				return client.Transport(err)
+			}
+			if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+				return err
+			}
+
+			if g.json {
+				return render.JSON(cmd.OutOrStdout(), resp.JSON200)
+			}
+			if resp.JSON200.Total == 0 {
+				fmt.Fprintf(cmd.ErrOrStderr(), "ha: %s has never reported. docs/operations.md says how to set that up.\n", args[0])
+				return nil
+			}
+			render.ReportSummaries(cmd.OutOrStdout(), *resp.JSON200)
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&limit, "limit", 0, "how many at most; 50 by default and never more than 200")
+	cmd.Flags().IntVar(&offset, "offset", 0, "how many to skip, to walk further back")
+	return cmd
 }

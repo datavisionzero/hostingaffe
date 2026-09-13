@@ -329,6 +329,37 @@ anyway.
 **`ha` writes no crontab entry and no systemd unit.** Files end where execution
 begins (VISION 13); `operations.md` shows both ways to set it up, to copy.
 
+## Reading what a machine said
+
+```sh
+ha report show ex44 [--number N]       # the last report, or one of the series
+ha report list ex44 [--limit N]        # the series, newest first
+```
+
+`show` sets the report out the way `ha machine view` sets out a machine: the
+sections one under the other, sizes in what a person reads rather than in bytes,
+percentages as percentages, times relative with the exact one beside them, and
+the containers as a table — name, image with its tag, state, since when, how
+often it restarted. A section the collector could not determine stands there
+with its reason: `disks: not determined (df is not on the PATH)`. The line at
+the top answers the question somebody came with — when this report arrived.
+`--json` prints the body as the API answered it, like everywhere else.
+
+`list` is one line per report out of the summary the API serves: when, how many
+containers ran of how many, the highest disk percentage, and the load. Enough to
+see that something changed on the 3rd, and then `show --number` to look.
+
+**`last seen` is on `ha machine list` and `ha machine view`**, relative — "12
+minutes ago", "6 days ago" — and empty where nothing ever came. In `view` it
+stands beside `measured`, because the two mean different things: `measured` is
+when a person last checked the facts, `last seen` is when the machine last spoke
+for itself.
+
+**No threshold, no colour, no judgement.** `ha` does not say "stale" and does
+not say "silent"; it says when. Whoever set up a quarter of an hour sees what
+"6 days ago" means, and a line the product drew would be the wrong one for the
+next host (VISION 5).
+
 ## The key a machine reports under
 
 ```sh
