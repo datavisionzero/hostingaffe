@@ -68,6 +68,8 @@ to message on `validation`.
 | `stale` | 412 | `If-Match` did not match; `current` carries the object |
 | `transition` | 422 | the object's state does not allow the act — restoring what is not deleted, deleting a software that still has installations (`installations` says how many), deleting an installation or a machine that others depend on (`dependents` says how many) |
 | `smtp-not-configured` | 422 | the act needs a mail and the instance sends none |
+| `too-large` | 413 | the body is over what that endpoint takes; `limit` says what that was |
+| `rate-limited` | 429 | that arrived again too soon; `retry_after` says in how many seconds |
 | `internal` | 500 | a bug; the document carries nothing else |
 
 ### Exit codes of the CLI
@@ -157,6 +159,11 @@ The line of [VISION 9](../Vision.md#9-users-and-permissions):
   token never carries the administrator role.
 - An administrator invites users, grants and revokes the administrator role,
   deactivates and reactivates, and configures the instance.
+- **A machine token is not an identity and reads nothing.** It authenticates
+  one call — handing in a report for its own machine — and every other endpoint
+  refuses it, reads included. A user token and an agent token are refused at
+  that one call in turn, so the two doors never fall through to each other
+  ([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 
 ## Retiring, and deleting
 
@@ -574,6 +581,69 @@ again. So are `number`, `previous`, `files` and `status`.
 deployment is not necessarily who deployed. `ticket` is a planaffe key like
 `LOG-42` and stays a string: a reference to the other product, not a word of
 this model.
+
+### Reports
+
+What a machine said about itself at a moment: a sample beside the record, and
+never a field of it
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+| | |
+|---|---|
+| `POST /api/machines/{key}/reports` | hand one in; **the machine's token and nothing else** |
+
+**The one write of the feature, and the narrowest door in the API.** It is
+authenticated with the machine token of that machine: a user token and an agent
+token are `unauthenticated` here, because somebody who could post a report by
+hand could forge the drift comparison with nothing showing anywhere. A machine
+token for another machine is refused too, and the answer does not distinguish
+"there is no such machine" from "that one is not yours" — a token that could
+enumerate keys would read something, and this one reads nothing.
+
+```json
+{
+  "collected_at": "2026-09-13T08:00:07Z",
+  "agent": "0.4.0",
+  "host": { "hostname": "ex44", "os": "Ubuntu 26.04 LTS", "kernel": "6.14.0-27-generic",
+            "arch": "x86_64", "uptime_seconds": 1893244, "load1": 0.14, "load5": 0.2, "load15": 0.18 },
+  "memory": { "total_bytes": 67430400000, "used_bytes": 19204000000,
+              "available_bytes": 46900000000, "swap_total_bytes": 0, "swap_used_bytes": 0 },
+  "disks": [ { "mount": "/", "device": "/dev/nvme0n1p2",
+               "size_bytes": 502000000000, "used_bytes": 301000000000, "percent": 60 } ],
+  "containers": [ { "name": "logaffe", "image": "ghcr.io/datavisionzero/logaffe:1.4.0",
+                    "state": "running", "status": "Up 3 days", "health": "healthy",
+                    "restarts": 0, "started_at": "2026-09-10T09:12:00Z",
+                    "ports": ["127.0.0.1:18502->8080/tcp"] } ],
+  "missing": []
+}
+```
+
+**Every section may be left out**, and a host without Docker reports no
+containers instead of failing — it says so in `missing`, as
+`{"section": "containers", "reason": "docker is not installed"}`. The shape is
+**closed, section by section**: a field the contract does not define is
+`unknown-field` rather than ignored, which is what keeps the body from becoming
+a collecting bin.
+
+**Numbers are numbers** — bytes, never `42G` — and times are RFC 3339 like
+everywhere else. A container's `image` carries its **tag**, where a software's
+`image` carries none: the tag is the thing worth comparing.
+
+**The instance sets `received_at` itself** and does not trust the host's clock.
+`collected_at` is kept as it came, and the order of reports and a machine's
+`last_seen` are read from `received_at`. A `collected_at` far in the future is
+stored rather than refused: denying a machine with a wrong clock its sign of
+life would be the worse answer.
+
+**At the door:** a body over **64 KB** is `too-large`, with `limit` saying what
+it was, and more than **one report per machine per minute** is `rate-limited`,
+with `retry_after` saying how long. Neither guards against an attacker holding a
+valid token — it can lie about its own machine whatever it does — they guard
+against a cron running amok and a collector that appended something large.
+
+**Nothing else happens.** No field of the machine is set, no history row is
+written, no deployment appears, nothing on an installation is touched. The
+answer is `{ "number", "received_at" }`, which is all a cron has any use for.
 
 ### Importing
 

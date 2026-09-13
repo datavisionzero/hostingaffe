@@ -78,6 +78,12 @@ public static class OpenApiDocument
                     || type == typeof(WriteFileRequest)
                     || type == typeof(RecordDeploymentRequest)
                     || type == typeof(CorrectDeploymentRequest)
+                    || type == typeof(HandInReportRequest)
+                    || type == typeof(HostSectionRequest)
+                    || type == typeof(MemorySectionRequest)
+                    || type == typeof(DiskRequest)
+                    || type == typeof(ContainerRequest)
+                    || type == typeof(MissingRequest)
                     || type == typeof(CreatePageRequest))
                 {
                     schema.AdditionalPropertiesAllowed = false;

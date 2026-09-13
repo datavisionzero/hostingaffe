@@ -14,7 +14,8 @@ const (
 	Usage = 2
 	// NotFound is 404 not-found and 404 deleted.
 	NotFound = 3
-	// Refused is 400 validation and every 422.
+	// Refused is 400 validation, every 422, a 413 over an endpoint's limit, and
+	// a 429 that arrived too soon.
 	Refused = 4
 	// Conflict is 409: idempotency-mismatch, email-exists, last-administrator.
 	Conflict = 5
@@ -49,7 +50,10 @@ func FromResponse(status int, p *problem.Problem) int {
 	// "your request was wrong" that 400 usually is (ADR 0005).
 	case status == 400 && (p.Code() == "device-denied" || p.Code() == "device-expired"):
 		return Denied
-	case status == 400 || status == 422:
+	// A body over what the endpoint takes, and one that arrived again too soon,
+	// are both "as sent, this does not go through" — the same answer a
+	// validation is, and not the "something is broken" of Unexpected.
+	case status == 400 || status == 413 || status == 422 || status == 429:
 		return Refused
 	case status == 409:
 		return Conflict

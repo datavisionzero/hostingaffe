@@ -90,6 +90,7 @@ catch (ArgumentException refusal)
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<AuthenticateToken>();
+builder.Services.AddScoped<AuthenticateMachineToken>();
 builder.Services.AddScoped<BootstrapTheInstance>();
 builder.Services.AddScoped<ReadMe>();
 builder.Services.AddScoped<ReportAgentMetadata>();
@@ -191,6 +192,10 @@ builder.Services.AddScoped<MoveInstallation>();
 builder.Services.AddScoped<MoveFile>();
 builder.Services.AddScoped<MoveDeployment>();
 
+// What a machine says about itself, beside the record and never in it
+// (VISION 7, ADR 0015).
+builder.Services.AddScoped<HandInReport>();
+
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();
 builder.Services.AddScoped<ListPages>();
@@ -208,6 +213,7 @@ builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<BootstrapService>();
 
 builder.Services.AddHostingaffeTokenAuthentication();
+builder.Services.AddHostingaffeMachineAuthentication();
 builder.Services.AddHostingaffeOpenApi();
 
 // JSON in, JSON out, snake_case fields (docs/api.md, Conventions). Enums travel
@@ -250,6 +256,10 @@ app.UseHostingaffeVersion();
 // what keeps a later reordering from silently moving it in front.
 app.UseRouting();
 
+// Before a body is read, and therefore before binding: what an endpoint says it
+// takes is refused at the door rather than after the cost was already paid.
+app.UseHostingaffeBodyLimit();
+
 app.UseAuthentication();
 app.UseMiddleware<BrowserCsrfMiddleware>();
 app.UseHostingaffeIdempotency();
@@ -275,6 +285,7 @@ api.MapSoftware();
 api.MapInstallations();
 api.MapFiles();
 api.MapDeployments();
+api.MapReports();
 api.MapPages();
 api.MapSearch();
 api.MapImport();

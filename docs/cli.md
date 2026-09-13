@@ -156,7 +156,7 @@ a number rather than on a sentence:
 | 1 | unexpected: a 500, an answer `ha` cannot parse, a bug in `ha` |
 | 2 | usage: bad arguments, no instance, no token, a malformed address, a token file others can read |
 | 3 | not found, deleted included |
-| 4 | refused: validation, and every 422 |
+| 4 | refused: validation, every 422, a body over an endpoint's limit, and one that arrived again too soon |
 | 5 | conflict: `idempotency-mismatch`, `email-exists`, `last-administrator` |
 | 6 | stale: `If-Match` did not match |
 | 7 | denied: 401, 403, and a device login somebody refused or let expire |

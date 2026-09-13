@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using Hostingaffe.Domain.Identities;
+using Hostingaffe.Domain.Machines;
 
 namespace Hostingaffe.IntegrationTests;
 
@@ -53,6 +55,26 @@ internal sealed class AnInstance(
         context.Users.Add(user);
         context.Tokens.Add(Token.Issue(user, secret, now));
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return secret;
+    }
+
+    /// <summary>
+    /// A machine token, put in the database the way the endpoint of ADR 0016
+    /// would — so that a test about reporting does not depend on the test about
+    /// issuing.
+    /// </summary>
+    public async Task<string> AddMachineTokenAsync(string machineKey)
+    {
+        await using var context = Migrated.ContextFor(connectionString);
+
+        var machine = await context.Machines.SingleAsync(
+            one => one.Key == machineKey, TestContext.Current.CancellationToken);
+        var issuer = await context.Identities.FirstAsync(TestContext.Current.CancellationToken);
+
+        var secret = TokenSecret.Generate();
+        context.MachineTokens.Add(MachineToken.Issue(machine.Id, secret, issuer.Id, DateTimeOffset.UtcNow));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
         return secret;
     }
 
