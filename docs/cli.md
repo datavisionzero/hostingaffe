@@ -196,6 +196,7 @@ user's own repository.
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
+| `ha report` | `collect` and `send` on the host itself; `show` and `list` from anywhere |
 | `ha search` | one call over every field, every Markdown body and every file |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history`, `check` |
@@ -282,6 +283,51 @@ on all three rows. `ha <object> history KEY` is where it is read back.
 from a file or from `-`, and naming both is exit 2. `view` prints the fields
 that are filled in and then the description as it is stored, so the output can
 be piped straight back into `--description-file -`.
+
+## Reporting from a host
+
+```sh
+ha report collect                      # gather and print; nothing is sent
+ha report send [KEY] [--quiet]         # gather and hand in
+```
+
+These two run **on** the machine they are about, and they are the only commands
+that do besides `ha files sync`. `collect` is the transparency path and comes
+first for that reason: it prints exactly what `send` would hand in, needs
+neither token nor instance, and runs on a host with no network.
+
+**What is never collected: no container environment, no process command lines,
+no file contents, no labels of arbitrary content.** That is not a convenience
+rule — it is the line that keeps secret values out of the record, and it is
+written here so that somebody can check it against `ha report collect` without
+reading the code.
+
+The collector needs no root beyond the docker group for the socket, installs
+nothing, and uses only what lies on every Linux host: `/proc/uptime`,
+`/proc/loadavg`, `/proc/meminfo`, `/proc/mounts`, `/etc/os-release`, `uname`,
+`df`, and `docker ps` where there is a Docker. Where `/proc` can answer, `/proc`
+is read rather than a command run, and every command has a short timeout so that
+a hanging `docker` cannot hold the run.
+
+**A section it could not determine is not a failure.** A host without Docker
+reports no containers, says why in `missing`, and `send` still exits 0: the sign
+of life is the point, and a cron that failed over a missing section is one
+somebody switches off within a fortnight.
+
+`send` reads the machine token from `HOSTINGAFFE_TOKEN` or from the file
+`--token-file` names, and touches no keychain — a server has none. Which machine
+this host is comes from the argument or from `HOSTINGAFFE_MACHINE` beside the
+token; the token cannot say, because it reads nothing at all. `--quiet` says
+nothing on success so that a cron writes no mail every quarter of an hour, and
+errors go to stderr regardless: exit 7 for a token the instance will not take,
+10 for an instance it could not reach, 9 for a version skew.
+
+**A failed run is not caught up.** No buffer, no queue, no file of unsent
+reports: the next run is a quarter of an hour away and is the more current one
+anyway.
+
+**`ha` writes no crontab entry and no systemd unit.** Files end where execution
+begins (VISION 13); `operations.md` shows both ways to set it up, to copy.
 
 ## The key a machine reports under
 

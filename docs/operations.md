@@ -135,10 +135,12 @@ machine's files each say which directory on the machine they lie in, and sync
 writes one; `ha files list --machine KEY` is where that question is answered,
 and `ha files get` is what puts one of them in place (ADR 0008).
 
-**Nothing on the host holds a token.** There is no configuration file to leave
+**No token that reads is on the host.** There is no configuration file to leave
 one in — the two environment variables come from the SSH session and go with
 it, which is why a host that is handed on carries no credentials of this
-instance.
+instance. The one token that does live on a host is the machine token below,
+and it reads nothing at all
+([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 
 It keeps `.ha-sync.json` beside the files. That file is the only state outside
 Postgres, and it is what tells a file sync wrote from one that was always
@@ -151,6 +153,114 @@ A run that reports `in the way` exits 5 and has left something as it found it:
 the record and the disk disagree about that path, and a person decides which is
 right. Take the file into the record with `ha files put`, or take it out of the
 directory.
+
+## A machine that reports for itself
+
+A host can hand in a **report** every quarter of an hour: a sign of life, plus
+disk usage, memory, load and what Docker runs. The record stays written and the
+report stays beside it — nothing here changes a field
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+Setting it up is three steps, and none of them is automated: `ha` writes no
+crontab entry and no systemd unit, because files end where execution begins
+([VISION 13](../Vision.md#13-where-structure-stops)).
+
+**1. See what would leave the host.** On the machine, before anything is sent
+and without a token:
+
+```sh
+ha report collect
+```
+
+It prints the JSON `ha report send` would hand in. What it never carries: no
+container environment, no process command lines, no file contents. That is the
+same line that keeps secret values out of the record, and `collect` is how
+anyone checks it without reading the code.
+
+**2. Issue the machine its token**, from wherever you work — not on the host:
+
+```sh
+ha machine token issue ex44 > /tmp/ex44.token   # the secret is printed once
+```
+
+Put it on the host in a file of its own, owned by whoever runs the timer:
+
+```sh
+install -m 600 /dev/null /etc/hostingaffe.env
+cat >> /etc/hostingaffe.env <<'EOF'
+HOSTINGAFFE_URL=https://hosts.example.org
+HOSTINGAFFE_TOKEN=ha_…
+HOSTINGAFFE_MACHINE=ex44
+EOF
+```
+
+The token belongs to that one machine and can do one thing: hand in a report for
+it. It reads nothing — not an installation, not a file, not even its own machine
+— which is why it may lie there at all. `HOSTINGAFFE_MACHINE` says which machine
+this host is, because the token cannot: a token that could tell `ha` the key
+would be reading something.
+
+**3. Run it every quarter of an hour.** With cron:
+
+```cron
+*/15 * * * * . /etc/hostingaffe.env && /usr/local/bin/ha report send --quiet
+```
+
+Or with a systemd timer, on a host that has no cron:
+
+```ini
+# /etc/systemd/system/hostingaffe-report.service
+[Unit]
+Description=Hand in a report to hostingaffe
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/hostingaffe.env
+ExecStart=/usr/local/bin/ha report send --quiet
+```
+
+```ini
+# /etc/systemd/system/hostingaffe-report.timer
+[Unit]
+Description=Hand in a report to hostingaffe every quarter of an hour
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
+```
+
+```sh
+systemctl enable --now hostingaffe-report.timer
+```
+
+**Checking that it arrives.** From wherever you work:
+
+```sh
+ha machine list                  # the `last seen` column
+ha report show ex44              # the last report, as a person reads it
+ha machine token show ex44       # when the token was last used, if it was
+```
+
+**A run that fails is not caught up.** There is no buffer and no queue: the next
+run is a quarter of an hour away and is the more current one anyway. `--quiet`
+says nothing on success so that cron writes no mail every quarter of an hour;
+failures go to stderr regardless, and the exit code says which half is wrong —
+7 for a token the instance will not take, 10 for an instance it could not reach,
+9 for a version skew.
+
+**A section the collector could not determine is not a failure.** A host without
+Docker reports no containers, says why, and exits 0 — the sign of life is the
+point, and a cron that failed over a missing section would be switched off
+within a fortnight.
+
+**Rotating and revoking.** `ha machine token issue ex44 --rotate` replaces the
+token and revokes the old one at once, so the host fails visibly at its next run
+until the new secret is in the file; `ha machine token revoke ex44` takes it back
+for good. The reports a machine has already handed in stay.
 
 ## When something is wrong
 

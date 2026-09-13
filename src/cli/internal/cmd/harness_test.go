@@ -143,3 +143,20 @@ func TestAnArgumentMistakeIsExitTwo(t *testing.T) {
 		}
 	}
 }
+
+// runWithout is `run` with no token in the environment: for the commands that
+// read one from somewhere else — a machine reporting under a token in a file of
+// its own (ADR 0016).
+func runWithout(t *testing.T, server *httptest.Server, args ...string) (code int, stdout, stderr string) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	code = Run(context.Background(), args, Env{
+		Getenv:   environment(t, map[string]string{"HOSTINGAFFE_URL": server.URL}),
+		Stdin:    strings.NewReader(""),
+		Stdout:   &out,
+		Stderr:   &errOut,
+		HTTP:     server.Client(),
+		Keychain: &memory{},
+	})
+	return code, out.String(), errOut.String()
+}
