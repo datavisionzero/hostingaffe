@@ -44,6 +44,7 @@ material value to understanding the decision.
 - [0012 – A path is found by its letters, not by its words](./0012-a-path-is-found-by-its-letters-not-by-its-words.md)
 - [0013 – Sync stays, because a directory has an owner](./0013-sync-stays-because-a-directory-has-an-owner.md)
 - [0014 – An installation depends on an installation, and the reverse is derived](./0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)
+- [0015 – A machine reports, and the record stays written](./0015-a-machine-reports-and-the-record-stays-written.md)
 
 ## Adopted from planaffe
 
