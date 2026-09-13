@@ -591,6 +591,9 @@ never a field of it
 | | |
 |---|---|
 | `POST /api/machines/{key}/reports` | hand one in; **the machine's token and nothing else** |
+| `GET /api/machines/{key}/reports` | the series, newest first, as slim `ReportSummary`; `limit` defaults to 50 and never exceeds 200, `offset` walks back |
+| `GET /api/machines/{key}/reports/latest` | the latest one, whole |
+| `GET /api/machines/{key}/reports/{number}` | one by its number, whole |
 
 **The one write of the feature, and the narrowest door in the API.** It is
 authenticated with the machine token of that machine: a user token and an agent
@@ -644,6 +647,34 @@ against a cron running amok and a collector that appended something large.
 **Nothing else happens.** No field of the machine is set, no history row is
 written, no deployment appears, nothing on an installation is touched. The
 answer is `{ "number", "received_at" }`, which is all a cron has any use for.
+
+**Reading is ordinary.** The three `GET`s take a user or agent token like
+everything else, because everyone in the instance sees everything
+([VISION 9](../Vision.md#9-users-and-permissions)). A **machine token reaches
+none of them**, its own machine's reports included.
+
+The series answers `{ "total", "reports" }`, and a `ReportSummary` is what a
+list makes a line of: `number`, `received_at`, `collected_at`, how many
+containers run of how many, the highest disk percentage, and `load1`. All of it
+is counted from the body on read; none of it is stored beside the body it is
+counted from. That is enough for "on the 3rd the disk went from 60 to 91 per
+cent" without fetching two hundred whole bodies to see it.
+
+A machine that has never reported answers `not-found` on `latest` and an
+**empty list** on the series. That is not an error: it is the ordinary state of
+a machine on which no cron has been set up.
+
+**`last_seen` is on the machine**, in `GET /api/machines/{key}` and in the
+`MachineSummary` of the list, so that an overview does not ask once per row. It
+is the `received_at` of the latest report, derived and never written, and it is
+absent where a machine has never reported. It stands beside `measured_at` and
+means something else — `measured_at` is when a person last checked the facts.
+
+**What is not here:** no filter over the contents of a body, no aggregate, no
+time window beyond the ordinary paging, and no search in reports. `GET
+/api/search` goes over the record, and a report is not the record; whoever wants
+an evaluation has a monitoring tool for it
+([VISION 5](../Vision.md#5-non-goals-deliberate-boundaries)).
 
 ### Importing
 

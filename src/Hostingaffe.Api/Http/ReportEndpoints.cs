@@ -47,6 +47,29 @@ public static class ReportEndpoints
             .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        var reading = endpoints.MapGroup("/machines/{key}/reports")
+            .RequireAuthorization()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        reading.MapGet(
+                string.Empty,
+                (string key, int? limit, int? offset, ListReports list, CancellationToken cancellationToken) =>
+                    list.ExecuteAsync(key, limit, offset, cancellationToken))
+            .WithName("ListReports")
+            .WithSummary("The machine's reports, newest by `received_at` first, as the slim summary a list makes a line of. `limit` defaults to 50 and never exceeds 200; `offset` walks back. A machine that has never reported answers with an empty list, which is the ordinary state of one on which no cron has been set up.")
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        reading.MapGet("/latest", (string key, ReadLatestReport read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, cancellationToken))
+            .WithName("ReadLatestReport")
+            .WithSummary("The machine's latest report, whole. A machine that has never reported is `not-found` here.");
+
+        reading.MapGet("/{number:int}", (string key, int number, ReadReport read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, number, cancellationToken))
+            .WithName("ReadReport")
+            .WithSummary("One report by its number, whole. A number the sweep has taken is `not-found`, and numbers are never handed out twice.");
+
         return endpoints;
     }
 }

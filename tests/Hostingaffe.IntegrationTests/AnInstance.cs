@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Machines;
+using Hostingaffe.Domain.Reports;
 
 namespace Hostingaffe.IntegrationTests;
 
@@ -76,6 +77,31 @@ internal sealed class AnInstance(
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return secret;
+    }
+
+    /// <summary>
+    /// Reports put in beside the door, a quarter of an hour apart from
+    /// <paramref name="from"/>: the endpoint takes one a minute, and a test
+    /// about a series needs several without waiting for the clock.
+    /// </summary>
+    public async Task AddReportsAsync(string machineKey, DateTimeOffset from, int count)
+    {
+        await using var context = Migrated.ContextFor(connectionString);
+
+        var machine = await context.Machines.SingleAsync(
+            one => one.Key == machineKey, TestContext.Current.CancellationToken);
+
+        var next = await context.Reports
+            .Where(report => report.MachineId == machine.Id)
+            .MaxAsync(report => (int?)report.Number, TestContext.Current.CancellationToken) ?? 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            var at = from.AddMinutes(15 * i);
+            context.Reports.Add(Report.Record(machine.Id, ++next, at, at, "0.4.0", ReportBody.Empty));
+        }
+
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     /// <summary>

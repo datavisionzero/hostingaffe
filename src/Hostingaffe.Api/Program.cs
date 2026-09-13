@@ -195,6 +195,9 @@ builder.Services.AddScoped<MoveDeployment>();
 // What a machine says about itself, beside the record and never in it
 // (VISION 7, ADR 0015).
 builder.Services.AddScoped<HandInReport>();
+builder.Services.AddScoped<ListReports>();
+builder.Services.AddScoped<ReadLatestReport>();
+builder.Services.AddScoped<ReadReport>();
 
 // The flat wiki (VISION 7, ADR 0021): the instance's pages, addressed by slug.
 builder.Services.AddScoped<PageAssembler>();

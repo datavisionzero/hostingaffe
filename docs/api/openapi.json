@@ -4657,6 +4657,193 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The machine's reports, newest by `received_at` first, as the slim summary a list makes a line of. `limit` defaults to 50 and never exceeds 200; `offset` walks back. A machine that has never reported answers with an empty list, which is the ordinary state of one on which no cron has been set up.",
+        "operationId": "ListReports",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/reports/latest": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "The machine's latest report, whole. A machine that has never reported is `not-found` here.",
+        "operationId": "ReadLatestReport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machines/{key}/reports/{number}": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "One report by its number, whole. A number the sweep has taken is `not-found`, and numbers are never handed out twice.",
+        "operationId": "ReadReport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/pages": {
@@ -5890,6 +6077,61 @@
         },
         "additionalProperties": false
       },
+      "ContainerState": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "health": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "restarts": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "started_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "CorrectDeploymentRequest": {
         "type": "object",
         "properties": {
@@ -6606,6 +6848,41 @@
         },
         "additionalProperties": false
       },
+      "DiskUsage": {
+        "type": "object",
+        "properties": {
+          "mount": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "size_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "percent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "EmailChangeRequest": {
         "required": [
           "email"
@@ -6860,6 +7137,63 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "HostSection": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "os": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kernel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "arch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "uptime_seconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "load1": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load5": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load15": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         }
       },
@@ -7770,6 +8104,7 @@
           "ssh",
           "status",
           "measured_at",
+          "last_seen",
           "description",
           "created_by",
           "updated_by",
@@ -7885,6 +8220,13 @@
             ],
             "format": "date-time"
           },
+          "last_seen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "description": {
             "type": "string"
           },
@@ -7938,6 +8280,7 @@
           "location",
           "arch",
           "measured_at",
+          "last_seen",
           "updated_at"
         ],
         "type": "object",
@@ -7977,6 +8320,13 @@
             ]
           },
           "measured_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "last_seen": {
             "type": [
               "null",
               "string"
@@ -8061,6 +8411,46 @@
           }
         }
       },
+      "MemorySection": {
+        "type": "object",
+        "properties": {
+          "total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "available_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_total_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "swap_used_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "MemorySectionRequest": {
         "type": "object",
         "properties": {
@@ -8119,6 +8509,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "MissingSection": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
       },
       "Monitoring": {
         "enum": [
@@ -8424,6 +8825,107 @@
           }
         }
       },
+      "Report": {
+        "required": [
+          "machine",
+          "number",
+          "received_at",
+          "collected_at",
+          "agent",
+          "host",
+          "memory",
+          "disks",
+          "containers",
+          "missing"
+        ],
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "host": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HostSection"
+              }
+            ]
+          },
+          "memory": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MemorySection"
+              }
+            ]
+          },
+          "disks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DiskUsage"
+            }
+          },
+          "containers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ContainerState"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingSection"
+            }
+          }
+        }
+      },
+      "ReportPage": {
+        "required": [
+          "total",
+          "reports"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSummary"
+            }
+          }
+        }
+      },
       "ReportReceipt": {
         "required": [
           "number",
@@ -8438,6 +8940,60 @@
           "received_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ReportSummary": {
+        "required": [
+          "number",
+          "received_at",
+          "collected_at",
+          "containers_running",
+          "containers_total",
+          "disk_percent",
+          "load1"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "containers_running": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "containers_total": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "disk_percent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "load1": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         }
       },
