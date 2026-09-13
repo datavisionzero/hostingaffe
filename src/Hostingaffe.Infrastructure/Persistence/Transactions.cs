@@ -151,6 +151,29 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
             """,
             [settings.DeletionGrace], cancellationToken);
 
+        // A report and a machine's token are reached only through the machine,
+        // so neither carries a deletion of its own: they go when it goes. Not
+        // batched, because the batch is a machine — a month of samples is a few
+        // thousand narrow rows, and leaving half of them behind would only hold
+        // the machine back for another write.
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from machine_report
+             where machine_id in (
+                select id from machine
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval)
+            """,
+            [settings.DeletionGrace], cancellationToken);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            delete from machine_token
+             where machine_id in (
+                select id from machine
+                 where deleted_at is not null and deleted_at <= now() - {0}::interval)
+            """,
+            [settings.DeletionGrace], cancellationToken);
+
         await context.Database.ExecuteSqlRawAsync(
             """
             delete from machine where id in (

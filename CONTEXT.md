@@ -330,11 +330,16 @@ What a deletion takes:
 
 | deleting a | takes | and |
 |---|---|---|
-| machine | its files, its installations (with theirs), the vms it hosts | its pages stay |
+| machine | its files, its installations (with theirs), the vms it hosts, its reports and its token | its pages stay |
 | installation | its files, its deployments | its pages stay |
 | software | nothing | it is **refused** while installations still hang on it, with a count |
 | file | its revisions | |
 | deployment | nothing | |
+
+Reports and a machine's token are the one thing a cascade does not stamp: they
+are reached only through the machine, so they are invisible while it is
+deleted, come back with it, and are taken by the purge with the row
+(`docs/storage.md`, Reports).
 
 **A restore brings back what that deletion took, and nothing else.** Every row a
 cascade touches carries the moment of the deletion, and a restore brings back

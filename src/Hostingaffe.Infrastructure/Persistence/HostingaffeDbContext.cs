@@ -7,6 +7,7 @@ using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
+using Hostingaffe.Domain.Reports;
 
 namespace Hostingaffe.Infrastructure.Persistence;
 
@@ -63,6 +64,12 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
 
     /// <summary>The instance's flat wiki (VISION 7, ADR 0021).</summary>
     public DbSet<Page> Pages => Set<Page>();
+
+    /// <summary>What a machine said about itself, and when (VISION 7, ADR 0015).</summary>
+    public DbSet<Report> Reports => Set<Report>();
+
+    /// <summary>The one key a machine may hold, which reads nothing (ADR 0016).</summary>
+    public DbSet<MachineToken> MachineTokens => Set<MachineToken>();
 
     public DbSet<HistoryEntry> History => Set<HistoryEntry>();
 
