@@ -131,7 +131,8 @@ builder.Services.AddScoped<RedeemDeviceLogin>();
 // The dial of the instance, read once from the environment; a value that is
 // not a positive number stops the start here, where the message names it.
 builder.Services.AddSingleton(InstanceSettings.FromVariables(
-    builder.Configuration[InstanceSettings.DeletionGraceVariable]));
+    builder.Configuration[InstanceSettings.DeletionGraceVariable],
+    builder.Configuration[InstanceSettings.ReportRetentionVariable]));
 
 // The record itself (VISION 7): the computers the instance knows about.
 builder.Services.AddScoped<MachineAssembler>();

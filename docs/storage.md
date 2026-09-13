@@ -625,7 +625,10 @@ counted where it is read, not stored beside the list it can be counted from.
 
 **Reports are swept after thirty days**, except the latest report of a machine,
 which is kept however old it is (`operations.md`,
-`HOSTINGAFFE_REPORT_RETENTION_DAYS`).
+`HOSTINGAFFE_REPORT_RETENTION_DAYS`). The sweep runs in the purge at the end of
+a write transaction, like everything else that is cleared away — and a report is
+itself a write, so it runs once per arriving report and clears twenty for every
+one that comes in.
 
 ## Machine tokens
 
@@ -985,6 +988,11 @@ page of the instance.
 approved, refused or never answered, it is worth nothing ten minutes after it
 was made, and the day's grace is so that somebody who ran `ha login` and walked
 away still reads why it failed.
+
+**Reports past the retention window go in the same stroke**, twenty at a time,
+and never the latest of a machine (`operations.md`,
+`HOSTINGAFFE_REPORT_RETENTION_DAYS`). That is not a deletion with a grace
+period: a report is a sample and is simply older than what is kept.
 
 **A machine's reports and its token go with it**, and not one at a time. Both
 are reached only through the machine, so neither carries a `deleted_at`: they

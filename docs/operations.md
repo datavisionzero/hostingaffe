@@ -30,6 +30,7 @@ missing.
 | `HOSTINGAFFE_IMAGE` | `ghcr.io/…/hostingaffe:latest` | `:main` follows the trunk, a `sha-<commit>` or a version stands still |
 | `HOSTINGAFFE_TRUSTED_PROXY` | unset | an address, a CIDR network, or `all`; unset, every request looks as if it came from the proxy |
 | `HOSTINGAFFE_DELETION_GRACE_DAYS` | `7` | how long a deleted row can be restored before the purge may take it |
+| `HOSTINGAFFE_REPORT_RETENTION_DAYS` | `30` | how long a machine's reports are kept; the latest of each machine is never swept, and `0` keeps every one of them |
 
 A value the instance will not accept stops the start with one line naming the
 variable, rather than being rounded to something nobody asked for or leaving a
@@ -256,6 +257,15 @@ failures go to stderr regardless, and the exit code says which half is wrong —
 Docker reports no containers, says why, and exits 0 — the sign of life is the
 point, and a cron that failed over a missing section would be switched off
 within a fortnight.
+
+**How long reports are kept.** Thirty days, and then the instance sweeps them
+away — opportunistically, in the same stroke that already purges expired
+deletions, with no scheduler and nothing new to operate. `HOSTINGAFFE_REPORT_RETENTION_DAYS`
+moves the window and `0` switches the sweeping off. **The latest report of a
+machine is never swept**, however old it is: a machine that has been silent for
+six weeks must keep the one thing worth knowing about it, which is when it last
+spoke and how it was doing then. There is no downsampling and no aggregate — if
+thirty days is once too few, the answer is a larger number.
 
 **Rotating and revoking.** `ha machine token issue ex44 --rotate` replaces the
 token and revokes the old one at once, so the host fails visibly at its next run

@@ -73,23 +73,4 @@ public sealed class Reports(HostingaffeDbContext context) : IReports
     public void Add(Report report) => context.Reports.Add(report);
 
     public Task SaveAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
-
-    /// <summary>
-    /// The sweep, in SQL because it is a delete over rows nothing has loaded.
-    /// The latest report of every machine is exempt however old it is: a machine
-    /// that fell silent six weeks ago must keep the one thing worth knowing
-    /// about it — when it last spoke, and how it was doing then.
-    /// </summary>
-    public Task<int> SweepAsync(DateTimeOffset olderThan, int batch, CancellationToken cancellationToken) =>
-        context.Database.ExecuteSqlRawAsync(
-            """
-            delete from machine_report where id in (
-                select r.id from machine_report r
-                 where r.received_at < {0}
-                   and r.received_at < (
-                        select max(latest.received_at) from machine_report latest
-                         where latest.machine_id = r.machine_id)
-                 limit {1})
-            """,
-            [olderThan, batch], cancellationToken);
 }

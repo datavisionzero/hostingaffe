@@ -82,7 +82,7 @@ public sealed class PageSchemaTests(PostgresFixture postgres)
         // the write itself: here it is an unrelated page that pays for it.
         await using (var context = Migrated.ContextFor(db.ConnectionString))
         {
-            var transactions = new Transactions(context, new InstanceSettings(grace));
+            var transactions = new Transactions(context, new InstanceSettings(grace, InstanceSettings.Defaults.ReportRetention));
             await transactions.RunAsync(async () =>
             {
                 context.Pages.Add(Page.Create("onboarding", "Onboarding", null, PageKind.Note, db.User.Id, Migrated.Now));

@@ -27,6 +27,13 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// waiting for the next write. What is left standing is picked up next time.
 /// </para>
 /// <para>
+/// <strong>Reports are swept on the same stroke</strong>, past the retention
+/// window and never the latest of a machine. A report is itself a write, so
+/// this runs once per arriving report and clears twenty for every one that
+/// comes in — which is what keeps a cron reporting every quarter of an hour
+/// from outrunning it.
+/// </para>
+/// <para>
 /// <strong>The history is never purged</strong>, and neither is the register of
 /// keys. That is what VISION 7 asks for: the history of a deleted machine still
 /// says that it existed and when it went, and the key it had is never given out
@@ -195,6 +202,29 @@ public sealed class Transactions(HostingaffeDbContext context, InstanceSettings 
                  limit {1})
             """,
             [settings.DeletionGrace, Batch], cancellationToken);
+
+        // The reports past the retention window, which is thirty days unless an
+        // operator said otherwise. **The latest report of every machine is
+        // exempt however old it is**: a machine that fell silent six weeks ago
+        // must keep the one thing worth knowing about it — when it last spoke,
+        // and how it was doing then (ADR 0015).
+        //
+        // The batch keeps up by itself: a report is a write, so this runs once
+        // per arriving report and clears twenty for every one that comes in.
+        if (settings.SweepsReports)
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                delete from machine_report where id in (
+                    select r.id from machine_report r
+                     where r.received_at < now() - {0}::interval
+                       and r.received_at < (
+                            select max(latest.received_at) from machine_report latest
+                             where latest.machine_id = r.machine_id)
+                     limit {1})
+                """,
+                [settings.ReportRetention, Batch], cancellationToken);
+        }
 
         // A device login is worth nothing ten minutes after it was made, whether
         // it was approved, refused or never answered. A day's grace, so that a

@@ -32,11 +32,4 @@ public interface IReports
     void Add(Report report);
 
     Task SaveAsync(CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Removes every report older than <paramref name="olderThan"/> except the
-    /// latest of each machine, and answers with how many went
-    /// (<c>operations.md</c>, <c>HOSTINGAFFE_REPORT_RETENTION_DAYS</c>).
-    /// </summary>
-    Task<int> SweepAsync(DateTimeOffset olderThan, int batch, CancellationToken cancellationToken);
 }
