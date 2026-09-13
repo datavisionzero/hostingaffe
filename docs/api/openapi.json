@@ -7076,6 +7076,60 @@
           }
         }
       },
+      "Drift": {
+        "required": [
+          "kind",
+          "subject",
+          "field",
+          "record",
+          "record_at",
+          "reported",
+          "reported_at"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DriftKind"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "record": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "record_at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "reported": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DriftKind": {
+        "enum": [
+          "version",
+          "container",
+          "fact"
+        ],
+        "type": "string"
+      },
       "EmailChangeRequest": {
         "required": [
           "email"
@@ -8322,6 +8376,7 @@
           "status",
           "measured_at",
           "last_seen",
+          "drift",
           "description",
           "created_by",
           "updated_by",
@@ -8443,6 +8498,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "drift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
+            }
           },
           "description": {
             "type": "string"
@@ -9117,7 +9178,8 @@
           "memory",
           "disks",
           "containers",
-          "missing"
+          "missing",
+          "drift"
         ],
         "type": "object",
         "properties": {
@@ -9184,6 +9246,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MissingSection"
+            }
+          },
+          "drift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
             }
           }
         }

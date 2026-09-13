@@ -280,3 +280,31 @@ func TestMachineListSaysWhenEachLastSpoke(t *testing.T) {
 		}
 	}
 }
+
+// The drift is the point of keeping a report beside the record: both sides are
+// named with their ages, and which of them is right ha does not say (ADR 0015).
+func TestReportShowNamesBothSidesOfADrift(t *testing.T) {
+	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
+		return 200, `{"machine":"ex44","number":7,"received_at":"2026-09-13T08:00:09Z","collected_at":"2026-09-13T08:00:07Z","agent":"0.4.0",
+		"host":null,"memory":null,"disks":null,"containers":null,"missing":[],
+		"drift":[{"kind":"version","subject":"logaffe-prod","field":"version","record":"1.4.0","record_at":"2026-09-08T19:12:00Z","reported":"1.3.2","reported_at":"2026-09-13T08:00:09Z"}]}`
+	}}
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "report", "show", "ex44")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, want := range []string{"drift", "logaffe-prod", "1.4.0", "1.3.2"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("%q is not in the output:\n%s", want, stdout)
+		}
+	}
+	// No verdict: the CLI names both sides and leaves the decision alone.
+	for _, verdict := range []string{"wrong", "should be", "outdated", "fix"} {
+		if strings.Contains(strings.ToLower(stdout), verdict) {
+			t.Fatalf("%q is a verdict, and ha gives none:\n%s", verdict, stdout)
+		}
+	}
+}

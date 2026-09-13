@@ -37,10 +37,11 @@ public sealed record ReportShape(
     MemorySection? Memory,
     IReadOnlyList<DiskUsage>? Disks,
     IReadOnlyList<ContainerState>? Containers,
-    IReadOnlyList<MissingSection> Missing);
+    IReadOnlyList<MissingSection> Missing,
+    IReadOnlyList<DriftShape> Drift);
 
-/// <summary>Turns report rows into the two shapes.</summary>
-public static class ReportAssembler
+/// <summary>Turns report rows into the two shapes, with the drift beside the whole one.</summary>
+public sealed class ReportAssembler(DriftFinder drift)
 {
     public static ReportSummaryShape Summary(Report report)
     {
@@ -58,7 +59,14 @@ public static class ReportAssembler
             report.Body.Host?.Load1);
     }
 
-    public static ReportShape Complete(Machine machine, Report report)
+    /// <summary>
+    /// The whole report, and what it and the record disagree about. The
+    /// comparison is made here rather than by each client, which is what keeps
+    /// the web application and <c>ha</c> from saying different things about one
+    /// host (ADR 0015).
+    /// </summary>
+    public async Task<ReportShape> CompleteAsync(
+        Machine machine, Report report, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(report);
@@ -73,7 +81,8 @@ public static class ReportAssembler
             report.Body.Memory,
             report.Body.Disks,
             report.Body.Containers,
-            report.Body.Missing);
+            report.Body.Missing,
+            await drift.BetweenAsync(machine, report, cancellationToken));
     }
 }
 
@@ -120,7 +129,8 @@ public sealed class ListReports(IMachines machines, IReports reports, InstanceSe
 }
 
 /// <summary>The latest report of a machine, whole.</summary>
-public sealed class ReadLatestReport(IMachines machines, IReports reports, InstanceSettings settings)
+public sealed class ReadLatestReport(
+    IMachines machines, IReports reports, ReportAssembler assembler, InstanceSettings settings)
 {
     /// <exception cref="Refusal"><c>not-found</c> where the machine has never reported.</exception>
     public async Task<ReportShape> ExecuteAsync(string key, CancellationToken cancellationToken)
@@ -130,12 +140,13 @@ public sealed class ReadLatestReport(IMachines machines, IReports reports, Insta
         var report = await reports.LatestAsync(machine.Id, cancellationToken)
             ?? throw new Refusal(RefusalCode.NotFound, $"{machine.Key} has never reported.");
 
-        return ReportAssembler.Complete(machine, report);
+        return await assembler.CompleteAsync(machine, report, cancellationToken);
     }
 }
 
 /// <summary>One report of a machine by its number, whole.</summary>
-public sealed class ReadReport(IMachines machines, IReports reports, InstanceSettings settings)
+public sealed class ReadReport(
+    IMachines machines, IReports reports, ReportAssembler assembler, InstanceSettings settings)
 {
     /// <exception cref="Refusal"><c>not-found</c> where there is no such report, swept included.</exception>
     public async Task<ReportShape> ExecuteAsync(string key, int number, CancellationToken cancellationToken)
@@ -145,6 +156,6 @@ public sealed class ReadReport(IMachines machines, IReports reports, InstanceSet
         var report = await reports.FindAsync(machine.Id, number, cancellationToken)
             ?? throw new Refusal(RefusalCode.NotFound, $"{machine.Key} has no report {number}.");
 
-        return ReportAssembler.Complete(machine, report);
+        return await assembler.CompleteAsync(machine, report, cancellationToken);
     }
 }

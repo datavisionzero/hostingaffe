@@ -28,6 +28,7 @@ const machine = {
   status: "active",
   measured_at: null,
   last_seen: null,
+  drift: [],
   description: "The one that answers the website.",
   created_by: identity,
   updated_by: identity,

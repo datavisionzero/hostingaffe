@@ -12,6 +12,7 @@ const machine = {
   provider: "example-hoster", plan: "EX44", location: "fsn1", os: "Ubuntu 26.04 LTS",
   arch: "amd64", cpu: null, memory: null, disk: null, ipv4: null, ipv6: null,
   private_ip: null, ssh: null, status: "active", measured_at: null, last_seen: null,
+  drift: [],
   description: "", created_by: identity, updated_by: identity,
   created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z",
 };
@@ -43,6 +44,7 @@ const report = {
     },
   ],
   missing: [],
+  drift: [],
 };
 
 function view(routes: Parameters<typeof installInstance>[0] = {}) {
@@ -135,6 +137,37 @@ describe("what a machine says about itself (VISION 7, ADR 0015)", () => {
 
     await userEvent.click(within(section).getByRole("button", { name: /59%/ }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("Report 6");
+  });
+});
+
+describe("drift: what the record and the machine disagree about (ADR 0015)", () => {
+  const drift = [
+    {
+      kind: "version", subject: "logaffe-prod", field: "version",
+      record: "1.4.0", record_at: "2026-09-08T19:12:00Z",
+      reported: "1.3.2", reported_at: report.received_at,
+    },
+  ];
+
+  it("names both sides with their ages, and gives no verdict", async () => {
+    view({ "GET /api/machines/ex44": { ...machine, drift } });
+
+    expect(await screen.findByRole("heading", { name: "Drift" })).toBeInTheDocument();
+    expect(screen.getByText("1.4.0")).toBeInTheDocument();
+    expect(screen.getByText("1.3.2")).toBeInTheDocument();
+
+    // One click from the record somebody would correct, and no button that
+    // corrects it for them: that would be discovery through the back door.
+    expect(screen.getByRole("link", { name: "logaffe-prod" }))
+      .toHaveAttribute("href", "/installations/logaffe-prod");
+    expect(screen.queryByRole("button", { name: /reconcile|apply|sync/i })).not.toBeInTheDocument();
+  });
+
+  it("says nothing at all where the two sides agree", async () => {
+    view();
+
+    expect(await screen.findByText(/This machine does not report/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Drift" })).not.toBeInTheDocument();
   });
 });
 

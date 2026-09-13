@@ -15,11 +15,14 @@ import { ActionDialog } from "@/shared/ActionDialog";
 import { useAsk } from "@/shared/ask";
 import { Nothing, Section } from "@/shared/Detail";
 import { ago, moment } from "@/shared/when";
+import { Link } from "react-router";
+import { installationPath } from "./addresses";
 import { Asks, Line, Rows } from "./Parts";
 
 type Report = Schemas["Report"];
 type ReportPage = Schemas["ReportPage"];
 type MachineToken = Schemas["MachineToken"];
+type Drift = Schemas["Drift"];
 
 /** How many of the series a page of it shows. */
 const perPage = 20;
@@ -176,6 +179,8 @@ export function ReportBody({ report }: { report: Report }) {
           )}
         </div>
       )}
+
+      <DriftList drift={report.drift} />
 
       {report.missing.length > 0 && (
         <ul className="grid gap-1 text-xs text-muted-foreground">
@@ -427,5 +432,40 @@ HOSTINGAFFE_MACHINE=${machine}`}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * What the record and the machine disagree about: a list of sentences, each
+ * naming both sides and how old each is.
+ *
+ * **Which side is right this does not say.** That is the decision ADR 0015
+ * leaves to a person or an agent, and there is deliberately no button that
+ * pulls the record after the report — that would be discovery through the back
+ * door. What there is instead is the link to the installation, so that whoever
+ * decides is one click from the record they would correct.
+ */
+export function DriftList({ drift }: { drift: Drift[] }) {
+  if (drift.length === 0) return null;
+
+  return (
+    <ul className="grid gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+      {drift.map((one) => (
+        <li key={`${one.kind}:${one.subject}:${one.field}`}>
+          {one.kind === "fact" ? (
+            <span className="font-mono text-xs">{one.subject}</span>
+          ) : (
+            <Link className="font-mono text-xs text-brand hover:underline" to={installationPath(one.subject)}>
+              {one.subject}
+            </Link>
+          )}{" "}
+          <span className="text-muted-foreground">{one.field}</span>: the record says{" "}
+          <span className="font-medium">{one.record ?? "nothing"}</span>
+          {one.record_at !== null && <span className="text-muted-foreground"> ({ago(one.record_at)})</span>}
+          , the machine reported <span className="font-medium">{one.reported ?? "nothing"}</span>
+          <span className="text-muted-foreground"> ({ago(one.reported_at)})</span>.
+        </li>
+      ))}
+    </ul>
   );
 }

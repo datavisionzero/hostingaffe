@@ -692,6 +692,53 @@ is the `received_at` of the latest report, derived and never written, and it is
 absent where a machine has never reported. It stands beside `measured_at` and
 means something else — `measured_at` is when a person last checked the facts.
 
+### Drift
+
+**Because both sides are there, they can be compared** — and that is why a
+report stands beside the record instead of in it
+([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
+
+`drift` comes with the whole report (`latest` and one by number) and with
+`GET /api/machines/{key}`, where it is computed from that machine's latest
+report. It is served here rather than assembled by each client, which is what
+keeps the web application and `ha` from saying different things about one host.
+
+```json
+{"kind": "version", "subject": "logaffe-prod", "field": "version",
+ "record": "1.4.0", "record_at": "2026-09-08T19:12:00Z",
+ "reported": "1.3.2", "reported_at": "2026-09-13T08:00:09Z"}
+```
+
+`kind` is one of three:
+
+- **`version`** — the tag of a container's image against the version of the
+  installation's latest deployment. The most valuable line of the whole
+  feature: "the record says logaffe-prod runs 1.4.0, the machine reports
+  1.3.2."
+- **`container`** — an installation the record calls `active` whose container
+  the machine reports as `exited`. A statement, not an alarm.
+- **`fact`** — `os` or `arch` against the machine's own fields, with
+  `record_at` the `measured_at` beside them. This is
+  [VISION 15.1](../Vision.md#151-measuring-instead-of-typing) word for word.
+
+**Which side is right the product does not say.** Every drift names both sides
+and how old each is, and the decision is a person's or an agent's. No field is
+set, nothing is "reconciled", and there is no call that pulls the record after
+the report — that would be discovery through the back door, and it is
+deliberately not here.
+
+**Where the assignment is ambiguous, nothing is claimed.** A container is
+matched to an installation by the image name *without* its tag, which the
+software already carries, plus the machine it lies on. Two installations of the
+same software on one machine, or two containers out of one image, produce no
+drift at all: the report is shown and the reader compares the two rows. A wrong
+sentence is worse than none. So does a software whose `image` is empty, an
+installation with no container, and a container with no installation.
+
+**Disk, memory and load make no drift.** They have no other side in the record,
+so they are shown and not compared, and "91 per cent full" is a number a person
+reads rather than a disagreement.
+
 **What is not here:** no filter over the contents of a body, no aggregate, no
 time window beyond the ordinary paging, and no search in reports. `GET
 /api/search` goes over the record, and a report is not the record; whoever wants

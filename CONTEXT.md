@@ -196,6 +196,14 @@ belongs to the deployment.
 file contents. It is the rule the record already follows, and it holds here
 because the material is the machine's own.
 
+**Drift** is where the two sides disagree, computed on read and stored nowhere:
+the tag of a container's image against the version of the installation's latest
+deployment (`version`), an installation the record calls active whose container
+is not running (`container`), and `os` and `arch` against the machine's own
+fields (`fact`). Every drift names both sides and how old each is; which of them
+is right the product does not say. Where the assignment of a container to an
+installation is ambiguous, nothing is claimed.
+
 Reports are swept after thirty days, except the latest of a machine, which is
 kept however old it is.
 

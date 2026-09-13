@@ -95,6 +95,8 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("ReportPage", schemas);
         Assert.Contains("MachineToken", schemas);
         Assert.Contains("IssuedMachineToken", schemas);
+        Assert.Contains("Drift", schemas);
+        Assert.Contains("DriftKind", schemas);
         Assert.Contains("File", schemas);
         Assert.Contains("FileSummary", schemas);
         Assert.Contains("FileRevision", schemas);

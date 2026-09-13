@@ -5,7 +5,7 @@ import { useAsk } from "@/shared/ask";
 import { Failed, Fields, Section, Waiting } from "@/shared/Detail";
 import { ago, moment } from "@/shared/when";
 import { About, Attached, Description, Files, History, Installations, StatusBadge } from "./Parts";
-import { LastReport, ReportHistory, ReportingToken } from "./Reports";
+import { DriftList, LastReport, ReportHistory, ReportingToken } from "./Reports";
 
 type Machine = Schemas["Machine"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -104,6 +104,15 @@ export function MachineView() {
               body: { description },
             })}
         />
+
+        {/* What the record above and the machine's own last word disagree
+            about, where somebody reads the fields it contradicts. Which side is
+            right the product does not say (ADR 0015). */}
+        {machine.drift.length > 0 && (
+          <Section title="Drift">
+            <DriftList drift={machine.drift} />
+          </Section>
+        )}
 
         <Installations of={{ machine: machine.key }} />
 

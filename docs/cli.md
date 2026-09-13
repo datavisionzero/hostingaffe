@@ -349,6 +349,12 @@ the top answers the question somebody came with — when this report arrived.
 containers ran of how many, the highest disk percentage, and the load. Enough to
 see that something changed on the 3rd, and then `show --number` to look.
 
+**The drift stands under the report**, and under the machine in
+`ha machine view`: one line per disagreement, naming both sides and how old each
+is — "the record says logaffe-prod 1.4.0, the machine reported 1.3.2". **Which
+side is right `ha` does not say**; that is the decision a person or an agent
+makes, and there is no verb that pulls the record after the report.
+
 **`last seen` is on `ha machine list` and `ha machine view`**, relative — "12
 minutes ago", "6 days ago" — and empty where nothing ever came. In `view` it
 stands beside `measured`, because the two mean different things: `measured` is

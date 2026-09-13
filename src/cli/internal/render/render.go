@@ -152,6 +152,12 @@ func Machine(w io.Writer, m api.Machine) {
 	}
 	line(w, fields...)
 	touched(w, m.UpdatedAt, m.UpdatedBy, m.CreatedBy)
+
+	// What the record above and the machine's own last word disagree about. It
+	// is here, at the machine, because that is where somebody reads the fields
+	// it contradicts (ADR 0015).
+	Drift(w, m.Drift)
+
 	body(w, m.Description)
 }
 
@@ -636,6 +642,8 @@ func Report(w io.Writer, r api.Report) {
 			fmt.Fprintf(w, "%s: not determined (%s)\n", or(missing.Section), or(missing.Reason))
 		}
 	}
+
+	Drift(w, r.Drift)
 }
 
 // ReportSummaries prints the series: one line per report, enough to see when
@@ -657,5 +665,28 @@ func ReportSummaries(w io.Writer, page api.ReportPage) {
 		}
 		fmt.Fprintf(w, "%-6d %-20s %-8s %-6s %-6s %s\n",
 			r.Number, r.ReceivedAt.Format("2006-01-02 15:04"), containers, disk, load, Ago(now, r.ReceivedAt))
+	}
+}
+
+// Drift prints what the record and the machine disagree about: one sentence
+// per disagreement, naming both sides and how old each is.
+//
+// **Which side is right, ha does not say.** That is the decision ADR 0015
+// leaves to a person or an agent, and a CLI that picked one would be making it
+// for them.
+func Drift(w io.Writer, drift []api.Drift) {
+	if len(drift) == 0 {
+		return
+	}
+
+	now := time.Now()
+	fmt.Fprintln(w)
+	for _, one := range drift {
+		record := or(one.Record)
+		if one.RecordAt != nil {
+			record += " (" + Ago(now, *one.RecordAt) + ")"
+		}
+		fmt.Fprintf(w, "drift  %s %s: the record says %s, the machine reported %s (%s)\n",
+			one.Subject, one.Field, record, or(one.Reported), Ago(now, one.ReportedAt))
 	}
 }

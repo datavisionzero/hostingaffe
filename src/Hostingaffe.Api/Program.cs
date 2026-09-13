@@ -194,6 +194,8 @@ builder.Services.AddScoped<MoveDeployment>();
 
 // What a machine says about itself, beside the record and never in it
 // (VISION 7, ADR 0015).
+builder.Services.AddScoped<DriftFinder>();
+builder.Services.AddScoped<ReportAssembler>();
 builder.Services.AddScoped<HandInReport>();
 builder.Services.AddScoped<ListReports>();
 builder.Services.AddScoped<ReadLatestReport>();

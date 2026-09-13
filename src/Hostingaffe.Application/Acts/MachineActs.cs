@@ -46,6 +46,7 @@ public sealed record MachineShape(
     Status Status,
     DateTimeOffset? MeasuredAt,
     DateTimeOffset? LastSeen,
+    IReadOnlyList<DriftShape> Drift,
     string Description,
     IdentityRef CreatedBy,
     IdentityRef UpdatedBy,
@@ -128,7 +129,7 @@ public sealed record ChangeMachineRequest(
 /// from one query, because an overview that asked once per row would be the
 /// reason somebody turned the column off.
 /// </remarks>
-public sealed class MachineAssembler(IIdentities identities, IMachines machines, IReports reports)
+public sealed class MachineAssembler(IIdentities identities, IMachines machines, IReports reports, DriftFinder drift)
 {
     public static MachineSummaryShape Summary(Machine machine, DateTimeOffset? lastSeen)
     {
@@ -169,6 +170,7 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
         var host = machine.HostId is { } id
             ? (await machines.KeysAsync([id], cancellationToken)).GetValueOrDefault(id)
             : null;
+        var latest = await reports.LatestAsync(machine.Id, cancellationToken);
 
         return new MachineShape(
             machine.Key,
@@ -190,7 +192,11 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
             machine.Ssh,
             machine.Status,
             machine.MeasuredAt,
-            (await reports.LatestAsync(machine.Id, cancellationToken))?.ReceivedAt,
+            latest?.ReceivedAt,
+            // What the record above and the machine's own last word disagree
+            // about, computed here so that no client builds it twice
+            // (ADR 0015).
+            latest is null ? [] : await drift.BetweenAsync(machine, latest, cancellationToken),
             machine.Description,
             IdentityRef.Of(people[machine.CreatedBy]),
             IdentityRef.Of(people[machine.UpdatedBy]),
