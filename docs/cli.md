@@ -364,9 +364,10 @@ cron, and `ha report collect --sync-dir …` prints exactly what would go out.
 the comparison is not made rather than answered with noise, and that is the
 same rule a machine with no ports written down keeps.
 
-A directory sync never wrote into, one whose manifest cannot be read, and a
-path holding something that is not a plain file are each said once in
-`missing` — the run goes on, and the other directories are still reported.
+A directory sync never wrote into, one whose manifest cannot be read, a path
+holding something that is not a plain file, and a second directory holding an
+installation the first one already held are each said once in `missing` — the
+run goes on, and the other directories are still reported.
 
 **A section it could not determine is not a failure.** A host without Docker
 reports no containers, says why in `missing`, and `send` still exits 0: the sign

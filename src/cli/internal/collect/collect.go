@@ -285,6 +285,7 @@ func Collect(ctx context.Context, env Environment, agent string, dirs ...string)
 func collectFiles(dirs []string) ([]Synced, []string) {
 	var synced []Synced
 	var complaints []string
+	held := map[string]string{}
 
 	for _, dir := range dirs {
 		if len(synced) >= MaxSyncedDirectories {
@@ -293,26 +294,37 @@ func collectFiles(dirs []string) ([]Synced, []string) {
 			break
 		}
 
-		held, err := manifest.Read(dir)
+		manifested, err := manifest.Read(dir)
 		if err != nil {
 			complaints = append(complaints, fmt.Sprintf("%s: %v", dir, err))
 			continue
 		}
-		if held.Owner == "" {
+		if manifested.Owner == "" {
 			complaints = append(complaints, fmt.Sprintf("%s: sync has never written there", dir))
 			continue
 		}
 
-		key, ok := held.InstallationKey()
+		key, ok := manifested.InstallationKey()
 		if !ok {
-			complaints = append(complaints, fmt.Sprintf("%s: %s is not an installation's directory", dir, held.Owner))
+			complaints = append(complaints, fmt.Sprintf("%s: %s is not an installation's directory", dir, manifested.Owner))
 			continue
 		}
 
+		// An installation has one directory in the record, so a report claiming
+		// two for it says two things that cannot both be answered — and the
+		// instance refuses the whole body for it. It is said here instead, so
+		// that a cron given the same directory twice keeps reporting.
+		if first, already := held[key]; already {
+			complaints = append(complaints, fmt.Sprintf(
+				"%s was left out: %s already holds the files of %s", dir, first, key))
+			continue
+		}
+		held[key] = dir
+
 		one := Synced{Installation: key, Directory: dir, Files: []SyncedFile{}}
 
-		paths := make([]string, 0, len(held.Files))
-		for path := range held.Files {
+		paths := make([]string, 0, len(manifested.Files))
+		for path := range manifested.Files {
 			paths = append(paths, path)
 		}
 		sort.Strings(paths)

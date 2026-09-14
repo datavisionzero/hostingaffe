@@ -717,6 +717,13 @@ stops a report from carrying the file names of whatever else lies in a compose
 directory. An empty `files` on a directory is not nothing: it says the machine
 holds that installation's files there and has none of them.
 
+**One installation, one directory, and one entry per path in it.** An
+installation has a single `path` in the record, so a body claiming two
+directories for it says two things that cannot both be answered; both that and a
+path named twice are `validation` rather than deduplicated. `ha` says so on the
+host instead and reports the first directory, so that a cron given the same
+`--sync-dir` twice keeps its sign of life.
+
 A report carries at most **32 directories** and **128 files each**, and the
 64 KB below is the real ceiling. An `installation` this machine does not have is
 stored as it came and compared against nothing: that is a cron pointed at the

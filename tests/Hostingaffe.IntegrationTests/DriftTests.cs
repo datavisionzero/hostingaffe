@@ -719,6 +719,71 @@ public sealed class DriftTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, handed.StatusCode);
     }
 
+    /// <summary>
+    /// An installation has one directory in the record, so a body claiming two
+    /// for it says two things that cannot both be answered. It is refused whole
+    /// rather than deduplicated: a cron given the same directory twice is a
+    /// mistake on the host, and this is how somebody finds out.
+    /// </summary>
+    [Fact]
+    public async Task A_report_that_names_one_installation_twice_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new { installation = "logaffe-prod", directory = "/srv/logaffe", files = Array.Empty<object>() },
+                    new { installation = "logaffe-prod", directory = "/srv/elsewhere", files = Array.Empty<object>() },
+                },
+            },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, handed.StatusCode);
+    }
+
+    /// <summary>And one path twice in one directory says two things about one file.</summary>
+    [Fact]
+    public async Task A_report_that_names_one_path_twice_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new
+                    {
+                        installation = "logaffe-prod",
+                        directory = "/srv/logaffe",
+                        files = new[]
+                        {
+                            new { path = "compose.yml", sha256 = Digest("one\n") },
+                            new { path = "compose.yml", sha256 = Digest("another\n") },
+                        },
+                    },
+                },
+            },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, handed.StatusCode);
+    }
+
     /// <summary>The digest of a content, as the host computes the one it reports.</summary>
     private static string Digest(string content) =>
         Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content)));

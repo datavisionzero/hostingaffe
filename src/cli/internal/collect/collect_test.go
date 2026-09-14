@@ -628,3 +628,27 @@ func TestTheBodyCarriesTheSyncedDirectories(t *testing.T) {
 		t.Fatalf("compose.yml: %+v", file)
 	}
 }
+
+// An installation has one directory in the record. A cron given two for it is
+// told so, and the first one is still reported: the instance would refuse the
+// whole body, and losing the sign of life over it would be the worse answer.
+func TestOneInstallationIsReportedOnce(t *testing.T) {
+	first := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "services:\n"})
+	second := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "something else\n"})
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", first, second)
+
+	if len(report.Files) != 1 || report.Files[0].Directory != first {
+		t.Fatalf("files: %+v", report.Files)
+	}
+
+	var said string
+	for _, missing := range report.Missing {
+		if missing.Section == "files" {
+			said = missing.Reason
+		}
+	}
+	if !strings.Contains(said, second) {
+		t.Fatalf("missing: %q", said)
+	}
+}

@@ -348,10 +348,21 @@ public static class ReportWrites
     /// here as it is refused there, and a digest is a digest.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The installation is taken as a key and looked up nowhere: the comparison
     /// happens on read, and a report that names an installation this machine
     /// does not have is stored as it came and compared against nothing
     /// (ADR 0015).
+    /// </para>
+    /// <para>
+    /// <strong>One installation, one directory, and one entry per path in
+    /// it.</strong> An installation has a single <c>path</c> in the record, so a
+    /// body claiming two directories for it says two things that cannot both be
+    /// answered — and a body claiming a path twice says two things about one
+    /// file. Both are refused whole rather than deduplicated: a cron given the
+    /// same <c>--sync-dir</c> twice is a mistake on the host, and one that fails
+    /// at its next run with a sentence naming the key is how somebody finds out.
+    /// </para>
     /// </remarks>
     private static IReadOnlyList<SyncedDirectory>? Files(IReadOnlyList<SyncedDirectoryRequest>? given)
     {
@@ -362,6 +373,8 @@ public static class ReportWrites
 
         AtMost("files", given.Count, ReportBody.MaxSyncedDirectories);
 
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
         return
         [
             .. given.Select(directory =>
@@ -369,11 +382,22 @@ public static class ReportWrites
                 Closed("A report's directory", directory.UnknownFields);
                 AtMost("files.files", directory.Files?.Count ?? 0, ReportBody.MaxSyncedFiles);
 
+                var installation = Validated.Field(
+                    "files.installation",
+                    () => Key.Normalize(directory.Installation ?? string.Empty, "files.installation"));
+
+                if (!seen.Add(installation))
+                {
+                    throw Refusal.Validation(
+                        "files.installation",
+                        $"An installation has one directory, and {installation} is named twice.");
+                }
+
+                var paths = new HashSet<string>(StringComparer.Ordinal);
+
                 return new SyncedDirectory
                 {
-                    Installation = Validated.Field(
-                        "files.installation",
-                        () => Key.Normalize(directory.Installation ?? string.Empty, "files.installation")),
+                    Installation = installation,
                     Directory = Validated.Field(
                         "files.directory",
                         () => FileDirectory.Normalize(directory.Directory, "files.directory")),
@@ -383,13 +407,17 @@ public static class ReportWrites
                         {
                             Closed("A report's file", file.UnknownFields);
 
-                            return new SyncedFile
+                            var path = Validated.Field(
+                                "files.path",
+                                () => FilePath.Normalize(file.Path ?? string.Empty, "files.path"));
+
+                            if (!paths.Add(path))
                             {
-                                Path = Validated.Field(
-                                    "files.path",
-                                    () => FilePath.Normalize(file.Path ?? string.Empty, "files.path")),
-                                Sha256 = Digest(file.Sha256),
-                            };
+                                throw Refusal.Validation(
+                                    "files.path", $"A directory holds one file at {path}, and it is named twice.");
+                            }
+
+                            return new SyncedFile { Path = path, Sha256 = Digest(file.Sha256) };
                         })],
                 };
             }),
