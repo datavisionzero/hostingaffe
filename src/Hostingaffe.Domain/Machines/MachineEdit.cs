@@ -13,6 +13,11 @@ namespace Hostingaffe.Domain.Machines;
 /// it", because a cleared host arrives as a null row either way.
 /// </para>
 /// <para>
+/// <see cref="Ports"/> is the one list here, and it is value objects rather
+/// than rows: a port is the machine's own, not a reference to anything the
+/// Domain would have to resolve.
+/// </para>
+/// <para>
 /// <see cref="Kind"/>, <see cref="Arch"/>, <see cref="Status"/> and
 /// <see cref="MeasuredAt"/> are set, never cleared. A closed set has no empty
 /// value to send, and a measurement is corrected by measuring again.
@@ -53,6 +58,12 @@ public sealed record MachineEdit
     public string? PrivateIp { get; init; }
 
     public string? Ssh { get; init; }
+
+    /// <summary>
+    /// The machine's own ports; an empty list clears them, and clearing them
+    /// says nothing about the machine rather than "it listens on nothing".
+    /// </summary>
+    public IReadOnlyList<Port>? Ports { get; init; }
 
     public Status? Status { get; init; }
 

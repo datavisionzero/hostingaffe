@@ -6138,6 +6138,15 @@
               "string"
             ]
           },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
+          },
           "status": {
             "oneOf": [
               {
@@ -6673,6 +6682,15 @@
               "null",
               "string"
             ]
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
           },
           "status": {
             "oneOf": [
@@ -7815,6 +7833,7 @@
           "ipv6",
           "private_ip",
           "ssh",
+          "ports",
           "status",
           "measured_at",
           "description",
@@ -7924,6 +7943,15 @@
               "null",
               "string"
             ]
+          },
+          "ports": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
           },
           "status": {
             "type": [
@@ -8456,6 +8484,7 @@
           "ipv6",
           "private_ip",
           "ssh",
+          "ports",
           "status",
           "measured_at",
           "last_seen",
@@ -8565,6 +8594,12 @@
               "null",
               "string"
             ]
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            }
           },
           "status": {
             "$ref": "#/components/schemas/Status"

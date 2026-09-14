@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router";
 import { api, type Schemas } from "@/api/client";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { Failed, Fields, Section, Waiting } from "@/shared/Detail";
@@ -88,6 +89,20 @@ export function MachineView() {
               ["IPv4", machine.ipv4 === null ? null : <code className="font-mono text-xs">{machine.ipv4}</code>],
               ["IPv6", machine.ipv6 === null ? null : <code className="font-mono text-xs">{machine.ipv6}</code>],
               ["Private", machine.private_ip === null ? null : <code className="font-mono text-xs">{machine.private_ip}</code>],
+              // The machine's own ports: what it listens on and no installation
+              // of it answers to — SSH, a Wireguard endpoint. An empty list says
+              // nothing about the machine rather than "it listens on nothing",
+              // and it is what makes an undocumented public port a drift
+              // somebody can clear.
+              ["Ports", machine.ports.length === 0 ? null : (
+                <span className="flex flex-wrap gap-1">
+                  {machine.ports.map((port) => (
+                    <Badge key={`${port.port}/${port.protocol}`} variant="outline">
+                      {port.port}/{port.protocol} {port.scope}
+                    </Badge>
+                  ))}
+                </span>
+              )],
             ]}
           />
         </Section>

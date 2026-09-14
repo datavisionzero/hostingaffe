@@ -377,6 +377,7 @@ the office. It exists whether or not anything is installed on it.
 | `ipv4`, `ipv6` | address | public addresses, each optional |
 | `private_ip` | address | on the operator's private network, optional |
 | `ssh` | text | the SSH target or alias the operator uses |
+| `ports` | list of objects | the same shape an installation's ports have — what the *machine* listens on and no installation of it answers to: SSH, a Wireguard endpoint, a provider's agent. **An empty list says nothing rather than "none"** |
 | `status` | `planned` · `active` · `retired` | closed set |
 | `measured_at` | date | when the facts above were last verified against the machine |
 | `description` | Markdown | what the machine is for, and anything that fits nowhere else |
@@ -387,6 +388,18 @@ mirror" is a truer description than a number.
 
 `measured_at` is the answer to the stale-state problem in section 2: the
 machine list shows it, and a machine nobody has looked at for a year says so.
+
+**A machine's `ports` are what makes "reachable from outside and written down
+nowhere" answerable.** The record holds one side of that question in an
+installation's `ports`, and SSH is in no installation; without a place for the
+machine's own, a port bound in public that nothing claims could be reported but
+never resolved, and a drift nobody can clear teaches people to stop reading the
+list. So it is a field, and an empty one means the record says nothing about
+this machine's ports — not that the machine listens on none. Whoever names one
+port switches the comparison on and can clear every finding it makes, by
+writing a port down or by closing it; whoever names none sees nothing new. It
+is not a suppression list: no single port and no single finding is ever
+silenced (16).
 
 **Deliberately left out:** rack, serial number, warranty, purchase date, owner,
 tags, monthly cost (17.), a free-form key/value bag.
@@ -427,7 +440,7 @@ means something else to systemd and to Docker Compose.
 | `role` | `application` · `platform` | closed set; `platform` is what the host runs for everyone — Caddy, Uptime Kuma, Beszel, ntfy — the template's "host service" |
 | `status` | `planned` · `active` · `retired` | |
 | `urls` | list of URL | where it is reachable, if anywhere |
-| `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network) |
+| `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network). A machine carries the same field for what belongs to no installation |
 | `path` | text | where it lives on the machine, `/srv/logaffe` — also where `files sync` writes by default |
 | `data` | text | where its persistent data lies, `/srv/services/logaffe` — what a backup has to take |
 | `secrets` | list of objects | `{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }`; the *name* it needs and the file the value lies in, never the value. `path` may be empty, and reads as `NAME@/the/file` ([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)) |

@@ -139,6 +139,9 @@ func Machine(w io.Writer, m api.Machine) {
 	line(w, maybe("provider", m.Provider), maybe("plan", m.Plan), maybe("location", m.Location))
 	line(w, maybe("hostname", m.Hostname), maybe("ssh", m.Ssh))
 	line(w, maybe("ipv4", m.Ipv4), maybe("ipv6", m.Ipv6), maybe("private ip", m.PrivateIp))
+	// The machine's own ports and no installation's: SSH, a Wireguard endpoint.
+	// An empty list says nothing about the machine rather than "none".
+	line(w, said("ports", Ports(m.Ports)))
 	line(w, maybe("os", m.Os), maybe("cpu", m.Cpu), maybe("memory", m.Memory), maybe("disk", m.Disk))
 	// `measured` is when a person last checked the facts; `last seen` is when
 	// the machine last spoke for itself. The two mean different things, and

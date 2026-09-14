@@ -162,6 +162,10 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
                     ["ipv6"] = null,
                     ["private_ip"] = null,
                     ["ssh"] = "ex44",
+                    ["ports"] = new List<object>
+                    {
+                        new { port = 22, protocol = "tcp", scope = "public" },
+                    },
                     ["status"] = "active",
                     ["measured_at"] = "2026-09-01T08:00:00Z",
                     ["description"] = "The box everything else sits on.",
@@ -192,6 +196,9 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
 
         var machine = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
         Assert.Equal("2×512G NVMe ZFS mirror", machine.GetProperty("disk").GetString());
+
+        // The machine's own ports travel with it, as an installation's do.
+        Assert.Equal(22, machine.GetProperty("ports").EnumerateArray().Single().GetProperty("port").GetInt32());
 
         // What only the instance writes is the instance's, whatever the
         // document said: the caller is who imported it, at the moment they did.

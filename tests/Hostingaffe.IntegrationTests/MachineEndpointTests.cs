@@ -159,6 +159,62 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
         Assert.Equal("Ubuntu 26.04 LTS", machine.GetProperty("os").GetString());
     }
 
+    /// <summary>
+    /// The machine's own ports: what it listens on and no installation of it
+    /// answers to. The same shape an installation's ports have, because it is
+    /// the same field — and an empty list says the record holds none, never
+    /// that the machine listens on none.
+    /// </summary>
+    [Fact]
+    public async Task A_machine_keeps_the_ports_no_installation_answers_to()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await Machine(admin, "ex44", "dedicated");
+
+        using var written = await admin.PatchAsJsonAsync(
+            "/api/machines/ex44",
+            new { ports = new[] { new { port = 22, protocol = "tcp", scope = "public" } } },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        var read = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
+        var port = read.GetProperty("ports").EnumerateArray().Single();
+        Assert.Equal(22, port.GetProperty("port").GetInt32());
+        Assert.Equal("tcp", port.GetProperty("protocol").GetString());
+        Assert.Equal("public", port.GetProperty("scope").GetString());
+
+        // The history keeps the spelling a person reads, as an installation's
+        // ports do.
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/history", Ct);
+        Assert.Equal(
+            "22/tcp:public",
+            history.EnumerateArray().Single(one => one.GetProperty("field").GetString() == "ports")
+                .GetProperty("new_value").GetString());
+
+        using var cleared = await admin.PatchAsJsonAsync("/api/machines/ex44", new { ports = Array.Empty<object>() }, Ct);
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        Assert.Empty((await cleared.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("ports").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_port_of_the_machine_that_is_not_a_port_is_refused_and_names_its_field()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await Machine(admin, "ex44", "dedicated");
+
+        using var refused = await admin.PatchAsJsonAsync(
+            "/api/machines/ex44",
+            new { ports = new[] { new { port = 70000, protocol = "tcp", scope = "public" } } },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("ports", (await Problem(refused)).GetProperty("errors").EnumerateObject().Single().Name);
+    }
+
     [Fact]
     public async Task The_key_is_immutable_and_taken_once()
     {

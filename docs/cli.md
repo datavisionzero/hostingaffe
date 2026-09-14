@@ -241,6 +241,21 @@ record only says where it is.
 and the lone value `none` clears it. A port is written and read the way a person
 writes one, `443/tcp:public`; the field itself is the object, and `ha` converts.
 
+**`--port` is a machine's flag too**, and means what the machine itself listens
+on and no installation of it answers to — SSH, a Wireguard endpoint, a
+provider's agent:
+
+```sh
+ha machine set ex44 --port 22/tcp:public --port 51820/udp:private
+```
+
+It is what makes "listening in public and written down nowhere" a drift a person
+can clear, either by writing the port down or by closing it. **A machine with no
+port written down hears nothing about undocumented ones**: the record says
+nothing about its ports, and the comparison is not made rather than reporting
+every port the host has for ever (`docs/api.md`, Drift). `--port none` goes back
+to that.
+
 **`--depends-on` names an installation this one needs**, by key, on this machine
 or on another one:
 

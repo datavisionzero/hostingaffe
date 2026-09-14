@@ -93,7 +93,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "history", "idempotency",
                 "identity", "identity_metadata", "installation", "installation_depends_on",
                 "installation_port", "installation_secret",
-                "machine", "machine_report", "machine_token",
+                "machine", "machine_port", "machine_report", "machine_token",
                 "one_time_secret", "page", "software", "token",
             ],
             tables);
@@ -137,7 +137,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "pk_file", "pk_file_revision", "pk_history", "pk_idempotency",
                 "pk_identity", "pk_identity_metadata", "pk_installation",
                 "pk_installation_depends_on", "pk_installation_port", "pk_installation_secret",
-                "pk_machine", "pk_machine_report", "pk_machine_token",
+                "pk_machine", "pk_machine_port", "pk_machine_report", "pk_machine_token",
                 "pk_one_time_secret", "pk_page", "pk_software", "pk_token",
                 "software_key", "software_letters", "software_search", "token_agent", "token_secret_hash",
             ],

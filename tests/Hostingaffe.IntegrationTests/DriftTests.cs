@@ -280,13 +280,15 @@ public sealed class DriftTests(PostgresFixture postgres)
     }
 
     /// <summary>
-    /// The question this section was wanted for, and the one the record cannot
-    /// answer: SSH is in no installation, so a drift about port 22 could never
-    /// be resolved by anybody, and a drift nobody can clear teaches people to
-    /// stop reading the list. The section is shown whole instead.
+    /// A machine nobody keeps ports for is told nothing about undocumented
+    /// ones: the record says nothing about what belongs to the machine itself,
+    /// so a drift about port 22 could never be resolved by anybody, and a drift
+    /// nobody can clear teaches people to stop reading the list. The section is
+    /// shown whole instead, and the three comparisons against an installation's
+    /// ports run either way.
     /// </summary>
     [Fact]
-    public async Task A_port_no_installation_answers_to_is_shown_and_is_not_drift()
+    public async Task A_machine_that_keeps_no_ports_is_told_nothing_about_undocumented_ones()
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
@@ -305,6 +307,129 @@ public sealed class DriftTests(PostgresFixture postgres)
 
         var report = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports/latest", Ct);
         Assert.Equal(3, report.GetProperty("listening").GetArrayLength());
+    }
+
+    /// <summary>
+    /// The question a documentation of rented machines is kept for: what is
+    /// reachable from outside that nobody wrote down. It is answerable once the
+    /// machine keeps its own ports — SSH is written down at the machine — and
+    /// then it is a drift somebody can clear, by writing the port down or by
+    /// closing it.
+    /// </summary>
+    [Fact]
+    public async Task A_machine_that_keeps_its_ports_hears_about_one_that_stands_in_no_record()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        await Keeps(admin, [new { port = 22, protocol = "tcp", scope = "public" }]);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(
+            machine,
+            [
+                new { port = 18502, protocol = "tcp", binding = "public" },
+                new { port = 22, protocol = "tcp", binding = "public" },
+                new { port = 8080, protocol = "tcp", binding = "public" },
+            ]);
+
+        // 18502 is the installation's and 22 is the machine's; 8080 is nobody's.
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("port", one.GetProperty("kind").GetString());
+        Assert.Equal("ex44", one.GetProperty("subject").GetString());
+        Assert.Equal("port 8080/tcp", one.GetProperty("field").GetString());
+
+        // The record says nothing, which is the whole finding — and there is no
+        // line to date, so `record_at` is null with it.
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("record").ValueKind);
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("record_at").ValueKind);
+        Assert.Equal("public", one.GetProperty("reported").GetString());
+    }
+
+    /// <summary>
+    /// A socket on loopback alone reaches nothing off this machine, so it is
+    /// not what "reachable from outside and written down nowhere" asks about. A
+    /// record of what an operator rents is not a process list.
+    /// </summary>
+    [Fact]
+    public async Task A_port_bound_to_loopback_alone_is_not_an_undocumented_one()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        await Keeps(admin, [new { port = 22, protocol = "tcp", scope = "public" }]);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(
+            machine,
+            [
+                new { port = 18502, protocol = "tcp", binding = "public" },
+                new { port = 22, protocol = "tcp", binding = "public" },
+                new { port = 5432, protocol = "tcp", binding = "loopback" },
+            ]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// The machine's own ports are compared like an installation's, because
+    /// they are the same field: the record says SSH is reachable and nothing
+    /// listens there.
+    /// </summary>
+    [Fact]
+    public async Task The_record_says_the_machine_listens_on_a_port_and_nothing_listens_there()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", null);
+        await Keeps(admin, [new { port = 22, protocol = "tcp", scope = "public" }]);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 2222, protocol = "tcp", binding = "public" }]);
+
+        var drift = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().ToArray();
+        Assert.Equal(2, drift.Length);
+
+        var silent = drift.Single(one => one.GetProperty("field").GetString() == "port 22/tcp");
+        Assert.Equal("ex44", silent.GetProperty("subject").GetString());
+        Assert.Equal("public", silent.GetProperty("record").GetString());
+        Assert.Equal(JsonValueKind.Null, silent.GetProperty("reported").ValueKind);
+
+        // And the one that answers instead stands in no record at all.
+        var loud = drift.Single(one => one.GetProperty("field").GetString() == "port 2222/tcp");
+        Assert.Equal(JsonValueKind.Null, loud.GetProperty("record").ValueKind);
+        Assert.Equal("public", loud.GetProperty("reported").GetString());
+    }
+
+    /// <summary>
+    /// A port a planned installation wrote down is not an undocumented one:
+    /// somebody put it in the record, whatever the installation's state says.
+    /// The planned installation is still not expected to be listening.
+    /// </summary>
+    [Fact]
+    public async Task A_port_a_planned_installation_wrote_down_is_not_undocumented()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var parked = await admin.PatchAsJsonAsync("/api/installations/logaffe-prod", new { status = "planned" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, parked.StatusCode);
+
+        await Keeps(admin, [new { port = 22, protocol = "tcp", scope = "public" }]);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(
+            machine,
+            [
+                new { port = 18502, protocol = "tcp", binding = "public" },
+                new { port = 22, protocol = "tcp", binding = "public" },
+            ]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
     }
 
     /// <summary>
@@ -340,6 +465,13 @@ public sealed class DriftTests(PostgresFixture postgres)
         await Reports(machine, "ghcr.io/datavisionzero/logaffe:1.4.0", "running");
 
         Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>The ports the machine itself keeps: SSH, and what no installation answers to.</summary>
+    private static async Task Keeps(HttpClient admin, object[] ports)
+    {
+        using var written = await admin.PatchAsJsonAsync("/api/machines/ex44", new { ports }, Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
     }
 
     private static async Task<JsonElement> Drift(HttpClient client, string address) =>

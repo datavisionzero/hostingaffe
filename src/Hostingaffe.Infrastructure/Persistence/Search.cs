@@ -27,7 +27,9 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// the number, so a query that is a port number is looked up in the column as
 /// well. That is what makes VISION 5's own example answer. It asks whether such
 /// a row exists rather than joining it, because 53 may be both <c>tcp</c> and
-/// <c>udp</c> and that is one installation, not two answers.
+/// <c>udp</c> and that is one installation, not two answers. A machine's own
+/// ports answer the same way: <c>22</c> finds the host SSH is written down on,
+/// and it is the same question asked of the other side of the record.
 /// </para>
 /// <para>
 /// <strong>Paths are letters, not words.</strong> Postgres makes one token of
@@ -74,6 +76,14 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
             from machine m, q
             where m.deleted_at is null
               and (m.search @@ q.words or (q.fragment is not null and m.letters ilike q.fragment))
+
+            union all
+            select 1, 'machine', m.key, m.name, null::int, null::text, null::text, null::text, 'ports'
+            from machine m, q
+            where m.deleted_at is null and @port is not null
+              and not (m.search @@ q.words or (q.fragment is not null and m.letters ilike q.fragment))
+              and exists (select 1 from machine_port p
+                          where p.machine_id = m.id and p.port = @port)
 
             union all
             select 2, 'software', s.key, s.name, null::int, null::text, null::text, null::text,

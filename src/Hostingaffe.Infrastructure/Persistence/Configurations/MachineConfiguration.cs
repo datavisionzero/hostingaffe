@@ -12,10 +12,21 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// covers deleted rows on purpose: a key stays spent until the purge, so that a
 /// restore never lands on a name somebody else has taken (ADR 0013).
 /// </summary>
+/// <remarks>
+/// The machine's own ports are a table of their own, for the reason an
+/// installation's are: <c>protocol</c> and <c>scope</c> are closed sets like
+/// every other one in the model, and a closed set is a column with a check
+/// constraint that lists the words. The two tables are the same shape, because
+/// it is the same field.
+/// </remarks>
 public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
 {
     /// <summary>
     /// Everything of a machine somebody would find it by typing, as one text.
+    /// The ports are not in it, for the reason an installation's are not:
+    /// <c>22</c> inside the token <c>22/tcp</c> is not something anyone would
+    /// find by typing the number, and a query that <em>is</em> a port number is
+    /// looked up in the column instead (<c>docs/storage.md</c>, Searching).
     /// Both search columns are generated from this and from nothing else, so a
     /// field added to the row reaches the words and the letters together or
     /// neither (ADR 0012).
@@ -90,6 +101,32 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
         builder.Property(m => m.Ipv6).HasColumnName("ipv6").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.PrivateIp).HasColumnName("private_ip").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.Ssh).HasColumnName("ssh").HasMaxLength(Machine.FactMaxLength);
+
+        // What the machine itself listens on and no installation of it answers
+        // to: SSH, a Wireguard endpoint, a provider's agent. No row is not the
+        // same as no port — a machine nobody keeps this for says nothing about
+        // its ports, and the drift that reads it is simply not computed.
+        builder.OwnsMany(m => m.Ports, port =>
+        {
+            port.ToTable("machine_port", table =>
+            {
+                table.HasCheckConstraint("ck_machine_port_protocol", "protocol in ('tcp', 'udp')");
+                table.HasCheckConstraint("ck_machine_port_scope", "scope in ('public', 'private', 'internal')");
+                table.HasCheckConstraint("ck_machine_port_number", "port between 1 and 65535");
+            });
+
+            port.WithOwner().HasForeignKey("machine_id").HasConstraintName("fk_machine_port_machine");
+            port.Property(p => p.Number).HasColumnName("port");
+            port.Property(p => p.Protocol).HasColumnName("protocol").HasConversion(new SnakeCaseEnumConverter<Protocol>());
+            port.Property(p => p.Scope).HasColumnName("scope").HasConversion(new SnakeCaseEnumConverter<Scope>());
+
+            // The key is what makes a port the same port: the number and the
+            // transport. A second row for 22/tcp with another scope would be a
+            // contradiction, and the database refuses to hold one.
+            port.HasKey("machine_id", nameof(Port.Number), nameof(Port.Protocol)).HasName("pk_machine_port");
+        });
+
+        builder.Navigation(m => m.Ports).AutoInclude();
 
         builder.Property(m => m.Status)
             .HasColumnName("status")

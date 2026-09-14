@@ -35,6 +35,16 @@ public sealed class Machine
     /// <summary>What every free-text fact fits in: a line, not a paragraph.</summary>
     public const int FactMaxLength = 200;
 
+    /// <summary>How many ports one machine holds — the same bound an installation's list has.</summary>
+    public const int ListMaxCount = 50;
+
+    /// <summary>
+    /// The machine's own ports, in the field EF Core fills: the navigation
+    /// itself is read only, because a port is added by replacing the list and
+    /// never by reaching into it.
+    /// </summary>
+    private readonly List<Port> _ports = [];
+
     private Machine()
     {
         // EF Core materializes through this; every other route goes through Create.
@@ -95,6 +105,23 @@ public sealed class Machine
 
     /// <summary>The SSH target or alias the operator uses.</summary>
     public string? Ssh { get; private set; }
+
+    /// <summary>
+    /// What the machine itself listens on and belongs to no installation of it:
+    /// SSH, a Wireguard endpoint, a provider's agent. The same shape an
+    /// installation's ports have, and a row of its own per port for the same
+    /// reason (<c>docs/storage.md</c>).
+    /// </summary>
+    /// <remarks>
+    /// <strong>An empty list says nothing rather than "none".</strong> The
+    /// field is what makes "listens in public and stands in no record" a drift
+    /// somebody can clear — by writing the port down or by closing it — and a
+    /// machine nobody has filled it in for is not told that every port it has
+    /// is undocumented. Not kept means quiet; the comparison is the operator's
+    /// to switch on by naming one port, and the drift against an installation's
+    /// ports does not depend on it either way.
+    /// </remarks>
+    public IReadOnlyList<Port> Ports => _ports;
 
     public Status Status { get; private set; }
 
@@ -160,6 +187,23 @@ public sealed class Machine
         Fields.Text("ipv4", edit.Ipv4, Ipv4, value => Ipv4 = value, value => Address(value, AddressFamily.InterNetwork, "ipv4"), changes);
         Fields.Text("ipv6", edit.Ipv6, Ipv6, value => Ipv6 = value, value => Address(value, AddressFamily.InterNetworkV6, "ipv6"), changes);
         Fields.Text("private_ip", edit.PrivateIp, PrivateIp, value => PrivateIp = value, value => Address(value, null, "private_ip"), changes);
+
+        // Two ports on the same number and protocol are one port, whatever
+        // their scopes say, so that is what makes them the same entry — the
+        // rule an installation's list follows, because it is the same field.
+        Fields.Many(
+            "ports",
+            edit.Ports,
+            Ports,
+            value =>
+            {
+                _ports.Clear();
+                _ports.AddRange(value);
+            },
+            port => port.ToString(),
+            ListMaxCount,
+            changes,
+            port => $"{port.Number}/{Spelling.Of(port.Protocol)}");
 
         Fields.Closed("kind", edit.Kind, Kind, value => Kind = value, changes);
         Fields.Closed("arch", edit.Arch, Arch, value => Arch = value, changes);

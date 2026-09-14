@@ -1,6 +1,6 @@
-namespace Hostingaffe.Domain.Installations;
+namespace Hostingaffe.Domain;
 
-/// <summary>The transport a port speaks (<c>CONTEXT.md</c>, Installation). Closed.</summary>
+/// <summary>The transport a port speaks (<c>CONTEXT.md</c>, Port). Closed.</summary>
 public enum Protocol
 {
     Tcp,
@@ -8,7 +8,7 @@ public enum Protocol
 }
 
 /// <summary>
-/// How far a port is reachable (<c>CONTEXT.md</c>, Installation). Closed.
+/// How far a port is reachable (<c>CONTEXT.md</c>, Port). Closed.
 /// </summary>
 public enum Scope
 {
@@ -23,10 +23,17 @@ public enum Scope
 }
 
 /// <summary>
-/// One port an installation listens on, and how far it is reachable
-/// (VISION 7).
+/// One port something listens on, and how far it is reachable (VISION 7).
 /// </summary>
 /// <remarks>
+/// <para>
+/// It belongs to an installation and to a machine alike, which is why it lies
+/// at the root beside <see cref="Key"/> and <see cref="Status"/> rather than
+/// under either of them. What an installation listens on is the installation's;
+/// what belongs to the machine and to no installation of it — SSH, a Wireguard
+/// endpoint, a provider's agent — is the machine's, and the two are the same
+/// field in the same shape.
+/// </para>
 /// <para>
 /// It is an object and not the string <c>443/tcp:public</c>, because that
 /// spelling is a <em>rendering</em>: as a field it would be the one place in

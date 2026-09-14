@@ -31,7 +31,7 @@ public static class MachineEndpoints
                 var machine = await create.ExecuteAsync(
                     request ?? new CreateMachineRequest(
                         null, null, null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null, null, null),
                     note,
                     cancellationToken);
 
@@ -63,7 +63,7 @@ public static class MachineEndpoints
                     key,
                     request ?? new ChangeMachineRequest(
                         null, null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null, null, null),
                     http.Headers.IfMatch.ToString(),
                     note,
                     cancellationToken))
