@@ -208,8 +208,9 @@ public sealed record ListeningPort
 /// <remarks>
 /// A scope is what an operator decided a port is for — <c>private</c> means
 /// "from my own network", which is a firewall's doing and invisible in a
-/// listening socket. A binding is only what the socket says: either it is
-/// reachable from beyond this machine, or it is not.
+/// listening socket, while <c>internal</c> means no host socket exists at all.
+/// A binding is only what the socket says: either it is reachable from beyond
+/// this machine, or it is bound to loopback alone.
 /// </remarks>
 public enum Binding
 {

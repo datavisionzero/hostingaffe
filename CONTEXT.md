@@ -162,15 +162,16 @@ machine's — and it is the same field on both.
 | closed set | values |
 |---|---|
 | `protocol` | `tcp` · `udp` |
-| `scope` | `public` · `private` (the operator's network) · `internal` (a container network) |
+| `scope` | `public` · `private` (the operator's network) · `loopback` (this machine only) · `internal` (never reaches the host) |
 
 It is an object — `{ "port": 443, "protocol": "tcp", "scope": "public" }`. The
 spelling `443/tcp:public` is what a person reads and types, and what a history
 row carries; it is a rendering, not the field.
 
 **A `scope` is not a Binding** (see Report). A scope is what an operator decided
-a port is *for*; a binding is what the socket says. The two are compared, never
-equated.
+a port is *for*: `public` and `private` reach beyond the machine, `loopback`
+reaches this machine only, and `internal` never reaches the host. A binding is
+what the socket says. The two are compared, never equated.
 
 ## Deployment
 
@@ -224,8 +225,9 @@ bound to a wildcard or to an address other machines can reach, and `loopback`,
 reachable from this machine and nowhere else. It is deliberately **not**
 `scope`, which is what an operator decided a port is *for*: `private` means
 "from my own network", and that is a firewall's doing and invisible in a
-listening socket. One entry per port and protocol, and where a port is bound to
-several addresses the widest binding wins.
+listening socket; `loopback` means the host alone, while `internal` means no
+host socket exists. One entry per port and protocol, and where a port is bound
+to several addresses the widest binding wins.
 
 The `listening` section carries **no process** — not the name, not the command
 line, not the arguments. Another user's process is visible only to root, and

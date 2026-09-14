@@ -257,7 +257,7 @@ create table machine_port (
     machine_id uuid not null references machine (id) on delete cascade,
     port       int  not null check (port between 1 and 65535),
     protocol   text not null check (protocol in ('tcp', 'udp')),
-    scope      text not null check (scope in ('public', 'private', 'internal')),
+    scope      text not null check (scope in ('public', 'private', 'loopback', 'internal')),
 
     primary key (machine_id, port, protocol)
 );
@@ -394,7 +394,7 @@ create table installation_port (
     installation_id uuid not null references installation (id) on delete cascade,
     port            int  not null check (port between 1 and 65535),
     protocol        text not null check (protocol in ('tcp', 'udp')),
-    scope           text not null check (scope in ('public', 'private', 'internal')),
+    scope           text not null check (scope in ('public', 'private', 'loopback', 'internal')),
 
     primary key (installation_id, port, protocol)
 );

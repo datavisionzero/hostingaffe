@@ -167,9 +167,10 @@ public sealed class DriftFinder(
     /// compared as if they were. <c>public</c> and <c>private</c> both need a
     /// socket bound beyond loopback — how much further is a firewall's doing,
     /// which no listening socket shows — so both are read as "reachable from
-    /// off this machine". <c>internal</c> means the port never reaches the host
-    /// at all, so hearing nothing is the agreement and hearing it in public is
-    /// the disagreement.
+    /// off this machine". <c>loopback</c> needs a loopback socket and
+    /// <c>internal</c> means the port never reaches the host at all, so silence
+    /// is the agreement there. A public binding contradicts either of those
+    /// narrower scopes.
     /// </para>
     /// <para>
     /// An installation the record does not call <c>active</c> is passed over: a
@@ -186,7 +187,7 @@ public sealed class DriftFinder(
     /// that every port it has is undocumented — the comparison is simply not
     /// made, because a drift nobody can clear teaches people to stop reading
     /// the list. It is not a suppression list: no single port and no single
-    /// finding is silenced, and the three comparisons above run either way.
+    /// finding is silenced, and recorded ports are still compared either way.
     /// </para>
     /// </remarks>
     private static void Ports(
@@ -312,6 +313,7 @@ public sealed class DriftFinder(
         var disagrees = port.Scope switch
         {
             Scope.Internal => binding is Binding.Public,
+            Scope.Loopback => binding is Binding.Public,
             _ => binding is Binding.Loopback,
         };
 

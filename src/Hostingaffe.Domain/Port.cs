@@ -18,7 +18,10 @@ public enum Scope
     /// <summary>From the operator's own network.</summary>
     Private,
 
-    /// <summary>From a container network, and nowhere else.</summary>
+    /// <summary>From this machine, and nowhere else.</summary>
+    Loopback,
+
+    /// <summary>From a container network that never reaches the host.</summary>
     Internal,
 }
 

@@ -245,6 +245,36 @@ public sealed class DriftTests(PostgresFixture postgres)
         Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
     }
 
+    [Theory]
+    [InlineData("loopback", false)]
+    [InlineData("public", true)]
+    [InlineData(null, true)]
+    public async Task A_loopback_scope_needs_a_socket_on_this_machine_only(string? binding, bool disagrees)
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "loopback" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+
+        await Listens(
+            machine,
+            binding is null
+                ? [new { port = 22, protocol = "tcp", binding = "public" }]
+                : [new { port = 18502, protocol = "tcp", binding }]);
+
+        var drift = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray();
+        if (!disagrees)
+        {
+            Assert.Empty(drift);
+            return;
+        }
+
+        var one = drift.Single();
+        Assert.Equal("loopback", one.GetProperty("record").GetString());
+        Assert.Equal(binding, one.GetProperty("reported").GetString());
+    }
+
     /// <summary>
     /// <c>internal</c> means the port never reaches the host at all, so hearing
     /// nothing about it is the agreement rather than a hole in the record.
@@ -284,8 +314,8 @@ public sealed class DriftTests(PostgresFixture postgres)
     /// ones: the record says nothing about what belongs to the machine itself,
     /// so a drift about port 22 could never be resolved by anybody, and a drift
     /// nobody can clear teaches people to stop reading the list. The section is
-    /// shown whole instead, and the three comparisons against an installation's
-    /// ports run either way.
+    /// shown whole instead, and recorded installation ports are still compared
+    /// either way.
     /// </summary>
     [Fact]
     public async Task A_machine_that_keeps_no_ports_is_told_nothing_about_undocumented_ones()

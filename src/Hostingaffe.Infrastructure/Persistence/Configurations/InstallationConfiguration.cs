@@ -128,7 +128,7 @@ public sealed class InstallationConfiguration : IEntityTypeConfiguration<Install
             port.ToTable("installation_port", table =>
             {
                 table.HasCheckConstraint("ck_installation_port_protocol", "protocol in ('tcp', 'udp')");
-                table.HasCheckConstraint("ck_installation_port_scope", "scope in ('public', 'private', 'internal')");
+                table.HasCheckConstraint("ck_installation_port_scope", "scope in ('public', 'private', 'loopback', 'internal')");
                 table.HasCheckConstraint("ck_installation_port_number", "port between 1 and 65535");
             });
 

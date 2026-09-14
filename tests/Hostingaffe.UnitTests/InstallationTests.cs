@@ -386,6 +386,8 @@ public sealed class InstallationTests
     [Fact]
     public void The_closed_sets_are_spelled_the_way_the_contract_spells_them()
     {
+        Assert.Equal(["tcp", "udp"], Enum.GetValues<Protocol>().Select(Spelling.Of));
+        Assert.Equal(["public", "private", "loopback", "internal"], Enum.GetValues<Scope>().Select(Spelling.Of));
         Assert.Equal(["production", "staging", "development"], Enum.GetValues<Environment>().Select(Spelling.Of));
         Assert.Equal(["application", "platform"], Enum.GetValues<Role>().Select(Spelling.Of));
         Assert.Equal(["planned", "active", "retired"], Enum.GetValues<Status>().Select(Spelling.Of));

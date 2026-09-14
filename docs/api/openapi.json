@@ -9541,6 +9541,7 @@
         "enum": [
           "public",
           "private",
+          "loopback",
           "internal"
         ],
         "type": "string"

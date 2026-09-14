@@ -111,7 +111,7 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             port.ToTable("machine_port", table =>
             {
                 table.HasCheckConstraint("ck_machine_port_protocol", "protocol in ('tcp', 'udp')");
-                table.HasCheckConstraint("ck_machine_port_scope", "scope in ('public', 'private', 'internal')");
+                table.HasCheckConstraint("ck_machine_port_scope", "scope in ('public', 'private', 'loopback', 'internal')");
                 table.HasCheckConstraint("ck_machine_port_number", "port between 1 and 65535");
             });
 

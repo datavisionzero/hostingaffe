@@ -445,8 +445,9 @@ backup, which is the honest state and the one the filter above is meant to find.
 
 `443/tcp:public` is how a person writes and reads one — the CLI and the
 interface convert, and the history writes it that way — but the field is the
-object. `protocol` is `tcp` or `udp`, `scope` is `public`, `private` or
-`internal`, and two entries for the same port and protocol are refused.
+object. `protocol` is `tcp` or `udp`; `scope` is `public`, `private`,
+`loopback` or `internal`, and two entries for the same port and protocol are
+refused.
 
 **A list is replaced whole**, never patched entry by entry: an entry has no
 address, and a caller who sends two of them means both. `[]` clears a list,
@@ -832,10 +833,11 @@ A `scope` and a `binding` are not compared as if they were the same word.
 `public` and `private` both need a socket bound past loopback — how much
 further is a firewall's doing, which no listening socket shows — so both are
 read as "reachable from off this machine", and a `loopback` binding under
-either is drift. `internal` means the port never reaches the host, so silence
-is the agreement and a `public` binding is the disagreement. An installation
-the record does not call `active` is passed over: a planned one is not supposed
-to be listening.
+either is drift. A `loopback` scope needs a `loopback` binding; silence or a
+`public` binding is drift. `internal` means the port never reaches the host, so
+silence is the agreement and a `public` binding is the disagreement. An
+installation the record does not call `active` is passed over: a planned one
+is not supposed to be listening.
 
 A `file` drift has three shapes and one silence. The record's digest against
 another one is a file changed on the host, or a record that moved with no sync

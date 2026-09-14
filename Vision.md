@@ -440,7 +440,7 @@ means something else to systemd and to Docker Compose.
 | `role` | `application` · `platform` | closed set; `platform` is what the host runs for everyone — Caddy, Uptime Kuma, Beszel, ntfy — the template's "host service" |
 | `status` | `planned` · `active` · `retired` | |
 | `urls` | list of URL | where it is reachable, if anywhere |
-| `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network) or `internal` (a Docker network). A machine carries the same field for what belongs to no installation |
+| `ports` | list of objects | `{ "port": 443, "protocol": "tcp", "scope": "public" }`; `protocol` is `tcp` · `udp`, and scope is `public`, `private` (the operator's network), `loopback` (this machine only) or `internal` (a container network that never reaches the host). A machine carries the same field for what belongs to no installation |
 | `path` | text | where it lives on the machine, `/srv/logaffe` — also where `files sync` writes by default |
 | `data` | text | where its persistent data lies, `/srv/services/logaffe` — what a backup has to take |
 | `secrets` | list of objects | `{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }`; the *name* it needs and the file the value lies in, never the value. `path` may be empty, and reads as `NAME@/the/file` ([ADR 0011](docs/adr/0011-a-secret-is-a-row-that-says-which-file-it-lies-in.md)) |
@@ -470,6 +470,14 @@ regular expression, "every installation with a public port" would become a text
 search instead of a query, and the generated clients would see a `string` they
 can read nothing out of. `protocol` and `scope` are closed sets like every other
 one here, with the same check constraint in the column.
+
+The four scopes keep two distinctions that a listening socket alone cannot
+make. `public` and `private` both reach beyond the machine; the firewall decides
+whether that means the internet or only the operator's network. `loopback`
+reaches the host and nothing beyond it. `internal` never reaches the host at
+all, as with a port exposed only inside a container network. The report's
+binding has only `public` and `loopback`, because the kernel cannot report what
+the firewall permits and sees no socket for an internal port.
 
 **An installation has two directories, and both are fields.** The one it is
 deployed from holds the Compose file and the runtime environment; the one its

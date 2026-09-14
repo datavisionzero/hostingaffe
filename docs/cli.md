@@ -249,6 +249,9 @@ provider's agent:
 ha machine set ex44 --port 22/tcp:public --port 51820/udp:private
 ```
 
+The scope is `public`, `private`, `loopback` (this machine only), or `internal`
+(a container network that never reaches the host).
+
 It is what makes "listening in public and written down nowhere" a drift a person
 can clear, either by writing the port down or by closing it. **A machine with no
 port written down hears nothing about undocumented ones**: the record says
