@@ -158,7 +158,8 @@ directory.
 ## A machine that reports for itself
 
 A host can hand in a **report** every quarter of an hour: a sign of life, plus
-disk usage, memory, load and what Docker runs. The record stays written and the
+disk usage, memory, load, what Docker runs, what listens on which port, and
+whether the machine is waiting for a restart. The record stays written and the
 report stays beside it — nothing here changes a field
 ([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
 
@@ -174,9 +175,21 @@ ha report collect
 ```
 
 It prints the JSON `ha report send` would hand in. What it never carries: no
-container environment, no process command lines, no file contents. That is the
-same line that keeps secret values out of the record, and `collect` is how
-anyone checks it without reading the code.
+container environment, no process command lines, no file contents, and no name
+of any process that is listening. That is the same line that keeps secret
+values out of the record, and `collect` is how anyone checks it without reading
+the code.
+
+The listening ports come out of `/proc/net`, which is why they carry no process
+name and why nothing here needs root. Whether a restart is pending is the file
+Debian and Ubuntu write, `/run/reboot-required`; on any other distribution the
+section is missing with its reason rather than `false`.
+
+**On Debian and Ubuntu that file is written by `update-notifier-common`.** A
+host without that package never gets one, and the report then says no restart
+is pending when one may be — the one thing this section cannot tell apart. If
+the column matters to you, `apt install update-notifier-common` on the hosts
+that lack it.
 
 **2. Issue the machine its token**, from wherever you work — not on the host:
 
@@ -241,7 +254,7 @@ systemctl enable --now hostingaffe-report.timer
 **Checking that it arrives.** From wherever you work:
 
 ```sh
-ha machine list                  # the `last seen` column
+ha machine list                  # the `last seen` and `restart` columns
 ha report show ex44              # the last report, as a person reads it
 ha machine token show ex44       # when the token was last used, if it was
 ```

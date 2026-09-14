@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hostingaffe.Domain;
+using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Reports;
 
 namespace Hostingaffe.Application.Acts;
@@ -23,6 +24,8 @@ public sealed record HandInReportRequest(
     MemorySectionRequest? Memory,
     IReadOnlyList<DiskRequest>? Disks,
     IReadOnlyList<ContainerRequest>? Containers,
+    IReadOnlyList<ListeningRequest>? Listening,
+    UpdatesRequest? Updates,
     IReadOnlyList<MissingRequest>? Missing)
 {
     /// <inheritdoc cref="ReportWrites.Closed"/>
@@ -70,6 +73,22 @@ public sealed record ContainerRequest(
     int? Restarts,
     DateTimeOffset? StartedAt,
     IReadOnlyList<string>? Ports)
+{
+    [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
+}
+
+/// <summary>
+/// One listening socket, as the collector found it: a port, a transport and how
+/// far it is bound. <strong>No process.</strong>
+/// </summary>
+/// <inheritdoc cref="HandInReportRequest"/>
+public sealed record ListeningRequest(int? Port, Protocol? Protocol, Binding? Binding)
+{
+    [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
+}
+
+/// <inheritdoc cref="HandInReportRequest"/>
+public sealed record UpdatesRequest(bool? RebootRequired)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -123,6 +142,8 @@ public static class ReportWrites
             Memory = MemorySection(request.Memory),
             Disks = Disks(request.Disks),
             Containers = Containers(request.Containers),
+            Listening = Listening(request.Listening),
+            Updates = Updates(request.Updates),
             Missing = Missing(request.Missing),
         };
     }
@@ -226,6 +247,78 @@ public static class ReportWrites
                 };
             }),
         ];
+    }
+
+    /// <summary>
+    /// The listening sockets, deduplicated on the way in: one entry per port
+    /// and protocol, and the widest binding wins. A collector that sent a port
+    /// twice — once on the wildcard, once on loopback — is saying one thing
+    /// about one port, and the body holds one thing about it.
+    /// </summary>
+    private static IReadOnlyList<ListeningPort>? Listening(IReadOnlyList<ListeningRequest>? given)
+    {
+        if (given is null)
+        {
+            return null;
+        }
+
+        AtMost("listening", given.Count, ReportBody.MaxListening);
+
+        var widest = new Dictionary<(int Port, Protocol Protocol), Binding>();
+        var order = new List<(int Port, Protocol Protocol)>();
+
+        foreach (var listening in given)
+        {
+            Closed("A report's listening port", listening.UnknownFields);
+
+            var port = listening.Port switch
+            {
+                null => throw Refusal.Validation("listening.port", "The value is required."),
+                < Port.Lowest or > Port.Highest =>
+                    throw Refusal.Validation("listening.port", $"A port is between {Port.Lowest} and {Port.Highest}."),
+                { } number => number,
+            };
+
+            var protocol = listening.Protocol
+                ?? throw Refusal.Validation("listening.protocol", "The value is required.");
+            var binding = listening.Binding
+                ?? throw Refusal.Validation("listening.binding", "The value is required.");
+
+            var key = (port, protocol);
+            if (widest.TryGetValue(key, out var already))
+            {
+                widest[key] = already is Binding.Public || binding is Binding.Public
+                    ? Binding.Public
+                    : Binding.Loopback;
+                continue;
+            }
+
+            widest[key] = binding;
+            order.Add(key);
+        }
+
+        return [.. order.Select(key => new ListeningPort
+        {
+            Port = key.Port,
+            Protocol = key.Protocol,
+            Binding = widest[key],
+        })];
+    }
+
+    private static UpdatesSection? Updates(UpdatesRequest? given)
+    {
+        if (given is null)
+        {
+            return null;
+        }
+
+        Closed("A report's updates", given.UnknownFields);
+
+        return new UpdatesSection
+        {
+            RebootRequired = given.RebootRequired
+                ?? throw Refusal.Validation("updates.reboot_required", "The value is required."),
+        };
     }
 
     private static IReadOnlyList<MissingSection> Missing(IReadOnlyList<MissingRequest>? given)

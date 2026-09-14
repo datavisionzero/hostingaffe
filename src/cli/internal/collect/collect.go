@@ -26,9 +26,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +44,7 @@ const (
 	MaxDisks      = 64
 	MaxContainers = 500
 	MaxPorts      = 64
+	MaxListening  = 128
 	MaxMissing    = 8
 )
 
@@ -62,6 +65,8 @@ type Report struct {
 	Memory      *Memory     `json:"memory"`
 	Disks       []Disk      `json:"disks"`
 	Containers  []Container `json:"containers"`
+	Listening   []Listening `json:"listening"`
+	Updates     *Updates    `json:"updates"`
 	Missing     []Missing   `json:"missing"`
 }
 
@@ -107,6 +112,35 @@ type Container struct {
 	Restarts  *int       `json:"restarts,omitempty"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	Ports     []string   `json:"ports,omitempty"`
+}
+
+// Listening is one port the machine listens on, and how far the socket is
+// bound — and it is deliberately nothing else.
+//
+// **No process name, no command line, no arguments.** `ss -tulpn` shows another
+// user's process only as root, and this collector's promise is that it needs
+// none; a section whole on the machine whose cron runs as root and half empty
+// on the next would be worse than one that says the same everywhere. What the
+// section exists for is the comparison against an installation's ports, and
+// those are ports rather than processes.
+type Listening struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+	Binding  string `json:"binding"`
+}
+
+// Updates is what the machine says about its own upkeep. Today one thing:
+// whether it is waiting for a restart.
+//
+// How many packages have an update is deliberately not here. Counting them
+// makes this distribution-dependent for the first time — apt, dnf, apk, pacman,
+// each with its own command — and a host on which nothing ran `apt update` for
+// weeks would report nothing pending and lie in the most comforting way there
+// is. Where the restart cannot be told, the section is missing and says so; a
+// false from a machine nobody could ask would be the worst of the three
+// answers.
+type Updates struct {
+	RebootRequired bool `json:"reboot_required"`
 }
 
 // Missing is a section the collector could not determine, and the reason it
@@ -171,6 +205,18 @@ func Collect(ctx context.Context, env Environment, agent string) Report {
 		report.missing("containers", err)
 	} else {
 		report.Containers = containers
+	}
+
+	if listening, err := collectListening(env); err != nil {
+		report.missing("listening", err)
+	} else {
+		report.Listening = listening
+	}
+
+	if updates, err := collectUpdates(env); err != nil {
+		report.missing("updates", err)
+	} else {
+		report.Updates = updates
 	}
 
 	return report
@@ -421,6 +467,217 @@ func realMounts(env Environment) (map[string]bool, error) {
 	return mounts, nil
 }
 
+// sockets are the four files the kernel already keeps, one per family and
+// transport. They are read rather than `ss` run for the reason /proc is read
+// everywhere else here: it needs no package, no PATH and no root.
+var sockets = []struct {
+	parts    []string
+	protocol string
+}{
+	{[]string{"proc", "net", "tcp"}, "tcp"},
+	{[]string{"proc", "net", "tcp6"}, "tcp"},
+	{[]string{"proc", "net", "udp"}, "udp"},
+	{[]string{"proc", "net", "udp6"}, "udp"},
+}
+
+// tcpListen is what /proc/net/tcp calls a socket waiting for a connection.
+const tcpListen = "0A"
+
+// collectListening is what has a socket open for it on this machine: one entry
+// per port and protocol, the widest binding winning where a port is bound to
+// several addresses. A port on 0.0.0.0 and on 127.0.0.1 is public, because that
+// is the honest answer to how far it is reachable.
+func collectListening(env Environment) ([]Listening, error) {
+	widest := map[Listening]bool{}
+	read := 0
+
+	for _, family := range sockets {
+		content, err := env.read(family.parts...)
+		if err != nil {
+			continue
+		}
+		read++
+
+		for _, one := range listeners(content, family.protocol) {
+			widest[one] = true
+		}
+	}
+
+	if read == 0 {
+		return nil, fmt.Errorf("%s could not be read", env.path("proc", "net"))
+	}
+
+	// A port heard in public and on loopback is one port, and it is public.
+	public := map[int]map[string]bool{}
+	for one := range widest {
+		if one.Binding != "public" {
+			continue
+		}
+		if public[one.Port] == nil {
+			public[one.Port] = map[string]bool{}
+		}
+		public[one.Port][one.Protocol] = true
+	}
+
+	listening := []Listening{}
+	for one := range widest {
+		if one.Binding == "loopback" && public[one.Port][one.Protocol] {
+			continue
+		}
+		listening = append(listening, one)
+	}
+
+	// Ordered, so that two reports of an unchanged machine are the same text
+	// and a person comparing them sees only what moved.
+	sort.Slice(listening, func(i, j int) bool {
+		if listening[i].Port != listening[j].Port {
+			return listening[i].Port < listening[j].Port
+		}
+		return listening[i].Protocol < listening[j].Protocol
+	})
+
+	if len(listening) > MaxListening {
+		listening = listening[:MaxListening]
+	}
+	return listening, nil
+}
+
+// listeners is one of the four files, as the entries a person would call
+// listening: every TCP socket in LISTEN, and every UDP socket with no peer.
+func listeners(content, protocol string) []Listening {
+	found := []Listening{}
+
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 4 || fields[0] == "sl" {
+			continue
+		}
+
+		if protocol == "tcp" {
+			if fields[3] != tcpListen {
+				continue
+			}
+		} else if _, peer, cut := strings.Cut(fields[2], ":"); !cut || !allZero(peer) {
+			// A UDP socket with a peer is a conversation, not a door.
+			continue
+		}
+
+		address, port, cut := strings.Cut(fields[1], ":")
+		if !cut {
+			continue
+		}
+		number, err := strconv.ParseUint(port, 16, 32)
+		if err != nil || number < 1 || number > 65535 {
+			continue
+		}
+
+		binding, err := binding(address)
+		if err != nil {
+			continue
+		}
+
+		found = append(found, Listening{Port: int(number), Protocol: protocol, Binding: binding})
+	}
+
+	return found
+}
+
+func allZero(hex string) bool {
+	return strings.Trim(hex, "0") == ""
+}
+
+// binding is how far a socket bound to this address reaches. The kernel writes
+// an address as hex words in the host's byte order, which on every platform
+// this runs on is little-endian: the bytes of each four come back reversed.
+func binding(address string) (string, error) {
+	if len(address)%8 != 0 || len(address) == 0 {
+		return "", fmt.Errorf("%q is not an address", address)
+	}
+
+	raw := make([]byte, 0, len(address)/2)
+	for word := 0; word < len(address); word += 8 {
+		for pair := 6; pair >= 0; pair -= 2 {
+			value, err := strconv.ParseUint(address[word+pair:word+pair+2], 16, 8)
+			if err != nil {
+				return "", err
+			}
+			raw = append(raw, byte(value))
+		}
+	}
+
+	ip := net.IP(raw)
+	if len(ip) != net.IPv4len && len(ip) != net.IPv6len {
+		return "", fmt.Errorf("%q is not an address", address)
+	}
+
+	// The wildcard is the widest bind there is, and net calls it unspecified
+	// rather than loopback; it is asked first for that reason.
+	if ip.IsUnspecified() || !ip.IsLoopback() {
+		return "public", nil
+	}
+	return "loopback", nil
+}
+
+// rebootMarkers are where a distribution says a restart is pending. Debian and
+// Ubuntu write the file; /var/run is /run on any system of this age, and both
+// are looked at so that a fake root in a test needs no symlink.
+var rebootMarkers = [][]string{
+	{"run", "reboot-required"},
+	{"var", "run", "reboot-required"},
+}
+
+// collectUpdates is whether the machine is waiting for a restart.
+//
+// The marker is Debian's and Ubuntu's, and the section is missing on anything
+// else rather than false: this collector runs no package manager, and a `false`
+// it could not check would be read as "nothing to do here".
+func collectUpdates(env Environment) (*Updates, error) {
+	for _, marker := range rebootMarkers {
+		if _, err := os.Stat(env.path(marker...)); err == nil {
+			return &Updates{RebootRequired: true}, nil
+		}
+	}
+
+	release, err := env.read("etc", "os-release")
+	if err != nil {
+		return nil, fmt.Errorf("%s could not be read", env.path("etc", "os-release"))
+	}
+
+	if !debianLike(release) {
+		return nil, errors.New(
+			"this distribution has no reboot-required marker that ha knows about; only Debian and Ubuntu do")
+	}
+
+	// On Debian and Ubuntu the marker is written by update-notifier-common. A
+	// host without that package never gets one, and this then says no restart
+	// is pending when one may be — the one thing the section cannot tell apart,
+	// and docs/operations.md says so.
+	return &Updates{RebootRequired: false}, nil
+}
+
+// debianLike is whether /etc/os-release names a distribution that writes the
+// reboot-required marker — either because it is Debian or Ubuntu, or because it
+// says it is like one.
+func debianLike(release string) bool {
+	values := map[string]string{}
+	scanner := bufio.NewScanner(strings.NewReader(release))
+	for scanner.Scan() {
+		key, value, found := strings.Cut(scanner.Text(), "=")
+		if !found {
+			continue
+		}
+		values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"`)
+	}
+
+	for _, word := range append(strings.Fields(values["ID_LIKE"]), values["ID"]) {
+		if word == "debian" || word == "ubuntu" {
+			return true
+		}
+	}
+	return false
+}
+
 // dockerLine is the part of `docker ps --format json` this reads, and nothing
 // else. It is an allowlist rather than a filter: what is not named here never
 // enters the process, let alone the report.
@@ -621,6 +878,26 @@ func (r Report) Body() api.HandInReportRequest {
 			containers = append(containers, one)
 		}
 		body.Containers = &containers
+	}
+
+	if r.Listening != nil {
+		listening := make([]api.ListeningRequest, 0, len(r.Listening))
+		for _, one := range r.Listening {
+			port := int32(one.Port)
+			protocol := api.Protocol(one.Protocol)
+			binding := api.Binding(one.Binding)
+			listening = append(listening, api.ListeningRequest{
+				Port:     &port,
+				Protocol: &protocol,
+				Binding:  &binding,
+			})
+		}
+		body.Listening = &listening
+	}
+
+	if r.Updates != nil {
+		reboot := r.Updates.RebootRequired
+		body.Updates = &api.UpdatesRequest{RebootRequired: &reboot}
 	}
 
 	missing := make([]api.MissingRequest, 0, len(r.Missing))

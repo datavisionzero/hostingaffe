@@ -21,7 +21,8 @@ public sealed record ReportSummaryShape(
     int? ContainersRunning,
     int? ContainersTotal,
     int? DiskPercent,
-    double? Load1);
+    double? Load1,
+    bool? RebootRequired);
 
 /// <summary>A page of a machine's reports, newest first, and how many there are in all.</summary>
 public sealed record ReportPageShape(int Total, IReadOnlyList<ReportSummaryShape> Reports);
@@ -37,6 +38,8 @@ public sealed record ReportShape(
     MemorySection? Memory,
     IReadOnlyList<DiskUsage>? Disks,
     IReadOnlyList<ContainerState>? Containers,
+    IReadOnlyList<ListeningPort>? Listening,
+    UpdatesSection? Updates,
     IReadOnlyList<MissingSection> Missing,
     IReadOnlyList<DriftShape> Drift);
 
@@ -56,7 +59,8 @@ public sealed class ReportAssembler(DriftFinder drift)
             containers is null ? null : containers.Count(one => one.State is "running"),
             containers?.Count,
             report.Body.Disks is { Count: > 0 } disks ? disks.Max(disk => disk.Percent) : null,
-            report.Body.Host?.Load1);
+            report.Body.Host?.Load1,
+            report.Body.Updates?.RebootRequired);
     }
 
     /// <summary>
@@ -81,6 +85,8 @@ public sealed class ReportAssembler(DriftFinder drift)
             report.Body.Memory,
             report.Body.Disks,
             report.Body.Containers,
+            report.Body.Listening,
+            report.Body.Updates,
             report.Body.Missing,
             await drift.BetweenAsync(machine, report, cancellationToken));
     }

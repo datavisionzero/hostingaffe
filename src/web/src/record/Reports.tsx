@@ -180,6 +180,31 @@ export function ReportBody({ report }: { report: Report }) {
         </div>
       )}
 
+      {report.listening !== null && report.listening.length > 0 && (
+        <div className="grid gap-2">
+          <p className="text-xs text-muted-foreground">
+            {`${report.listening.length} listening ${report.listening.length === 1 ? "port" : "ports"}`}
+          </p>
+          <Rows>
+            {report.listening.map((one) => (
+              <Line key={`${one.port}/${one.protocol}`}>
+                <span className="w-24 shrink-0 font-mono text-xs">{`${one.port}/${one.protocol}`}</span>
+                {/* No process name, and nothing that stands in for one: the
+                    collector needs no root and this is the whole of what it
+                    saw (docs/api.md, Reports). */}
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {one.binding === "public" ? "reachable from off this machine" : "loopback only"}
+                </span>
+              </Line>
+            ))}
+          </Rows>
+        </div>
+      )}
+
+      {report.updates !== null && report.updates.reboot_required === true && (
+        <p className="text-sm">This machine is waiting for a restart.</p>
+      )}
+
       <DriftList drift={report.drift} />
 
       {report.missing.length > 0 && (
@@ -241,6 +266,9 @@ export function ReportHistory({ machine }: { machine: string }) {
                     </span>
                     <span className="hidden w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground sm:block">
                       {report.load1 === null ? "–" : report.load1.toFixed(2)}
+                    </span>
+                    <span className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground sm:block">
+                      {report.reboot_required === true ? "restart" : ""}
                     </span>
                   </button>
                 </li>

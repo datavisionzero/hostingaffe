@@ -46,6 +46,12 @@ public enum DriftKind
 
     /// <summary>A fact of the machine — <c>os</c>, <c>arch</c> — against what the host says it is.</summary>
     Fact,
+
+    /// <summary>
+    /// A port an installation says it listens on against what the machine
+    /// actually has a socket for.
+    /// </summary>
+    Port,
 }
 
 /// <summary>
@@ -66,13 +72,20 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
 
         Facts(machine, report, drift);
 
-        if (report.Body.Containers is not { } containers)
+        if (report.Body is { Containers: null, Listening: null })
         {
             return drift;
         }
 
         var rows = await installations.OnMachineAsync(machine.Id, null, cancellationToken);
         if (rows.Count == 0)
+        {
+            return drift;
+        }
+
+        Ports(rows, report, drift);
+
+        if (report.Body.Containers is not { } containers)
         {
             return drift;
         }
@@ -121,6 +134,100 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
                 machine.MeasuredAt,
                 Spelling.Of(reported),
                 report.ReceivedAt));
+        }
+    }
+
+    /// <summary>
+    /// What the record says an installation listens on against what the machine
+    /// has a socket for — the case VISION 16 asks as "what listens on 18502",
+    /// answered from what is the case rather than from what somebody typed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A <see cref="Scope"/> is not a <see cref="Binding"/> and the two are not
+    /// compared as if they were. <c>public</c> and <c>private</c> both need a
+    /// socket bound beyond loopback — how much further is a firewall's doing,
+    /// which no listening socket shows — so both are read as "reachable from
+    /// off this machine". <c>internal</c> means the port never reaches the host
+    /// at all, so hearing nothing is the agreement and hearing it in public is
+    /// the disagreement.
+    /// </para>
+    /// <para>
+    /// An installation the record does not call <c>active</c> is passed over: a
+    /// planned one is not supposed to be listening, and saying so every quarter
+    /// of an hour would be noise, not drift.
+    /// </para>
+    /// <para>
+    /// <strong>A port that listens and belongs to no installation is not
+    /// drift.</strong> It is the question this section was wanted for, but the
+    /// record has no place to put a machine's own ports — SSH is in no
+    /// installation — so the statement could never be resolved by anybody, and
+    /// a drift nobody can clear teaches people to stop reading the list. The
+    /// <c>listening</c> section is shown whole instead, and a person reads it.
+    /// </para>
+    /// </remarks>
+    private static void Ports(IReadOnlyList<Installation> rows, Report report, List<DriftShape> drift)
+    {
+        if (report.Body.Listening is not { } listening)
+        {
+            return;
+        }
+
+        var heard = new Dictionary<(int Port, Protocol Protocol), Binding>();
+        foreach (var one in listening)
+        {
+            heard[(one.Port, one.Protocol)] = one.Binding;
+        }
+
+        foreach (var installation in rows.Where(one => one.Status is Status.Active))
+        {
+            foreach (var port in installation.Ports)
+            {
+                Listening(installation, port, heard, report.ReceivedAt, drift);
+            }
+        }
+    }
+
+    private static void Listening(
+        Installation installation,
+        Port port,
+        IReadOnlyDictionary<(int Port, Protocol Protocol), Binding> heard,
+        DateTimeOffset receivedAt,
+        List<DriftShape> drift)
+    {
+        var field = $"port {port.Number}/{Spelling.Of(port.Protocol)}";
+        var recorded = Spelling.Of(port.Scope);
+
+        if (!heard.TryGetValue((port.Number, port.Protocol), out var binding))
+        {
+            // An `internal` port is inside a container network and the host
+            // never sees it; silence is what the record led one to expect.
+            if (port.Scope is Scope.Internal)
+            {
+                return;
+            }
+
+            drift.Add(new DriftShape(
+                DriftKind.Port, installation.Key, field, recorded, installation.UpdatedAt, null, receivedAt));
+            return;
+        }
+
+        var disagrees = port.Scope switch
+        {
+            Scope.Internal => binding is Binding.Public,
+            _ => binding is Binding.Loopback,
+        };
+
+        if (disagrees)
+        {
+            drift.Add(new DriftShape(
+                DriftKind.Port,
+                installation.Key,
+                field,
+                recorded,
+                installation.UpdatedAt,
+                Spelling.Of(binding),
+                receivedAt));
         }
     }
 

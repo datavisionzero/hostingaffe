@@ -181,6 +181,8 @@ missing:
 | `memory` | total, used, available, swap |
 | `disks` | per real mount: mount, device, size, used, percent |
 | `containers` | per container: name, image **with its tag**, state, status, health, restarts, started_at, ports, and how many of how many run |
+| `listening` | per port and protocol: the port, `tcp` or `udp`, and the **binding** — and never a process |
+| `updates` | whether the machine is waiting for a restart |
 
 Beside them: `collected_at`, the host's clock as it came; `received_at`, the
 instance's clock, which is what the order and `last_seen` are read from; the
@@ -191,6 +193,24 @@ reports no containers and says why.
 A container's `image` carries its **tag**, where a software's `image` carries
 none: the tag is what the report is compared against, and the software's
 belongs to the deployment.
+
+**Binding** is how far a socket is bound, and it has two values: `public`,
+bound to a wildcard or to an address other machines can reach, and `loopback`,
+reachable from this machine and nowhere else. It is deliberately **not**
+`scope`, which is what an operator decided a port is *for*: `private` means
+"from my own network", and that is a firewall's doing and invisible in a
+listening socket. One entry per port and protocol, and where a port is bound to
+several addresses the widest binding wins.
+
+The `listening` section carries **no process** — not the name, not the command
+line, not the arguments. Another user's process is visible only to root, and
+the collector needs none; what the section exists for is the comparison against
+an installation's `ports`, and those are ports rather than processes.
+
+The `updates` section says one thing: whether the machine is waiting for a
+restart. How many packages have an update is not in it — counting them makes
+the collector distribution-dependent, and a host whose package lists are weeks
+old would report nothing pending and lie in the most comforting way there is.
 
 **No secrets, ever** — no container environment, no process command lines, no
 file contents. It is the rule the record already follows, and it holds here

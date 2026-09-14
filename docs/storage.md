@@ -613,8 +613,8 @@ future is stored rather than refused, because refusing it would deny a machine
 with a wrong clock its sign of life.
 
 **The body is `jsonb`**, and it holds the closed set of sections — `host`,
-`memory`, `disks`, `containers` — plus `missing`, the sections the collector
-could not determine, each with its reason. `jsonb` because the sections are
+`memory`, `disks`, `containers`, `listening`, `updates` — plus `missing`, the
+sections the collector could not determine, each with its reason. `jsonb` because the sections are
 nested and optional and none of them is ever filtered or ordered by: a body is
 read whole. That it is `jsonb` does not mean any JSON is accepted — the shape is
 the Domain's, and the write path refuses a field the contract does not know, the
@@ -622,6 +622,16 @@ way every other request object is closed (`api.md`).
 
 **Nothing derivable is in the body.** How many containers run of how many is
 counted where it is read, not stored beside the list it can be counted from.
+So is a machine's `reboot_required`: it is the latest report's
+`updates.reboot_required`, read out of the same `jsonb` the `last_seen` is read
+from, and it is nowhere a column of `machine`.
+
+**A section added to the body needs no migration**, which is why `listening`
+and `updates` arrived without one. An older body simply has neither, and a
+report that never carried a section is the same thing as a machine that could
+not determine it: absent. That is the one thing a `jsonb` body buys that a
+column per fact would not, and it is why the shape being closed is enforced on
+the write path rather than by the table.
 
 **Reports are swept after thirty days**, except the latest report of a machine,
 which is kept however old it is (`operations.md`,

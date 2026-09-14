@@ -102,6 +102,12 @@ export function MachinesView() {
                       colour, no badge: the reader judges (VISION 5). */}
                   {machine.last_seen === null ? "" : ago(machine.last_seen)}
                 </span>
+                <span className="hidden w-16 shrink-0 truncate text-right text-xs text-muted-foreground sm:block">
+                  {/* The one column worth reading down ten machines on a Friday
+                      afternoon. A word and no colour: whether it is restarted
+                      now or on Monday is nobody's judgement but the reader's. */}
+                  {machine.reboot_required === true ? "restart" : ""}
+                </span>
                 <StatusBadge status={machine.status} />
               </Link>
             </li>

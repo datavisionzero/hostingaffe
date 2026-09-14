@@ -184,11 +184,172 @@ public sealed class DriftTests(PostgresFixture postgres)
         Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
     }
 
+    /// <summary>
+    /// The question VISION 16 asks as "what listens on 18502", answered from
+    /// what is the case rather than from what somebody typed.
+    /// </summary>
+    [Fact]
+    public async Task The_record_says_a_port_is_listened_on_and_nothing_listens_there()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+
+        // The machine has a socket open, but on another port entirely.
+        await Listens(machine, [new { port = 22, protocol = "tcp", binding = "public" }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("port", one.GetProperty("kind").GetString());
+        Assert.Equal("logaffe-prod", one.GetProperty("subject").GetString());
+        Assert.Equal("port 18502/tcp", one.GetProperty("field").GetString());
+        Assert.Equal("public", one.GetProperty("record").GetString());
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("reported").ValueKind);
+    }
+
+    /// <summary>
+    /// The case worth finding: the record says a port is reachable and the
+    /// socket is bound to loopback alone.
+    /// </summary>
+    [Fact]
+    public async Task The_record_says_reachable_and_the_socket_is_loopback_alone()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "private" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 18502, protocol = "tcp", binding = "loopback" }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("port", one.GetProperty("kind").GetString());
+
+        // A scope is not a binding: `private` is a firewall's doing, which no
+        // listening socket shows. What both `public` and `private` need is a
+        // socket bound past loopback, and this one is not.
+        Assert.Equal("private", one.GetProperty("record").GetString());
+        Assert.Equal("loopback", one.GetProperty("reported").GetString());
+    }
+
+    [Fact]
+    public async Task A_port_the_record_and_the_machine_agree_about_says_nothing()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 18502, protocol = "tcp", binding = "public" }]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// <c>internal</c> means the port never reaches the host at all, so hearing
+    /// nothing about it is the agreement rather than a hole in the record.
+    /// </summary>
+    [Fact]
+    public async Task An_internal_port_the_host_never_hears_is_no_drift()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 5432, protocol = "tcp", scope = "internal" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 22, protocol = "tcp", binding = "public" }]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>And the other way round: what should never have reached the host is bound in public.</summary>
+    [Fact]
+    public async Task An_internal_port_bound_in_public_is_drift()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 5432, protocol = "tcp", scope = "internal" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 5432, protocol = "tcp", binding = "public" }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("port", one.GetProperty("kind").GetString());
+        Assert.Equal("internal", one.GetProperty("record").GetString());
+        Assert.Equal("public", one.GetProperty("reported").GetString());
+    }
+
+    /// <summary>
+    /// The question this section was wanted for, and the one the record cannot
+    /// answer: SSH is in no installation, so a drift about port 22 could never
+    /// be resolved by anybody, and a drift nobody can clear teaches people to
+    /// stop reading the list. The section is shown whole instead.
+    /// </summary>
+    [Fact]
+    public async Task A_port_no_installation_answers_to_is_shown_and_is_not_drift()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(
+            machine,
+            [
+                new { port = 18502, protocol = "tcp", binding = "public" },
+                new { port = 22, protocol = "tcp", binding = "public" },
+                new { port = 53, protocol = "udp", binding = "public" },
+            ]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+
+        var report = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports/latest", Ct);
+        Assert.Equal(3, report.GetProperty("listening").GetArrayLength());
+    }
+
+    /// <summary>
+    /// An installation the record does not call <c>active</c> is passed over: a
+    /// planned one is not supposed to be listening, and saying so every quarter
+    /// of an hour would be noise rather than drift.
+    /// </summary>
+    [Fact]
+    public async Task A_planned_installation_is_not_expected_to_be_listening()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var parked = await admin.PatchAsJsonAsync("/api/installations/logaffe-prod", new { status = "planned" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, parked.StatusCode);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Listens(machine, [new { port = 22, protocol = "tcp", binding = "public" }]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>A report with no listening section at all claims nothing about ports.</summary>
+    [Fact]
+    public async Task A_report_that_says_nothing_about_listening_claims_nothing()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, "ghcr.io/datavisionzero/logaffe", "1.4.0", [new { port = 18502, protocol = "tcp", scope = "public" }]);
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Reports(machine, "ghcr.io/datavisionzero/logaffe:1.4.0", "running");
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
     private static async Task<JsonElement> Drift(HttpClient client, string address) =>
         (await client.GetFromJsonAsync<JsonElement>(address, Ct)).GetProperty("drift");
 
     /// <summary>A machine, a software, and one installation of it running a version.</summary>
-    private static async Task AHost(HttpClient admin, string? image, string version)
+    private static Task AHost(HttpClient admin, string? image, string version) => AHost(admin, image, version, null);
+
+    /// <inheritdoc cref="AHost(HttpClient, string?, string)"/>
+    private static async Task AHost(HttpClient admin, string? image, string version, object[]? ports)
     {
         using var machine = await admin.PostAsJsonAsync(
             "/api/machines", new { key = "ex44", kind = "dedicated" }, Ct);
@@ -200,9 +361,23 @@ public sealed class DriftTests(PostgresFixture postgres)
 
         using var installation = await admin.PostAsJsonAsync(
             "/api/installations",
-            new { key = "logaffe-prod", machine = "ex44", software = "logaffe", environment = "production", role = "application", version },
+            new { key = "logaffe-prod", machine = "ex44", software = "logaffe", environment = "production", role = "application", version, ports },
             Ct);
         Assert.Equal(HttpStatusCode.Created, installation.StatusCode);
+    }
+
+    /// <summary>
+    /// What the machine has a socket open for, and nothing else. One per test:
+    /// the door takes one report per machine per minute.
+    /// </summary>
+    private static async Task Listens(HttpClient machine, object[] listening)
+    {
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new { collected_at = "2026-09-13T08:00:00Z", listening },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
     }
 
     private static async Task Reports(HttpClient machine, string image, string state)

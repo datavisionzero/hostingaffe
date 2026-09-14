@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,8 +51,35 @@ func anOrdinaryHost(t *testing.T) string {
 			"/dev/sdb1 /srv/my\\040data ext4 rw 0 0",
 		}, "\n") + "\n",
 		"etc/os-release": "NAME=\"Ubuntu\"\nPRETTY_NAME=\"Ubuntu 26.04 LTS\"\nID=ubuntu\n",
+		"proc/net/tcp":   procNetTcp,
+		"proc/net/tcp6":  procNetTcp6,
+		"proc/net/udp":   procNetUdp,
+		"proc/net/udp6":  "  sl  local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode\n",
 	})
 }
+
+// The four files the kernel keeps, as a host with SSH, a proxy, logaffe behind
+// it and a resolver would have them. Ports are hex and addresses are hex words
+// in the host's byte order, which is what makes them worth a fixture.
+//
+//	0016 = 22, 01BB = 443, 0050 = 80, 4846 = 18502, 0035 = 53, 0143 = 323
+const procNetTcp = `  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 x 100 0 0 10 0
+   1: 0100007F:4846 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12346 1 x 100 0 0 10 0
+   2: 0100007F:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12347 1 x 100 0 0 10 0
+   3: 0100007F:8B0A 0100007F:CE4E 01 00000000:00000000 00:00000000 00000000     0        0 12348 1 x 100 0 0 10 0
+`
+
+const procNetTcp6 = `  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000000000000000000000000000:01BB 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 22345 1 x 100 0 0 10 0
+   1: 00000000000000000000000001000000:0050 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 22346 1 x 100 0 0 10 0
+`
+
+const procNetUdp = `  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000:0035 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 32345 2 x 0
+   1: 0100007F:0143 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 32346 2 x 0
+   2: 0100007F:9C40 0100007F:0035 01 00000000:00000000 00:00000000 00000000     0        0 32347 2 x 0
+`
 
 const df = `Filesystem     1B-blocks        Used   Available Capacity Mounted on
 /dev/nvme0n1p2 502000000000 301000000000 175000000000      60% /
@@ -230,7 +258,7 @@ func TestAHostThatSaysNothingStillReports(t *testing.T) {
 	for _, missing := range report.Missing {
 		sections = append(sections, missing.Section)
 	}
-	if strings.Join(sections, ",") != "host,memory,disks,containers" {
+	if strings.Join(sections, ",") != "host,memory,disks,containers,listening,updates" {
 		t.Fatalf("missing: %v", sections)
 	}
 	if !report.CollectedAt.Equal(time.Date(2026, 9, 13, 8, 0, 7, 0, time.UTC)) {
@@ -264,5 +292,138 @@ func TestTheBodyIsWhatWasCollected(t *testing.T) {
 		if strings.Contains(string(printed), forbidden) {
 			t.Fatalf("%q reached the report: %s", forbidden, printed)
 		}
+	}
+}
+
+// What listens, from the four files the kernel keeps: no `ss`, no package and
+// no root, which is the promise of HOST-19 and the reason the section carries
+// no process name.
+func TestWhatListensComesOutOfProcAndCarriesNoProcess(t *testing.T) {
+	report := Collect(context.Background(), ordinary(t), "0.4.0")
+
+	got := []string{}
+	for _, one := range report.Listening {
+		got = append(got, one.Protocol+"/"+strconv.Itoa(one.Port)+":"+one.Binding)
+	}
+
+	// Ordered by port, so that two reports of an unchanged machine are the
+	// same text. 22 is bound to the wildcard *and* to loopback and is one
+	// entry: the widest bind is the honest answer.
+	want := []string{
+		"tcp/22:public",
+		"udp/53:public",
+		"tcp/80:loopback",
+		"udp/323:loopback",
+		"tcp/443:public",
+		"tcp/18502:loopback",
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("listening: %v", got)
+	}
+
+	// A socket with a peer is a conversation, not a door: neither the
+	// established TCP connection nor the UDP one is in the list.
+	for _, one := range report.Listening {
+		if one.Port == 35594 || one.Port == 40000 {
+			t.Fatalf("a connected socket was reported: %+v", one)
+		}
+	}
+
+	printed, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"process", "cmdline", "exe", "uid"} {
+		if strings.Contains(strings.ToLower(string(printed)), forbidden) {
+			t.Fatalf("%q reached the report: %s", forbidden, printed)
+		}
+	}
+}
+
+// A machine whose /proc/net cannot be read says so and carries on; the section
+// is missing rather than empty, because an empty one reads as "nothing
+// listens".
+func TestAHostWithoutProcNetSaysSoRatherThanNothingListens(t *testing.T) {
+	env := ordinary(t)
+	for _, name := range []string{"tcp", "tcp6", "udp", "udp6"} {
+		if err := os.Remove(filepath.Join(env.Root, "proc", "net", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	report := Collect(context.Background(), env, "0.4.0")
+
+	if report.Listening != nil {
+		t.Fatalf("listening: %+v", report.Listening)
+	}
+	if len(report.Missing) != 1 || report.Missing[0].Section != "listening" {
+		t.Fatalf("missing: %+v", report.Missing)
+	}
+}
+
+// The marker is Debian's and Ubuntu's. Its presence is a pending restart, its
+// absence on such a host is none, and anything else is a missing section rather
+// than a comforting false.
+func TestTheRestartIsToldWhereItCanBeAndNotWhereItCannot(t *testing.T) {
+	for _, one := range []struct {
+		name    string
+		marker  string
+		release string
+		want    *bool
+		missing bool
+	}{
+		{name: "ubuntu, nothing pending", release: "ID=ubuntu\n", want: no()},
+		{name: "ubuntu, waiting", marker: "run/reboot-required", release: "ID=ubuntu\n", want: yes()},
+		{name: "the older path", marker: "var/run/reboot-required", release: "ID=ubuntu\n", want: yes()},
+		{name: "a derivative says it is like debian", release: "ID=raspbian\nID_LIKE=debian\n", want: no()},
+		{name: "alpine cannot be told", release: "ID=alpine\n", missing: true},
+		{name: "the marker is believed anywhere", marker: "run/reboot-required", release: "ID=alpine\n", want: yes()},
+	} {
+		t.Run(one.name, func(t *testing.T) {
+			files := map[string]string{"etc/os-release": one.release}
+			if one.marker != "" {
+				files[one.marker] = ""
+			}
+			env := Environment{Root: aHost(t, files), Now: time.Now}
+
+			updates, err := collectUpdates(env)
+			if one.missing {
+				if err == nil {
+					t.Fatalf("updates: %+v", updates)
+				}
+				if !strings.Contains(err.Error(), "Debian and Ubuntu") {
+					t.Fatalf("reason: %q", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if updates.RebootRequired != *one.want {
+				t.Fatalf("reboot required: %v", updates.RebootRequired)
+			}
+		})
+	}
+}
+
+func yes() *bool { value := true; return &value }
+
+func no() *bool { value := false; return &value }
+
+// The body carries what was collected, the listening section included, and it
+// carries it as the contract spells it.
+func TestTheBodyCarriesWhatListensAndTheRestart(t *testing.T) {
+	report := Collect(context.Background(), ordinary(t), "0.4.0")
+	body := report.Body()
+
+	if body.Listening == nil || len(*body.Listening) != len(report.Listening) {
+		t.Fatalf("listening: %+v", body.Listening)
+	}
+	first := (*body.Listening)[0]
+	if *first.Port != 22 || string(*first.Protocol) != "tcp" || string(*first.Binding) != "public" {
+		t.Fatalf("first: %+v", first)
+	}
+	if body.Updates == nil || *body.Updates.RebootRequired {
+		t.Fatalf("updates: %+v", body.Updates)
 	}
 }

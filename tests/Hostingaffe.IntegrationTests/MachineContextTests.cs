@@ -452,6 +452,42 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         Assert.DoesNotContain("ghcr.io/example/app-1:1.0.0", document, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// What an agent about to go on the host asks before anything else: what is
+    /// reachable from off this machine, and does it want restarting. Both in a
+    /// line each, and neither with a process beside it.
+    /// </summary>
+    [Fact]
+    public async Task The_report_says_what_listens_and_whether_a_restart_is_waiting()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await AHostAsync(admin, installations: 1);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                listening = new[]
+                {
+                    new { port = 22, protocol = "tcp", binding = "public" },
+                    new { port = 443, protocol = "tcp", binding = "public" },
+                    new { port = 18502, protocol = "tcp", binding = "loopback" },
+                },
+                updates = new { reboot_required = true },
+            },
+            Ct);
+        Assert.Equal(System.Net.HttpStatusCode.Created, handed.StatusCode);
+
+        var document = await DocumentAsync(admin, "ex44");
+
+        // Public first: it is the half an agent has to know about.
+        Assert.Contains("Listening: 22/tcp, 443/tcp public; 18502/tcp loopback.", document, StringComparison.Ordinal);
+        Assert.Contains("**This machine is waiting for a restart.**", document, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_machine_that_never_reported_gets_a_sentence()
     {

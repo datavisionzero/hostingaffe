@@ -5816,6 +5816,17 @@
           }
         }
       },
+      "Binding": {
+        "enum": [
+          "public",
+          "loopback",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
+      },
       "BootstrapExchangeRequest": {
         "required": [
           "token",
@@ -7126,7 +7137,8 @@
         "enum": [
           "version",
           "container",
-          "fact"
+          "fact",
+          "port"
         ],
         "type": "string"
       },
@@ -7328,6 +7340,25 @@
             "items": {
               "$ref": "#/components/schemas/ContainerRequest"
             }
+          },
+          "listening": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ListeningRequest"
+            }
+          },
+          "updates": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UpdatesRequest"
+              }
+            ]
           },
           "missing": {
             "type": [
@@ -8347,6 +8378,58 @@
           }
         }
       },
+      "ListeningPort": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/Protocol"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/Binding"
+          }
+        }
+      },
+      "ListeningRequest": {
+        "required": [
+          "port",
+          "protocol",
+          "binding"
+        ],
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "protocol": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Protocol"
+              }
+            ]
+          },
+          "binding": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Binding"
+              }
+            ]
+          }
+        }
+      },
       "Logging": {
         "enum": [
           "local",
@@ -8376,6 +8459,7 @@
           "status",
           "measured_at",
           "last_seen",
+          "reboot_required",
           "drift",
           "description",
           "created_by",
@@ -8499,6 +8583,12 @@
             ],
             "format": "date-time"
           },
+          "reboot_required": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "drift": {
             "type": "array",
             "items": {
@@ -8559,6 +8649,7 @@
           "arch",
           "measured_at",
           "last_seen",
+          "reboot_required",
           "updated_at"
         ],
         "type": "object",
@@ -8610,6 +8701,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "reboot_required": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           },
           "updated_at": {
             "type": "string",
@@ -9178,6 +9275,8 @@
           "memory",
           "disks",
           "containers",
+          "listening",
+          "updates",
           "missing",
           "drift"
         ],
@@ -9242,6 +9341,25 @@
               "$ref": "#/components/schemas/ContainerState"
             }
           },
+          "listening": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ListeningPort"
+            }
+          },
+          "updates": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UpdatesSection"
+              }
+            ]
+          },
           "missing": {
             "type": "array",
             "items": {
@@ -9300,7 +9418,8 @@
           "containers_running",
           "containers_total",
           "disk_percent",
-          "load1"
+          "load1",
+          "reboot_required"
         ],
         "type": "object",
         "properties": {
@@ -9343,6 +9462,12 @@
               "number"
             ],
             "format": "double"
+          },
+          "reboot_required": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -9664,6 +9789,28 @@
               "string"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "UpdatesRequest": {
+        "required": [
+          "reboot_required"
+        ],
+        "type": "object",
+        "properties": {
+          "reboot_required": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "UpdatesSection": {
+        "type": "object",
+        "properties": {
+          "reboot_required": {
+            "type": "boolean"
           }
         }
       },
