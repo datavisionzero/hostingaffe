@@ -33,15 +33,15 @@ Api ──────► Application ──────► Domain
 
 **Domain** carries the rules and no packages: `Identities` (user, agent, token,
 browser session, one-time secret, device login), `Machines` (with the machine
-token, which is a key and not an identity), `Installations` (with the port and
-its two closed sets, the secret and the file it lies in, and the dependency on
-another installation), `Files` (with the one list of refused paths),
+token, which is a key and not an identity), `Installations` (with the secret and
+the file it lies in, and the dependency on another installation), `Files` (with the one list of refused paths),
 `Deployments` (with `Derived`, which says what "latest" means), `Reports` (the
 closed set of sections a machine reports about itself), `Pages`, `History`, and
 at the root what belongs to more than one of them — `Key`, the handle an
 operator chooses; `AssignedKey`, the register that makes a key never reusable;
-`Status`, the lifecycle a machine and an installation share; `Anchor`, the
-machine-or-installation a file is owned by and a page attached to; `Spelling`,
+`Status`, the lifecycle a machine and an installation share; `Port`, what an
+installation and a machine alike listen on, with its two closed sets; `Anchor`,
+the machine-or-installation a file is owned by and a page attached to; `Spelling`,
 which turns a closed set's value into the word the contract, the column and the
 history all use; `Link`, how a Markdown body names another thing of the record;
 `Fields`, the shapes every editable field shares; and `Refusal` with

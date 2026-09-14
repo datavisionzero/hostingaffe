@@ -121,6 +121,10 @@ func TestAnExportIsATreeWithTheFilesInPlace(t *testing.T) {
 	if !strings.Contains(machine, "| disk | 2×512G NVMe ZFS mirror |") {
 		t.Errorf("the fields:\n%s", machine)
 	}
+	// The machine's own ports, which no installation of it answers to.
+	if !strings.Contains(machine, "| ports | 22/tcp:public |") {
+		t.Errorf("the machine's own ports:\n%s", machine)
+	}
 	if !strings.Contains(machine, "[sites/logaffe.caddy (revision 1)](files/sites/logaffe.caddy)") {
 		t.Errorf("the files are linked where they are:\n%s", machine)
 	}

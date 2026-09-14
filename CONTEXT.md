@@ -56,12 +56,20 @@ not anything is installed on it.
 | `kind` | `vps` · `dedicated` · `vm` · `local` |
 | `arch` | `amd64` · `arm64` |
 | `status` | `planned` · `active` · `retired` |
+| `protocol`, `scope` (of a port) | see Port |
 
 `host` is set only on a `vm`, and names the machine it runs on. Hardware facts
 are text rather than numbers, `arch` excepted: machines are compared by eye,
 and "2×512G NVMe ZFS mirror" is truer than a number. `measured_at` says when
 the facts were last verified — a machine nobody has looked at for a year says
 so.
+
+`ports` is the machine's own: what it listens on and no installation of it
+answers to — SSH, a Wireguard endpoint, a provider's agent. It is the same field
+an installation has, in the same shape (see Port). **An empty list says nothing
+rather than "none":** the record holds no ports for this machine, and the drift
+that reads it is simply not computed. Whoever writes one down switches that
+comparison on and can clear every finding it makes.
 
 `last_seen` is derived and never written: the moment the instance received the
 machine's latest report. It stands beside `measured_at` and answers a different
@@ -99,17 +107,13 @@ software.
 | `backup` | `none` · `planned` · `active` |
 | `monitoring` | `none` · `planned` · `external` |
 | `logging` | `local` · `central` |
-| `protocol` (of a port) | `tcp` · `udp` |
-| `scope` (of a port) | `public` · `private` · `internal` |
 
 `environment` and `role` answer two different questions: whom an installation
 serves, and what it is for the host. A Caddy fronting production and staging is
 both `platform` and `production`.
 
-`ports` is a list of objects — `{ "port": 443, "protocol": "tcp", "scope":
-"public" }`. The spelling `443/tcp:public` is what a person reads and types, and
-what a history row carries; it is a rendering, not the field. `urls` is a list
-of URLs.
+`ports` is a list of Ports — see below; it is the machine's field too, in the
+same shape. `urls` is a list of URLs.
 
 `secrets` is a list of objects too — `{ "name": "POSTGRES_PASSWORD", "path":
 "/opt/compose/logaffe/.env.runtime" }`. The **name** is a name and never a
@@ -147,6 +151,26 @@ backup timer that lives on the machine depend on a file, and what a file concern
 is prose ([ADR 0010](docs/adr/0010-a-file-has-one-owner-and-what-else-it-concerns-is-prose.md)).
 
 `version` is derived: the version of the installation's latest deployment.
+
+## Port
+
+One port something listens on, and how far it is reachable. It belongs to an
+installation and to a machine alike — what an installation listens on is the
+installation's, what belongs to the machine and to no installation of it is the
+machine's — and it is the same field on both.
+
+| closed set | values |
+|---|---|
+| `protocol` | `tcp` · `udp` |
+| `scope` | `public` · `private` (the operator's network) · `internal` (a container network) |
+
+It is an object — `{ "port": 443, "protocol": "tcp", "scope": "public" }`. The
+spelling `443/tcp:public` is what a person reads and types, and what a history
+row carries; it is a rendering, not the field.
+
+**A `scope` is not a Binding** (see Report). A scope is what an operator decided
+a port is *for*; a binding is what the socket says. The two are compared, never
+equated.
 
 ## Deployment
 
@@ -205,7 +229,8 @@ several addresses the widest binding wins.
 The `listening` section carries **no process** — not the name, not the command
 line, not the arguments. Another user's process is visible only to root, and
 the collector needs none; what the section exists for is the comparison against
-an installation's `ports`, and those are ports rather than processes.
+the `ports` of an installation and of the machine, and those are ports rather
+than processes.
 
 The `updates` section says one thing: whether the machine is waiting for a
 restart. How many packages have an update is not in it — counting them makes
@@ -219,10 +244,19 @@ because the material is the machine's own.
 **Drift** is where the two sides disagree, computed on read and stored nowhere:
 the tag of a container's image against the version of the installation's latest
 deployment (`version`), an installation the record calls active whose container
-is not running (`container`), and `os` and `arch` against the machine's own
-fields (`fact`). Every drift names both sides and how old each is; which of them
-is right the product does not say. Where the assignment of a container to an
-installation is ambiguous, nothing is claimed.
+is not running (`container`), `os` and `arch` against the machine's own fields
+(`fact`), and a port against the socket the machine has for it (`port`). Every
+drift names both sides and how old each is; which of them is right the product
+does not say. Where the assignment of a container to an installation is
+ambiguous, nothing is claimed.
+
+A `port` drift reads both sides of the record — an active installation's `ports`
+and the machine's own — against the `listening` section. **A port bound in
+public that neither of them claims is a drift only where the machine keeps its
+own ports**; where it keeps none, the record says nothing about them and the
+comparison is not made, because a drift nobody can clear teaches people to stop
+reading the list. That is the semantics of the field and not a suppression list:
+no single port and no single finding is ever silenced.
 
 Reports are swept after thirty days, except the latest of a machine, which is
 kept however old it is.

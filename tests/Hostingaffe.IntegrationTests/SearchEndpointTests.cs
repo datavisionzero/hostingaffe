@@ -31,6 +31,14 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
         Assert.Equal("logaffe-prod", Field(hit, "key"));
         Assert.Equal("ports", Field(hit, "where"));
 
+        // A machine's own port answers the same way, and from the other side of
+        // the record: SSH is in no installation.
+        var ssh = await HitsAsync(admin, "22");
+        var host = Assert.Single(ssh);
+        Assert.Equal("machine", Field(host, "kind"));
+        Assert.Equal("ex44", Field(host, "key"));
+        Assert.Equal("ports", Field(host, "where"));
+
         var page = await HitsAsync(admin, "tailscale");
         Assert.Equal("page", Field(Assert.Single(page), "kind"));
         Assert.Equal("backup-restore", Field(page[0], "key"));
@@ -314,6 +322,7 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
             provider = "hetzner",
             location = "fsn1-dc14",
             description = "The box everything else sits on.",
+            ports = new object[] { new { port = 22, protocol = "tcp", scope = "public" } },
         });
 
         await Created(client, "/api/software", new

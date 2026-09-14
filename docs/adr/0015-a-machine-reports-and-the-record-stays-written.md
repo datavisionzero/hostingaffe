@@ -119,7 +119,17 @@ have been added since, each by a decision of its own and each still closed:
   weeks old reports nothing pending and lies in the most comforting way there
   is.
 
+The `port` comparison has since been given its fourth case, and it needed a
+change to the *record* rather than to the report: **a machine keeps its own
+ports**, the ones no installation of it answers to. Without that there was no
+place to put SSH, so a port bound in public that nothing claimed could be
+reported and never resolved — and a drift nobody can clear teaches people to
+stop reading the list. With it the finding is a person's to clear, by writing
+the port down or by closing it, and a machine nobody keeps the list for is told
+nothing about undocumented ports at all.
+
 What that changes about this decision: nothing. A report still sets no field,
 writes no history row, carries no secret, and is still read by no machine
-token. A section proposed that weakened any of those four would be refused
-rather than planned.
+token. The machine's `ports` are a field a person writes, like every other field
+of the record, and no report has ever filled one in. A section proposed that
+weakened any of those four would be refused rather than planned.

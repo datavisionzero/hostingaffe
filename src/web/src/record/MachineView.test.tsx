@@ -25,6 +25,7 @@ const machine = {
   ipv6: null,
   private_ip: null,
   ssh: "root@192.0.2.10",
+  ports: [{ port: 22, protocol: "tcp", scope: "public" }],
   status: "active",
   measured_at: null,
   last_seen: null,
@@ -67,6 +68,22 @@ describe("a machine (VISION 6.2)", () => {
     expect(screen.getByText("192.0.2.10")).toBeInTheDocument();
     // No IPv6 was recorded, so there is no row for it rather than an empty one.
     expect(screen.queryByText("IPv6")).not.toBeInTheDocument();
+  });
+
+  // The machine's own ports: what it listens on and no installation of it
+  // answers to. They stand with the addresses, because that is where somebody
+  // reads how far the machine is reachable.
+  it("shows the ports the machine itself keeps", async () => {
+    view();
+
+    expect(await screen.findByText("22/tcp public")).toBeInTheDocument();
+  });
+
+  it("says nothing about ports where the machine keeps none", async () => {
+    view({ "GET /api/machines/web-01": { ...machine, ports: [] } });
+
+    expect(await screen.findByText("example-hoster")).toBeInTheDocument();
+    expect(screen.queryByText("Ports")).not.toBeInTheDocument();
   });
 
   it("says when the fields were last measured, and says so when they never were", async () => {

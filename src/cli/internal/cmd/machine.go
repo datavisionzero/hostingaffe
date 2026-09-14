@@ -124,6 +124,7 @@ type machineFields struct {
 	os, arch, cpu, memory, disk                          string
 	ipv4, ipv6, privateIP, ssh, status, measuredAt       string
 	description, descriptionFile                         string
+	ports                                                []string
 }
 
 func (m *machineFields) flags(cmd *cobra.Command) {
@@ -144,6 +145,8 @@ func (m *machineFields) flags(cmd *cobra.Command) {
 	f.StringVar(&m.ipv6, "ipv6", "", "its public IPv6 address")
 	f.StringVar(&m.privateIP, "private-ip", "", "its address on the private network")
 	f.StringVar(&m.ssh, "ssh", "", "how you reach it: the host of your ssh configuration")
+	f.StringArrayVar(&m.ports, "port", nil,
+		"a port of the machine itself, as 22/tcp:public — what belongs to no installation; repeat for more, `none` clears the list")
 	f.StringVar(&m.status, "status", "", "planned, active or retired")
 	f.StringVar(&m.measuredAt, "measured-at", "", "when the hardware facts were last verified: 2026-09-05, or an RFC 3339 timestamp")
 	f.StringVar(&m.description, "description", "", "what does not fit in a field, in Markdown")
@@ -162,6 +165,10 @@ func (m *machineFields) body(cmd *cobra.Command) (*fields, error) {
 		"status": &m.status, "description": &m.description,
 	} {
 		f.take(flag, value)
+	}
+
+	if err := f.takeList("port", "ports", m.ports, aPort); err != nil {
+		return nil, err
 	}
 
 	if err := f.takeMoment("measured-at", &m.measuredAt); err != nil {

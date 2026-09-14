@@ -13,26 +13,6 @@ using Environment = Hostingaffe.Domain.Installations.Environment;
 namespace Hostingaffe.Application.Acts;
 
 /// <summary>
-/// One port an installation listens on, as the contract carries it:
-/// <c>{ "port": 443, "protocol": "tcp", "scope": "public" }</c>.
-/// </summary>
-/// <remarks>
-/// An object rather than the string <c>443/tcp:public</c>, because that
-/// spelling is a rendering: as a field it would be the one value in the model
-/// with a grammar of its own, and a generated client would see a <c>string</c>
-/// it can read nothing out of. The spelling is what the CLI and the interface
-/// show and take.
-/// </remarks>
-public sealed record PortShape(int Port, Protocol Protocol, Scope Scope)
-{
-    public static PortShape Of(Port port)
-    {
-        ArgumentNullException.ThrowIfNull(port);
-        return new PortShape(port.Number, port.Protocol, port.Scope);
-    }
-}
-
-/// <summary>
 /// One secret an installation needs, as the contract carries it:
 /// <c>{ "name": "POSTGRES_PASSWORD", "path": "/opt/compose/logaffe/.env.runtime" }</c>.
 /// </summary>

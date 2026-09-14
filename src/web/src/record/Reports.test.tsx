@@ -11,7 +11,7 @@ const machine = {
   key: "ex44", name: "ex44", hostname: "ex44", kind: "dedicated", host: null,
   provider: "example-hoster", plan: "EX44", location: "fsn1", os: "Ubuntu 26.04 LTS",
   arch: "amd64", cpu: null, memory: null, disk: null, ipv4: null, ipv6: null,
-  private_ip: null, ssh: null, status: "active", measured_at: null, last_seen: null,
+  private_ip: null, ssh: null, ports: [], status: "active", measured_at: null, last_seen: null,
   reboot_required: null,
   drift: [],
   description: "", created_by: identity, updated_by: identity,

@@ -52,6 +52,7 @@ public sealed record ImportMachine(
     string? Ipv6,
     string? PrivateIp,
     string? Ssh,
+    IReadOnlyList<PortShape>? Ports,
     string? Status,
     DateTimeOffset? MeasuredAt,
     string? Description,
@@ -235,7 +236,7 @@ public sealed class ImportRecord(
                     one.Key ?? string.Empty,
                     new ChangeMachineRequest(
                         null, null, null, one.Host, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null, null, null),
                     ifMatch: null,
                     note,
                     cancellationToken);
@@ -395,7 +396,7 @@ public sealed class ImportRecord(
             null,
             one.Provider, one.Plan, one.Location, one.Os,
             Validated.Field("arch", () => Spelling.Read<Arch>(one.Arch, "arch")),
-            one.Cpu, one.Memory, one.Disk, one.Ipv4, one.Ipv6, one.PrivateIp, one.Ssh,
+            one.Cpu, one.Memory, one.Disk, one.Ipv4, one.Ipv6, one.PrivateIp, one.Ssh, one.Ports,
             Validated.Field("status", () => Spelling.Read<Status>(one.Status, "status")),
             one.MeasuredAt, one.Description);
 

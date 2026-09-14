@@ -45,6 +45,7 @@ public sealed record MachineShape(
     string? Ipv6,
     string? PrivateIp,
     string? Ssh,
+    IReadOnlyList<PortShape> Ports,
     Status Status,
     DateTimeOffset? MeasuredAt,
     DateTimeOffset? LastSeen,
@@ -78,6 +79,7 @@ public sealed record CreateMachineRequest(
     string? Ipv6,
     string? PrivateIp,
     string? Ssh,
+    IReadOnlyList<PortShape>? Ports,
     Status? Status,
     DateTimeOffset? MeasuredAt,
     string? Description)
@@ -108,6 +110,7 @@ public sealed record ChangeMachineRequest(
     string? Ipv6,
     string? PrivateIp,
     string? Ssh,
+    IReadOnlyList<PortShape>? Ports,
     Status? Status,
     DateTimeOffset? MeasuredAt,
     string? Description)
@@ -201,6 +204,7 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
             machine.Ipv6,
             machine.PrivateIp,
             machine.Ssh,
+            [.. machine.Ports.Select(PortShape.Of)],
             machine.Status,
             machine.MeasuredAt,
             latest?.ReceivedAt,
@@ -347,6 +351,7 @@ public sealed class CreateMachine(
                 Ipv6 = request.Ipv6,
                 PrivateIp = request.PrivateIp,
                 Ssh = request.Ssh,
+                Ports = MachineWrites.Ports(request.Ports),
                 Status = request.Status,
                 MeasuredAt = request.MeasuredAt,
                 Description = request.Description,
@@ -421,6 +426,7 @@ public sealed class ChangeMachine(
                 Ipv6 = changes.Ipv6,
                 PrivateIp = changes.PrivateIp,
                 Ssh = changes.Ssh,
+                Ports = MachineWrites.Ports(changes.Ports),
                 Status = changes.Status,
                 MeasuredAt = changes.MeasuredAt,
                 Description = changes.Description,
@@ -555,6 +561,17 @@ internal static class MachineWrites
 
         return edit with { HostGiven = true, Host = row };
     }
+
+    /// <summary>
+    /// The ports a caller gave, checked one by one so that a refusal names
+    /// <c>ports</c> and says which value did not hold. Nothing given leaves the
+    /// list alone; an empty list clears it.
+    /// </summary>
+    public static IReadOnlyList<Port>? Ports(IReadOnlyList<PortShape>? given) =>
+        given is null
+            ? null
+            : [.. given.Select(port => Validated.Field(
+                "ports", () => Port.Of(port.Port, port.Protocol, port.Scope)))];
 
     /// <summary>The machine applies what it was given, and a bad value is a refusal that names its field.</summary>
     public static IReadOnlyList<FieldChange> Apply(

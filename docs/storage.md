@@ -252,6 +252,36 @@ nobody has looked at for a year says so itself.
 `ipv4`, `ipv6` and `private_ip` are stored as the text of a parsed address, so
 that what comes back out is what an address parser accepted going in.
 
+```sql
+create table machine_port (
+    machine_id uuid not null references machine (id) on delete cascade,
+    port       int  not null check (port between 1 and 65535),
+    protocol   text not null check (protocol in ('tcp', 'udp')),
+    scope      text not null check (scope in ('public', 'private', 'internal')),
+
+    primary key (machine_id, port, protocol)
+);
+```
+
+**The machine's own ports are a table**, for the reason an installation's are:
+`protocol` and `scope` are closed sets like every other one in the model, and a
+closed set is a column with a check constraint that lists the words. The two
+tables are the same shape because it is the same field (`CONTEXT.md`, Port).
+The primary key is what makes a port the same port — the number and the
+transport — so a second row for `22/tcp` with another scope is a contradiction
+the database refuses to hold.
+
+**No row is not the same as no port.** A machine nobody keeps this for says
+nothing about its ports, and the drift that reads it is not computed at all
+(`docs/api.md`, Drift). The cascade is the one difference from `machine`'s own
+foreign keys and matches `installation_port`: a port has no life without the row
+it hangs on, and the soft delete leaves that row standing.
+
+The ports are not in `machine.letters`, for the reason an installation's are
+not: `22` inside the token `22/tcp` is not something anyone would find by typing
+the number. A query that *is* a port number is looked up in this column instead
+— see Searching.
+
 ## Software
 
 What an installation is an installation of (`CONTEXT.md`, Software). The word is
@@ -884,10 +914,13 @@ installation's `urls` would be the one field nobody could search for. It is the
 only function in the schema.
 
 **Ports are not in any of these columns.** They are rows of
-`installation_port`, and `18502` inside the token `18502/tcp` is not something
-anyone would find by typing the number. A query that *is* a port number is
-looked up in that column instead, which is what makes VISION 5's own example
-answer.
+`installation_port` and of `machine_port`, and `18502` inside the token
+`18502/tcp` is not something anyone would find by typing the number. A query
+that *is* a port number is looked up in those columns instead, which is what
+makes VISION 5's own example answer — and what makes `22` find the machine SSH
+is written down on. A machine its own fields already answered for is not listed
+a second time for its ports: somebody asked where something was, and the same
+machine twice is not two answers.
 
 **And a path is one word, which is why there is a second index beside every
 one of these.** `/srv/caddy/caddy.env` is a single token, so `/srv/caddy` matches

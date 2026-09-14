@@ -247,6 +247,9 @@ public sealed class ReadMachineContext(
             ("ipv6", machine.Ipv6),
             ("private ip", machine.PrivateIp),
             ("ssh", machine.Ssh),
+            // The machine's own ports, and no installation's: what an agent
+            // about to open a firewall has to know is already claimed.
+            ("ports", Fields.Joined(machine.Ports, port => port.ToString())),
             ("measured", Fields.Stamp(machine.MeasuredAt)),
         };
 

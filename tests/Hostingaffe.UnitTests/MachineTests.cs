@@ -46,6 +46,51 @@ public sealed class MachineTests
         Assert.Equal(Now.AddMinutes(1), machine.UpdatedAt);
     }
 
+    /// <summary>
+    /// The machine's own ports: the same field an installation has, and the
+    /// history keeps the spelling a person reads.
+    /// </summary>
+    [Fact]
+    public void The_ports_of_the_machine_itself_read_as_a_person_writes_them()
+    {
+        var machine = A();
+
+        var changes = machine.Apply(
+            new MachineEdit
+            {
+                Ports = [Port.Of(22, Protocol.Tcp, Scope.Public), Port.Of(51820, Protocol.Udp, Scope.Private)],
+            },
+            Actor,
+            Now.AddMinutes(1));
+
+        var ports = changes.Single(change => change.Field == "ports");
+        Assert.Null(ports.OldValue);
+        Assert.Equal("22/tcp:public, 51820/udp:private", ports.NewValue);
+
+        // Emptying it is a change to nothing at all, not to an empty-looking
+        // string — and what it says is that the record holds no ports for this
+        // machine, never that the machine listens on none.
+        var cleared = machine.Apply(new MachineEdit { Ports = [] }, Actor, Now.AddMinutes(2));
+        Assert.Null(cleared.Single(change => change.Field == "ports").NewValue);
+        Assert.Empty(machine.Ports);
+    }
+
+    [Fact]
+    public void A_new_machine_keeps_no_ports_until_somebody_writes_one_down() => Assert.Empty(A().Ports);
+
+    [Fact]
+    public void The_same_port_twice_is_refused_whatever_its_scope_says()
+    {
+        var machine = A();
+
+        var refusal = Assert.Throws<ArgumentException>(() => machine.Apply(
+            new MachineEdit { Ports = [Port.Of(22, Protocol.Tcp, Scope.Public), Port.Of(22, Protocol.Tcp, Scope.Private)] },
+            Actor,
+            Now));
+
+        Assert.Equal("ports", refusal.ParamName);
+    }
+
     [Fact]
     public void A_field_set_to_what_it_already_says_changed_nothing()
     {

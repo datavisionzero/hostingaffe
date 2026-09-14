@@ -48,8 +48,9 @@ public enum DriftKind
     Fact,
 
     /// <summary>
-    /// A port an installation says it listens on against what the machine
-    /// actually has a socket for.
+    /// A port an installation or the machine says it listens on against what
+    /// the machine actually has a socket for — and, where the machine keeps its
+    /// own ports, one bound in public that stands in no record at all.
     /// </summary>
     Port,
 }
@@ -78,14 +79,10 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         }
 
         var rows = await installations.OnMachineAsync(machine.Id, null, cancellationToken);
-        if (rows.Count == 0)
-        {
-            return drift;
-        }
 
-        Ports(rows, report, drift);
+        Ports(machine, rows, report, drift);
 
-        if (report.Body.Containers is not { } containers)
+        if (rows.Count == 0 || report.Body.Containers is not { } containers)
         {
             return drift;
         }
@@ -158,15 +155,20 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
     /// of an hour would be noise, not drift.
     /// </para>
     /// <para>
-    /// <strong>A port that listens and belongs to no installation is not
-    /// drift.</strong> It is the question this section was wanted for, but the
-    /// record has no place to put a machine's own ports — SSH is in no
-    /// installation — so the statement could never be resolved by anybody, and
-    /// a drift nobody can clear teaches people to stop reading the list. The
-    /// <c>listening</c> section is shown whole instead, and a person reads it.
+    /// <strong>A machine keeps its own ports, and an empty list says nothing
+    /// rather than "none".</strong> What belongs to the machine and to no
+    /// installation of it — SSH, a Wireguard endpoint — is written down at the
+    /// machine, and that is what makes "listens in public and stands in no
+    /// record" a drift somebody can clear: either the port is written down or
+    /// it is closed. A machine nobody has filled that list in for is not told
+    /// that every port it has is undocumented — the comparison is simply not
+    /// made, because a drift nobody can clear teaches people to stop reading
+    /// the list. It is not a suppression list: no single port and no single
+    /// finding is silenced, and the three comparisons above run either way.
     /// </para>
     /// </remarks>
-    private static void Ports(IReadOnlyList<Installation> rows, Report report, List<DriftShape> drift)
+    private static void Ports(
+        Machine machine, IReadOnlyList<Installation> rows, Report report, List<DriftShape> drift)
     {
         if (report.Body.Listening is not { } listening)
         {
@@ -179,18 +181,82 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
             heard[(one.Port, one.Protocol)] = one.Binding;
         }
 
-        foreach (var installation in rows.Where(one => one.Status is Status.Active))
+        // What the record claims, from both sides of it: an active
+        // installation's ports and the machine's own. A planned installation is
+        // passed over — it is not supposed to be listening — but its ports
+        // still count as claimed, because a port somebody wrote down is not an
+        // undocumented one whatever the installation's state says.
+        var claimed = new HashSet<(int Port, Protocol Protocol)>();
+
+        foreach (var installation in rows)
         {
             foreach (var port in installation.Ports)
             {
-                Listening(installation, port, heard, report.ReceivedAt, drift);
+                claimed.Add((port.Number, port.Protocol));
+
+                if (installation.Status is Status.Active)
+                {
+                    Listening(installation.Key, port, installation.UpdatedAt, heard, report.ReceivedAt, drift);
+                }
             }
+        }
+
+        foreach (var port in machine.Ports)
+        {
+            claimed.Add((port.Number, port.Protocol));
+            Listening(machine.Key, port, machine.UpdatedAt, heard, report.ReceivedAt, drift);
+        }
+
+        Undocumented(machine, listening, claimed, report.ReceivedAt, drift);
+    }
+
+    /// <summary>
+    /// The question a documentation of rented machines is kept for: what is
+    /// reachable from outside that nobody wrote down.
+    /// </summary>
+    /// <remarks>
+    /// Only where the machine keeps ports of its own — that is what makes every
+    /// finding here resolvable, and what keeps a machine nobody maintains the
+    /// list for quiet. A <c>loopback</c> socket is not in it: it reaches nothing
+    /// off this machine, and a record of what an operator rents is not a process
+    /// list.
+    /// </remarks>
+    private static void Undocumented(
+        Machine machine,
+        IReadOnlyList<ListeningPort> listening,
+        IReadOnlySet<(int Port, Protocol Protocol)> claimed,
+        DateTimeOffset receivedAt,
+        List<DriftShape> drift)
+    {
+        if (machine.Ports.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var one in listening)
+        {
+            if (one.Binding is not Binding.Public || claimed.Contains((one.Port, one.Protocol)))
+            {
+                continue;
+            }
+
+            // The record says nothing, which is the whole finding: `record` is
+            // null and `record_at` with it, because there is no line to date.
+            drift.Add(new DriftShape(
+                DriftKind.Port,
+                machine.Key,
+                $"port {one.Port}/{Spelling.Of(one.Protocol)}",
+                null,
+                null,
+                Spelling.Of(one.Binding),
+                receivedAt));
         }
     }
 
     private static void Listening(
-        Installation installation,
+        string subject,
         Port port,
+        DateTimeOffset recordedAt,
         IReadOnlyDictionary<(int Port, Protocol Protocol), Binding> heard,
         DateTimeOffset receivedAt,
         List<DriftShape> drift)
@@ -208,7 +274,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
             }
 
             drift.Add(new DriftShape(
-                DriftKind.Port, installation.Key, field, recorded, installation.UpdatedAt, null, receivedAt));
+                DriftKind.Port, subject, field, recorded, recordedAt, null, receivedAt));
             return;
         }
 
@@ -221,13 +287,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         if (disagrees)
         {
             drift.Add(new DriftShape(
-                DriftKind.Port,
-                installation.Key,
-                field,
-                recorded,
-                installation.UpdatedAt,
-                Spelling.Of(binding),
-                receivedAt));
+                DriftKind.Port, subject, field, recorded, recordedAt, Spelling.Of(binding), receivedAt));
         }
     }
 

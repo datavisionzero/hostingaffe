@@ -174,6 +174,7 @@ func machineMarkdown(machine machineRecord) string {
 		{"ipv6", value(machine.Ipv6)},
 		{"private ip", value(machine.PrivateIp)},
 		{"ssh", value(machine.Ssh)},
+		{"ports", render.Ports(machine.Ports)},
 		{"measured", stamp(machine.MeasuredAt)},
 	})
 

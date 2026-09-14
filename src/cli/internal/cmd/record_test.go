@@ -18,7 +18,8 @@ const (
 	machineJSON = `{"key":"ex44","name":"The big one","hostname":"ex44","kind":"dedicated","host":null,
 "provider":"hetzner","plan":"EX44","location":"fsn1-dc14","os":"Ubuntu 26.04 LTS","arch":"amd64",
 "cpu":"Intel i5-13500","memory":"64G","disk":"2×512G NVMe ZFS mirror","ipv4":"192.0.2.10","ipv6":"2001:db8::1",
-"private_ip":"198.51.100.7","ssh":"ex44","status":"active","measured_at":"2026-09-01T08:00:00.000000Z",
+"private_ip":"198.51.100.7","ssh":"ex44","ports":[{"port":22,"protocol":"tcp","scope":"public"}],
+"status":"active","measured_at":"2026-09-01T08:00:00.000000Z",
 "description":"The box everything else sits on.",` + identities + `}`
 
 	softwareJSON = `{"key":"logaffe","name":"logaffe","homepage":"https://example.test",
@@ -245,6 +246,47 @@ func TestPortsAreWrittenAsPeopleWriteThem(t *testing.T) {
 
 	// A list is replaced whole, and `none` on its own is what clears one.
 	if code, _, _ = run(t, server, "inst", "set", "logaffe-prod", "--port", "none"); code != exit.OK {
+		t.Fatal("code")
+	}
+	body = map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	cleared, _ := json.Marshal(body["ports"])
+	if string(cleared) != `[]` {
+		t.Errorf("cleared ports = %s", cleared)
+	}
+}
+
+// A machine keeps the ports no installation of it answers to — SSH, a Wireguard
+// endpoint — in the same field and the same spelling (CONTEXT.md, Port).
+func TestAMachineKeepsItsOwnPorts(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, out, stderr := run(t, server, "machine", "set", "ex44",
+		"--port", "22/tcp:public", "--port", "51820/udp:private")
+	if code != exit.OK || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+
+	body := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+
+	ports, _ := json.Marshal(body["ports"])
+	want := `[{"port":22,"protocol":"tcp","scope":"public"},{"port":51820,"protocol":"udp","scope":"private"}]`
+	if string(ports) != want {
+		t.Errorf("ports = %s", ports)
+	}
+
+	// And they are read back the way they were written.
+	if !strings.Contains(out, "ports: 22/tcp:public") {
+		t.Errorf("the ports as a person reads them:\n%s", out)
+	}
+
+	// A list is replaced whole, and `none` on its own is what clears one — which
+	// says the record holds no ports for this machine, not that it listens on
+	// none.
+	if code, _, _ = run(t, server, "machine", "set", "ex44", "--port", "none"); code != exit.OK {
 		t.Fatal("code")
 	}
 	body = map[string]any{}

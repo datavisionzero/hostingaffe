@@ -38,6 +38,10 @@ public sealed class MachineContextTests(PostgresFixture postgres)
         Assert.Contains("| provider | hetzner |", document, StringComparison.Ordinal);
         Assert.Contains("| ipv4 | 192.0.2.10 |", document, StringComparison.Ordinal);
         Assert.DoesNotContain("| ipv6 |", document, StringComparison.Ordinal);
+
+        // The machine's own ports, which no installation of it answers to: what
+        // an agent about to open a firewall has to know is already claimed.
+        Assert.Contains("| ports | 22/tcp:public |", document, StringComparison.Ordinal);
         Assert.Contains("The box everything else sits on.", document, StringComparison.Ordinal);
 
         // Its installations, with the version, the ports and the file list.
@@ -239,6 +243,7 @@ public sealed class MachineContextTests(PostgresFixture postgres)
             disk = "2×512G NVMe ZFS mirror",
             ipv4 = "192.0.2.10",
             ssh = "ex44",
+            ports = new object[] { new { port = 22, protocol = "tcp", scope = "public" } },
             measured_at = "2026-09-01T08:00:00Z",
             description = "The box everything else sits on. Two disks, mirrored, and nothing else worth saying here.",
         });

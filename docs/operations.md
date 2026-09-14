@@ -251,6 +251,25 @@ WantedBy=timers.target
 systemctl enable --now hostingaffe-report.timer
 ```
 
+**4. Write down the ports the machine itself has.** Optional, and what turns the
+`listening` section from something to read into something the instance compares:
+
+```sh
+ha machine set ex44 --port 22/tcp:public --port 51820/udp:private
+```
+
+These are the machine's own — what no installation of it answers to. With them
+written down, a port bound in public that neither an installation nor the
+machine claims is reported as drift, which is the question a documentation of
+rented machines is kept for: *what is reachable from outside that nobody wrote
+down.* Every finding it makes can be cleared — either the port is written down
+or it is closed.
+
+**A machine with no port written down hears nothing about undocumented ones.**
+That is deliberate: SSH would otherwise stand in every drift list of every
+machine for ever, and a drift nobody can clear teaches people to stop reading
+the list. The comparison against an installation's `ports` runs either way.
+
 **Checking that it arrives.** From wherever you work:
 
 ```sh

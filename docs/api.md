@@ -324,6 +324,15 @@ Retiring, and deleting.
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
 
+**`ports` is what the machine itself listens on** and no installation of it
+answers to: SSH, a Wireguard endpoint, a provider's agent. It is the same
+`Port` an installation carries — `{ "port": 22, "protocol": "tcp", "scope":
+"public" }` — and the same rules hold: a list left out stays as it is, an empty
+list clears it, and two entries with the same number and protocol are refused
+whatever their scopes say. **An empty list says nothing rather than "none"**:
+the record holds no ports for this machine, and the drift that reads it is not
+computed. Under Drift below is what writing one down switches on.
+
 **The machine token is the key a host reports under** and can do nothing else
 ([ADR 0016](adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
 `POST` answers `{ "machine", "prefix", "secret", "issued_at" }`, and **the
@@ -764,10 +773,12 @@ keeps the web application and `ha` from saying different things about one host.
 - **`fact`** — `os` or `arch` against the machine's own fields, with
   `record_at` the `measured_at` beside them. This is
   [VISION 15.1](../Vision.md#151-measuring-instead-of-typing) word for word.
-- **`port`** — a port an active installation says it listens on against what
-  the machine has a socket for. `field` names the port — `port 18502/tcp` —
-  `record` is the recorded `scope` and `reported` the `binding`, or `null`
-  where nothing listens there at all.
+- **`port`** — a port an active installation or the machine itself says it
+  listens on against what the machine has a socket for, and a port bound in
+  public that neither of them claims. `field` names the port — `port
+  18502/tcp` — `record` is the recorded `scope` and `reported` the `binding`;
+  `record` is `null` where nothing in the record claims the port, and
+  `reported` is `null` where nothing listens there at all.
 
 A `scope` and a `binding` are not compared as if they were the same word.
 `public` and `private` both need a socket bound past loopback — how much
@@ -778,12 +789,23 @@ is the agreement and a `public` binding is the disagreement. An installation
 the record does not call `active` is passed over: a planned one is not supposed
 to be listening.
 
-**A port that listens and belongs to no installation is not drift.** It is the
-question the section was wanted for, but the record has no place to put a
-machine's own ports — SSH is in no installation — so the statement could never
-be resolved by anybody, and a drift nobody can clear teaches people to stop
-reading the list. The `listening` section is served whole instead, and a person
-reads it.
+**A port bound in public that stands in no record is drift only where the
+machine keeps its own ports.** It is the question the section was wanted for —
+what is reachable from outside that nobody wrote down — and it is answerable
+because `ports` at the machine is where SSH goes. Where a machine keeps none,
+the record says nothing about its ports and the comparison is not made: every
+port it has would otherwise be reported as undocumented for ever, and a drift
+nobody can clear teaches people to stop reading the list. Writing one port down
+switches the comparison on, and every finding it then makes can be cleared —
+either the port is written down or it is closed.
+
+That is the semantics of the field and **not a suppression list**: no single
+port and no single finding is silenced, there is no ignore flag, and the three
+comparisons above run whatever the machine's `ports` say. A socket bound to
+loopback alone is not in it either — it reaches nothing off the machine, and a
+record of what an operator rents is not a process list. A port a `planned`
+installation wrote down counts as claimed: somebody put it in the record,
+whatever the installation's state says.
 
 **Which side is right the product does not say.** Every drift names both sides
 and how old each is, and the decision is a person's or an agent's. No field is
@@ -943,7 +965,9 @@ omission:
   `caddy /srv/caddy` is two words and stays a word search.
 - **A port is a number, not a word.** `18502` inside `18502/tcp` is not a token
   anyone would find by typing the number, so a query that *is* a port number is
-  looked up in the ports as well. That is what makes `ha search "18502"` answer.
+  looked up in the ports as well — an installation's and a machine's alike, so
+  that `22` finds the host SSH is written down on. That is what makes `ha
+  search "18502"` answer.
 
 **A file is searched at the revision it is at.** What an older revision said
 stopped being true when the next one was written, and a hit in it would send
