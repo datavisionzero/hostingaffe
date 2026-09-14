@@ -171,6 +171,7 @@ public sealed class FileEndpointTests(PostgresFixture postgres)
 
         var again = await admin.GetFromJsonAsync<JsonElement>("/api/installations/logaffe-prod/files", Ct);
         Assert.Equal(6, again[0].GetProperty("size").GetInt32());
+        Assert.Equal(2, again[0].GetProperty("revision").GetInt32());
     }
 
     [Fact]

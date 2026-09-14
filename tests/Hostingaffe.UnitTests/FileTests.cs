@@ -51,6 +51,24 @@ public sealed class FileTests
     }
 
     [Fact]
+    public void The_current_revision_does_not_depend_on_the_order_storage_loaded_them_in()
+    {
+        var file = A();
+        file.Write("services: two", null, null, Actor, Now.AddHours(1));
+        file.Write("services: three", null, null, Actor, Now.AddHours(2));
+
+        // EF fills the backing collection in whatever order rows arrive from
+        // PostgreSQL. Model that explicitly: the file's present is numbered,
+        // not whichever row happened to arrive last.
+        var loaded = Assert.IsType<List<FileRevision>>(file.Revisions);
+        loaded.Reverse();
+
+        Assert.Equal(3, file.Revision);
+        Assert.Equal("services: three", file.Content);
+        Assert.Equal(Now.AddHours(2), file.UpdatedAt);
+    }
+
+    [Fact]
     public void A_write_that_changes_nothing_makes_no_revision()
     {
         var file = A();

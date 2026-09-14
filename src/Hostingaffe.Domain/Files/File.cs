@@ -78,7 +78,10 @@ public sealed class File
     /// </summary>
     public string? Directory { get; private set; }
 
-    /// <summary>Every write, oldest first, each with the content it wrote.</summary>
+    /// <summary>
+    /// Every write, each with the content it wrote. Callers that present these
+    /// order them by number: persistence does not promise a collection order.
+    /// </summary>
     public IReadOnlyList<FileRevision> Revisions => _revisions;
 
     public Guid CreatedBy { get; private init; }
@@ -94,7 +97,10 @@ public sealed class File
     /// <summary>The newest revision — what the file says now.</summary>
     public FileRevision Current =>
         _revisions.Count > 0
-            ? _revisions[^1]
+            // EF materializes a collection in the order rows happen to arrive
+            // from PostgreSQL. No query plan promises that order, so the last
+            // item in the list is not necessarily the latest revision.
+            ? _revisions.MaxBy(revision => revision.Number)!
             : throw new InvalidOperationException("A file has at least one revision from the moment it exists.");
 
     /// <summary>The number of the newest revision, counted from one.</summary>

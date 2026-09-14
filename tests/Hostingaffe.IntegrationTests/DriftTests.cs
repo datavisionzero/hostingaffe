@@ -540,7 +540,13 @@ public sealed class DriftTests(PostgresFixture postgres)
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
 
         await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
-        await AFile(admin, "compose.yml", "services:\n");
+        await AFile(admin, "compose.yml", "an older revision\n");
+
+        using var written = await admin.PutAsJsonAsync(
+            "/api/installations/logaffe-prod/files/compose.yml",
+            new { content = "services:\n" },
+            Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
 
         using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
         await Holds(machine, [new { path = "compose.yml", sha256 = Digest("services:\n") }]);
