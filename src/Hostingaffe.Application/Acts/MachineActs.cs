@@ -4,6 +4,7 @@ using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.History;
 using Hostingaffe.Domain.Machines;
+using Hostingaffe.Domain.Reports;
 
 namespace Hostingaffe.Application.Acts;
 
@@ -22,6 +23,7 @@ public sealed record MachineSummaryShape(
     Arch? Arch,
     DateTimeOffset? MeasuredAt,
     DateTimeOffset? LastSeen,
+    bool? RebootRequired,
     DateTimeOffset UpdatedAt);
 
 /// <summary>The complete machine: every field of VISION 7, and who touched it.</summary>
@@ -46,6 +48,7 @@ public sealed record MachineShape(
     Status Status,
     DateTimeOffset? MeasuredAt,
     DateTimeOffset? LastSeen,
+    bool? RebootRequired,
     IReadOnlyList<DriftShape> Drift,
     string Description,
     IdentityRef CreatedBy,
@@ -129,9 +132,17 @@ public sealed record ChangeMachineRequest(
 /// from one query, because an overview that asked once per row would be the
 /// reason somebody turned the column off.
 /// </remarks>
+/// <remarks>
+/// <c>reboot_required</c> comes out of the same report and is derived the same
+/// way. It is in the slim shape because the list it makes possible is the one
+/// worth having: ten machines in a column, and the two that are waiting for a
+/// restart. It is absent where the machine has never reported and where the
+/// collector could not tell — a <c>false</c> from a machine nobody could ask
+/// would be the worst of the three answers.
+/// </remarks>
 public sealed class MachineAssembler(IIdentities identities, IMachines machines, IReports reports, DriftFinder drift)
 {
-    public static MachineSummaryShape Summary(Machine machine, DateTimeOffset? lastSeen)
+    public static MachineSummaryShape Summary(Machine machine, Report? latest)
     {
         ArgumentNullException.ThrowIfNull(machine);
 
@@ -144,7 +155,8 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
             machine.Location,
             machine.Arch,
             machine.MeasuredAt,
-            lastSeen,
+            latest?.ReceivedAt,
+            latest?.Body.Updates?.RebootRequired,
             machine.UpdatedAt);
     }
 
@@ -157,8 +169,7 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
 
         return
         [
-            .. rows.Select(row => Summary(
-                row, latest.TryGetValue(row.Id, out var report) ? report.ReceivedAt : null)),
+            .. rows.Select(row => Summary(row, latest.GetValueOrDefault(row.Id))),
         ];
     }
 
@@ -193,6 +204,7 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
             machine.Status,
             machine.MeasuredAt,
             latest?.ReceivedAt,
+            latest?.Body.Updates?.RebootRequired,
             // What the record above and the machine's own last word disagree
             // about, computed here so that no client builds it twice
             // (ADR 0015).

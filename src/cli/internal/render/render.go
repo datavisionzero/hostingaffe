@@ -150,6 +150,9 @@ func Machine(w io.Writer, m api.Machine) {
 	if m.LastSeen != nil {
 		fields = append(fields, said("last seen", Ago(time.Now(), *m.LastSeen)+" ("+m.LastSeen.Format(time.RFC3339)+")"))
 	}
+	if m.RebootRequired != nil && *m.RebootRequired {
+		fields = append(fields, said("restart", "pending"))
+	}
 	line(w, fields...)
 	touched(w, m.UpdatedAt, m.UpdatedBy, m.CreatedBy)
 
@@ -172,9 +175,16 @@ func MachineSummaries(w io.Writer, items []api.MachineSummary) {
 		if m.LastSeen != nil {
 			seen = Ago(now, *m.LastSeen)
 		}
-		fmt.Fprintf(w, "%-16s %-9s %-8s %-12s %-12s %-6s %-15s %-10s %s\n",
+		// The one column worth reading down ten machines on a Friday
+		// afternoon: which of them are waiting for a restart. A word, and no
+		// colour and no threshold.
+		restart := ""
+		if m.RebootRequired != nil && *m.RebootRequired {
+			restart = "restart"
+		}
+		fmt.Fprintf(w, "%-16s %-9s %-8s %-12s %-12s %-6s %-15s %-8s %-10s %s\n",
 			m.Key, m.Kind, m.Status, or(m.Provider), or(m.Location), or((*string)(m.Arch)),
-			seen, m.UpdatedAt.Format("2006-01-02"), m.Name)
+			seen, restart, m.UpdatedAt.Format("2006-01-02"), m.Name)
 	}
 }
 
@@ -633,6 +643,29 @@ func Report(w io.Writer, r api.Report) {
 		}
 	}
 
+	if r.Listening != nil && len(*r.Listening) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "listening: %d ports\n", len(*r.Listening))
+		for _, one := range *r.Listening {
+			port := "-"
+			if one.Port != nil {
+				port = fmt.Sprintf("%d/%s", *one.Port, or((*string)(one.Protocol)))
+			}
+			// No process, and nothing that hints at one: what `ha report
+			// collect` prints is what leaves the host, and this is all of it.
+			fmt.Fprintf(w, "  %-12s %s\n", port, or((*string)(one.Binding)))
+		}
+	}
+
+	if r.Updates != nil && r.Updates.RebootRequired != nil {
+		fmt.Fprintln(w)
+		if *r.Updates.RebootRequired {
+			fmt.Fprintln(w, "restart: the machine is waiting for one")
+		} else {
+			fmt.Fprintln(w, "restart: none pending")
+		}
+	}
+
 	// What the collector could not determine is said, not swallowed: a report
 	// that quietly left something out would be read as a machine that has it
 	// not.
@@ -663,8 +696,13 @@ func ReportSummaries(w io.Writer, page api.ReportPage) {
 		if r.Load1 != nil {
 			load = fmt.Sprintf("%.2f", *r.Load1)
 		}
-		fmt.Fprintf(w, "%-6d %-20s %-8s %-6s %-6s %s\n",
-			r.Number, r.ReceivedAt.Format("2006-01-02 15:04"), containers, disk, load, Ago(now, r.ReceivedAt))
+		restart := ""
+		if r.RebootRequired != nil && *r.RebootRequired {
+			restart = "  restart"
+		}
+		fmt.Fprintf(w, "%-6d %-20s %-8s %-6s %-6s %s%s\n",
+			r.Number, r.ReceivedAt.Format("2006-01-02 15:04"), containers, disk, load,
+			Ago(now, r.ReceivedAt), restart)
 	}
 }
 

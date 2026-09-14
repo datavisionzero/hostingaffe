@@ -650,6 +650,9 @@ enumerate keys would read something, and this one reads nothing.
                     "state": "running", "status": "Up 3 days", "health": "healthy",
                     "restarts": 0, "started_at": "2026-09-10T09:12:00Z",
                     "ports": ["127.0.0.1:18502->8080/tcp"] } ],
+  "listening": [ { "port": 22, "protocol": "tcp", "binding": "public" },
+                 { "port": 18502, "protocol": "tcp", "binding": "loopback" } ],
+  "updates": { "reboot_required": false },
   "missing": []
 }
 ```
@@ -664,6 +667,30 @@ a collecting bin.
 **Numbers are numbers** — bytes, never `42G` — and times are RFC 3339 like
 everywhere else. A container's `image` carries its **tag**, where a software's
 `image` carries none: the tag is the thing worth comparing.
+
+**`listening` carries no process.** Not the name, not the command line, not the
+arguments — there is no field for one, and a body that names one is
+`unknown-field`. `ss -tulpn` shows another user's process only as root, and the
+collector's promise is that it needs none; a section whole on the machine whose
+cron runs as root and half empty on the next would be worse than one that says
+the same everywhere. What the section exists for is the comparison against an
+installation's `ports`, and those are ports rather than processes.
+
+`binding` is `public` — bound to a wildcard or to an address other machines can
+reach — or `loopback`. It is **not** `scope`: a scope is what an operator
+decided a port is for, and `private` means "from my own network", which is a
+firewall's doing and invisible in a listening socket. The instance keeps **one
+entry per port and protocol** and the widest binding wins, so a collector that
+named a port twice, once on the wildcard and once on loopback, gets one
+`public` entry back.
+
+**`updates` says one thing: `reboot_required`.** How many packages have an
+update is deliberately not there. Counting them makes the collector
+distribution-dependent for the first time — apt, dnf, apk, pacman, each with
+its own command — and a host on which nothing ran `apt update` for weeks would
+report nothing pending and lie in the most comforting way there is. Where the
+restart cannot be told, the section is **absent** and `missing` says why: a
+`false` from a machine nobody could ask is the worst of the three answers.
 
 **The instance sets `received_at` itself** and does not trust the host's clock.
 `collected_at` is kept as it came, and the order of reports and a machine's
@@ -688,7 +715,8 @@ none of them**, its own machine's reports included.
 
 The series answers `{ "total", "reports" }`, and a `ReportSummary` is what a
 list makes a line of: `number`, `received_at`, `collected_at`, how many
-containers run of how many, the highest disk percentage, and `load1`. All of it
+containers run of how many, the highest disk percentage, `load1`, and
+`reboot_required`. All of it
 is counted from the body on read; none of it is stored beside the body it is
 counted from. That is enough for "on the 3rd the disk went from 60 to 91 per
 cent" without fetching two hundred whole bodies to see it.
@@ -702,6 +730,11 @@ a machine on which no cron has been set up.
 is the `received_at` of the latest report, derived and never written, and it is
 absent where a machine has never reported. It stands beside `measured_at` and
 means something else — `measured_at` is when a person last checked the facts.
+
+**`reboot_required` is on the machine too**, in the same two places and derived
+the same way, because the list worth having is ten machines in a column and the
+two that are waiting for a restart. It is `null` where the machine has never
+reported and where the collector could not tell.
 
 ### Drift
 
@@ -720,7 +753,7 @@ keeps the web application and `ha` from saying different things about one host.
  "reported": "1.3.2", "reported_at": "2026-09-13T08:00:09Z"}
 ```
 
-`kind` is one of three:
+`kind` is one of four:
 
 - **`version`** — the tag of a container's image against the version of the
   installation's latest deployment. The most valuable line of the whole
@@ -731,6 +764,26 @@ keeps the web application and `ha` from saying different things about one host.
 - **`fact`** — `os` or `arch` against the machine's own fields, with
   `record_at` the `measured_at` beside them. This is
   [VISION 15.1](../Vision.md#151-measuring-instead-of-typing) word for word.
+- **`port`** — a port an active installation says it listens on against what
+  the machine has a socket for. `field` names the port — `port 18502/tcp` —
+  `record` is the recorded `scope` and `reported` the `binding`, or `null`
+  where nothing listens there at all.
+
+A `scope` and a `binding` are not compared as if they were the same word.
+`public` and `private` both need a socket bound past loopback — how much
+further is a firewall's doing, which no listening socket shows — so both are
+read as "reachable from off this machine", and a `loopback` binding under
+either is drift. `internal` means the port never reaches the host, so silence
+is the agreement and a `public` binding is the disagreement. An installation
+the record does not call `active` is passed over: a planned one is not supposed
+to be listening.
+
+**A port that listens and belongs to no installation is not drift.** It is the
+question the section was wanted for, but the record has no place to put a
+machine's own ports — SSH is in no installation — so the statement could never
+be resolved by anybody, and a drift nobody can clear teaches people to stop
+reading the list. The `listening` section is served whole instead, and a person
+reads it.
 
 **Which side is right the product does not say.** Every drift names both sides
 and how old each is, and the decision is a person's or an agent's. No field is
@@ -746,7 +799,8 @@ drift at all: the report is shown and the reader compares the two rows. A wrong
 sentence is worse than none. So does a software whose `image` is empty, an
 installation with no container, and a container with no installation.
 
-**Disk, memory and load make no drift.** They have no other side in the record,
+**Disk, memory and load make no drift**, and neither does a pending restart.
+They have no other side in the record,
 so they are shown and not compared, and "91 per cent full" is a number a person
 reads rather than a disagreement.
 

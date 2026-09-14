@@ -12,6 +12,7 @@ const machine = {
   provider: "example-hoster", plan: "EX44", location: "fsn1", os: "Ubuntu 26.04 LTS",
   arch: "amd64", cpu: null, memory: null, disk: null, ipv4: null, ipv6: null,
   private_ip: null, ssh: null, status: "active", measured_at: null, last_seen: null,
+  reboot_required: null,
   drift: [],
   description: "", created_by: identity, updated_by: identity,
   created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z",
@@ -43,6 +44,11 @@ const report = {
       health: null, restarts: 3, started_at: null, ports: [],
     },
   ],
+  listening: [
+    { port: 22, protocol: "tcp", binding: "public" },
+    { port: 18502, protocol: "tcp", binding: "loopback" },
+  ],
+  updates: { reboot_required: true },
   missing: [],
   drift: [],
 };
@@ -96,6 +102,40 @@ describe("what a machine says about itself (VISION 7, ADR 0015)", () => {
     expect(screen.getByText("301.0GB of 502.0GB")).toBeInTheDocument();
   });
 
+  // What listens, and nothing about what is listening: the collector needs no
+  // root, and a process name is what would have cost it one (HOST-19).
+  it("says what listens, how far it is bound, and nothing about the process", async () => {
+    renderWith({ "GET /api/machines/ex44/reports/latest": report });
+
+    expect(await screen.findByText("2 listening ports")).toBeInTheDocument();
+    expect(screen.getByText("22/tcp")).toBeInTheDocument();
+    expect(screen.getByText("reachable from off this machine")).toBeInTheDocument();
+    expect(screen.getByText("18502/tcp")).toBeInTheDocument();
+    expect(screen.getByText("loopback only")).toBeInTheDocument();
+
+    // There is no column for it and no room for one.
+    expect(screen.queryByText(/sshd/)).toBeNull();
+    expect(screen.queryByText(/docker-proxy/)).toBeNull();
+  });
+
+  it("says when the machine is waiting for a restart, and says nothing when it is not", async () => {
+    renderWith({ "GET /api/machines/ex44/reports/latest": report });
+    expect(await screen.findByText("This machine is waiting for a restart.")).toBeInTheDocument();
+  });
+
+  it("says nothing about a restart the collector could not determine", async () => {
+    renderWith({
+      "GET /api/machines/ex44/reports/latest": {
+        ...report,
+        updates: null,
+        missing: [{ section: "updates", reason: "this distribution has no reboot-required marker" }],
+      },
+    });
+
+    expect(await screen.findByText(/not determined/)).toBeInTheDocument();
+    expect(screen.queryByText("This machine is waiting for a restart.")).toBeNull();
+  });
+
   it("says which section the collector could not determine, and why", async () => {
     view({
       "GET /api/machines/ex44/reports/latest": {
@@ -123,8 +163,8 @@ describe("what a machine says about itself (VISION 7, ADR 0015)", () => {
       "GET /api/machines/ex44/reports": {
         total: 2,
         reports: [
-          { number: 7, received_at: report.received_at, collected_at: report.collected_at, containers_running: 1, containers_total: 2, disk_percent: 60, load1: 0.14 },
-          { number: 6, received_at: "2026-09-13T07:45:00Z", collected_at: "2026-09-13T07:45:00Z", containers_running: 2, containers_total: 2, disk_percent: 59, load1: 0.2 },
+          { number: 7, received_at: report.received_at, collected_at: report.collected_at, containers_running: 1, containers_total: 2, disk_percent: 60, load1: 0.14, reboot_required: true },
+          { number: 6, received_at: "2026-09-13T07:45:00Z", collected_at: "2026-09-13T07:45:00Z", containers_running: 2, containers_total: 2, disk_percent: 59, load1: 0.2, reboot_required: false },
         ],
       },
       "GET /api/machines/ex44/reports/6": { ...report, number: 6 },

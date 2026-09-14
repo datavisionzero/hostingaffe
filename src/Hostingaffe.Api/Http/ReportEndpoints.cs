@@ -30,7 +30,7 @@ public static class ReportEndpoints
                 {
                     var receipt = await hand.ExecuteAsync(
                         key,
-                        request ?? new HandInReportRequest(null, null, null, null, null, null, null),
+                        request ?? new HandInReportRequest(null, null, null, null, null, null, null, null, null),
                         cancellationToken);
 
                     return Results.Created(

@@ -248,6 +248,129 @@ public sealed class ReportEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
     }
 
+    /// <summary>
+    /// What listens comes back as it was handed in, and the restart with it.
+    /// One entry per port and protocol: a collector that named a port twice —
+    /// once on the wildcard, once on loopback — said one thing about one port,
+    /// and the widest bind is the honest reading of it.
+    /// </summary>
+    [Fact]
+    public async Task What_listens_is_kept_one_entry_to_a_port_and_the_widest_bind_wins()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Machine(admin, "ex44");
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                listening = new[]
+                {
+                    new { port = 22, protocol = "tcp", binding = "loopback" },
+                    new { port = 22, protocol = "tcp", binding = "public" },
+                    new { port = 53, protocol = "udp", binding = "public" },
+                },
+                updates = new { reboot_required = true },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
+
+        var report = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports/latest", Ct);
+        var listening = report.GetProperty("listening").EnumerateArray().ToList();
+        Assert.Equal(2, listening.Count);
+
+        var ssh = listening.Single(one => one.GetProperty("port").GetInt32() == 22);
+        Assert.Equal("tcp", ssh.GetProperty("protocol").GetString());
+        Assert.Equal("public", ssh.GetProperty("binding").GetString());
+
+        // The one column worth reading down ten machines, and it is on the
+        // machine and in the series as well as in the report.
+        Assert.True(report.GetProperty("updates").GetProperty("reboot_required").GetBoolean());
+        Assert.True((await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct))
+            .GetProperty("reboot_required").GetBoolean());
+
+        var series = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports", Ct);
+        Assert.True(series.GetProperty("reports").EnumerateArray().Single()
+            .GetProperty("reboot_required").GetBoolean());
+    }
+
+    /// <summary>
+    /// A machine that never reported, and one whose collector could not tell,
+    /// both say nothing rather than <c>false</c>: a restart nobody could check
+    /// is not a restart nobody needs.
+    /// </summary>
+    [Fact]
+    public async Task A_restart_nobody_could_determine_is_absent_and_not_false()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Machine(admin, "ex44");
+
+        var never = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
+        Assert.Equal(JsonValueKind.Null, never.GetProperty("reboot_required").ValueKind);
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                missing = new[] { new { section = "updates", reason = "this distribution has no marker ha knows" } },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
+
+        var read = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
+        Assert.Equal(JsonValueKind.Null, read.GetProperty("reboot_required").ValueKind);
+
+        var report = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports/latest", Ct);
+        Assert.Equal(JsonValueKind.Null, report.GetProperty("updates").ValueKind);
+        Assert.Equal(JsonValueKind.Null, report.GetProperty("listening").ValueKind);
+    }
+
+    /// <summary>
+    /// The section is closed like every other: a port that is not a port, a
+    /// word that is not one of the set, and a field beside them are each
+    /// refused rather than swallowed.
+    /// </summary>
+    [Fact]
+    public async Task A_listening_port_that_is_not_one_is_refused_by_the_field_it_arrived_in()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Machine(admin, "ex44");
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+
+        var refused = await Refusals.Problem(
+            await machine.PostAsJsonAsync(
+                "/api/machines/ex44/reports",
+                new
+                {
+                    collected_at = "2026-09-13T08:00:00Z",
+                    listening = new[] { new { port = 70000, protocol = "tcp", binding = "public" } },
+                },
+                Ct),
+            HttpStatusCode.BadRequest,
+            "validation");
+        Assert.True(refused.GetProperty("errors").TryGetProperty("listening.port", out _));
+
+        // No process, and no room for one: the field does not exist.
+        await Refusals.Problem(
+            await machine.PostAsJsonAsync(
+                "/api/machines/ex44/reports",
+                new
+                {
+                    collected_at = "2026-09-13T08:00:00Z",
+                    listening = new[] { new { port = 22, protocol = "tcp", binding = "public", process = "sshd" } },
+                },
+                Ct),
+            HttpStatusCode.BadRequest,
+            "unknown-field");
+    }
+
     internal static object AReport() => new
     {
         collected_at = "2026-09-13T08:00:07Z",
@@ -289,6 +412,12 @@ public sealed class ReportEndpointTests(PostgresFixture postgres)
                 ports = new[] { "127.0.0.1:18502->8080/tcp" },
             },
         },
+        listening = new[]
+        {
+            new { port = 22, protocol = "tcp", binding = "public" },
+            new { port = 18502, protocol = "tcp", binding = "loopback" },
+        },
+        updates = new { reboot_required = false },
         missing = Array.Empty<object>(),
     };
 

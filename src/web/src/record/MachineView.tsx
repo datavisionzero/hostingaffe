@@ -140,6 +140,9 @@ export function MachineView() {
               ? "This machine has never reported."
               : <>Last seen <time title={moment(machine.last_seen)}>{ago(machine.last_seen)}</time>.</>}
           </p>
+          {machine.reboot_required === true && (
+            <p className="text-sm">This machine is waiting for a restart.</p>
+          )}
         </Section>
 
         <About of={machine} />

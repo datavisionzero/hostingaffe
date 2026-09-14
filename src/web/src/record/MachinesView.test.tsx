@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { installInstance, renderAt } from "@/shared/testing";
 import { MachinesView } from "./MachinesView";
 
-function aMachine(key: string, status = "active", kind = "vps", lastSeen: string | null = null) {
+function aMachine(
+  key: string,
+  status = "active",
+  kind = "vps",
+  lastSeen: string | null = null,
+  rebootRequired: boolean | null = null,
+) {
   return {
     key,
     name: key,
@@ -15,6 +21,7 @@ function aMachine(key: string, status = "active", kind = "vps", lastSeen: string
     arch: "amd64",
     measured_at: null,
     last_seen: lastSeen,
+    reboot_required: rebootRequired,
     updated_at: "2026-09-02T10:00:00Z",
   };
 }
@@ -43,6 +50,24 @@ describe("the machines (VISION 6.2)", () => {
     expect(screen.getByText("example-hoster")).toBeInTheDocument();
     // Never measured is a fact about the row, not an empty cell.
     expect(screen.getByText("never measured")).toBeInTheDocument();
+  });
+
+  // The list somebody works off on a Friday afternoon: which of them are
+  // waiting for a restart. A word, no colour and no threshold — and nothing at
+  // all where the machine never said (VISION 5).
+  it("says which machines are waiting for a restart, and nothing where it does not know", async () => {
+    installInstance({
+      "GET /api/machines": [
+        aMachine("web-01", "active", "vps", "2026-09-13T08:00:00Z", true),
+        aMachine("web-02", "active", "vps", "2026-09-13T08:00:00Z", false),
+        aMachine("web-03"),
+      ],
+    });
+
+    renderAt("/machines", <MachinesView />);
+
+    await screen.findByRole("link", { name: /web-01/ });
+    expect(screen.getAllByText("restart")).toHaveLength(1);
   });
 
   // A filtered list is something people send each other, so it is in the

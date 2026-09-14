@@ -634,6 +634,8 @@ nothing else (9). Nothing reaches out to the machine.
 | `memory` | section | total, used, available, swap |
 | `disks` | section | per real mount: mount, device, size, used, percent |
 | `containers` | section | per container: name, image *with its tag*, state, status, health, restarts, started_at, ports |
+| `listening` | section | per port and protocol: the port, `tcp` or `udp`, and the binding — `public` or `loopback`. Never a process |
+| `updates` | section | whether the machine is waiting for a restart |
 | `missing` | list | the sections the collector could not determine, each with its reason |
 
 A report **belongs to exactly one machine, has no key, and is never edited**.
@@ -649,9 +651,18 @@ metric database in six months. Every section may be missing, and a host without
 Docker reports no containers instead of failing.
 
 **No secrets, ever.** No container environment, no process command lines, no
-file contents. It is the same line that keeps secret values out of the record
-(5), and it is written down rather than only implemented, so that it can be
-checked without reading the code.
+file contents, and no name of any process that is listening. It is the same
+line that keeps secret values out of the record (5), and it is written down
+rather than only implemented, so that it can be checked without reading the
+code. The process name is the one the collector gives up deliberately: naming
+another user's process needs root, and this collector needs none — a section
+whole on one host and half empty on the next would be worse than one that says
+the same everywhere.
+
+`updates` says whether a restart is pending and nothing more. How many packages
+have an update is not in it: counting them makes the collector
+distribution-dependent, and a host whose package lists are weeks old would
+report nothing pending and lie in the most comforting way there is.
 
 Where the two sides disagree — the record says 1.4.0 and the machine reports
 1.3.2 — that is **drift**, and it is the point of the whole thing. The product

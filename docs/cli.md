@@ -297,17 +297,35 @@ first for that reason: it prints exactly what `send` would hand in, needs
 neither token nor instance, and runs on a host with no network.
 
 **What is never collected: no container environment, no process command lines,
-no file contents, no labels of arbitrary content.** That is not a convenience
-rule — it is the line that keeps secret values out of the record, and it is
-written here so that somebody can check it against `ha report collect` without
-reading the code.
+no file contents, no labels of arbitrary content, and no name of any process
+that is listening.** That is not a convenience rule — it is the line that keeps
+secret values out of the record, and it is written here so that somebody can
+check it against `ha report collect` without reading the code.
 
 The collector needs no root beyond the docker group for the socket, installs
 nothing, and uses only what lies on every Linux host: `/proc/uptime`,
-`/proc/loadavg`, `/proc/meminfo`, `/proc/mounts`, `/etc/os-release`, `uname`,
-`df`, and `docker ps` where there is a Docker. Where `/proc` can answer, `/proc`
-is read rather than a command run, and every command has a short timeout so that
-a hanging `docker` cannot hold the run.
+`/proc/loadavg`, `/proc/meminfo`, `/proc/mounts`, `/proc/net/tcp` and its three
+neighbours, `/etc/os-release`, `uname`, `df`, and `docker ps` where there is a
+Docker. Where `/proc` can answer, `/proc` is read rather than a command run, and
+every command has a short timeout so that a hanging `docker` cannot hold the
+run.
+
+**What listens comes out of `/proc/net`, and that is why it carries no process
+name.** `ss -tulpn` would name them, but it shows another user's process only
+as root, and this collector needs none — a section whole on the machine whose
+cron runs as root and half empty on the next would be worse than one that says
+the same everywhere. What comes back is the port, `tcp` or `udp`, and whether
+the socket is bound `public` — a wildcard or an address other machines can
+reach — or `loopback`. One entry per port and protocol, and where a port is
+bound to several addresses the widest binding wins.
+
+**Whether a restart is pending** is the file Debian and Ubuntu write,
+`/run/reboot-required`. On anything else the section is missing with its reason
+rather than `false`: this collector runs no package manager, and a `false` it
+could not check would be read as "nothing to do here". How many packages have
+an update is not collected at all — that would make the collector
+distribution-dependent, and a host whose package lists are weeks old would
+report nothing pending and lie in the most comforting way there is.
 
 **A section it could not determine is not a failure.** A host without Docker
 reports no containers, says why in `missing`, and `send` still exits 0: the sign
@@ -346,14 +364,22 @@ the top answers the question somebody came with — when this report arrived.
 `--json` prints the body as the API answered it, like everywhere else.
 
 `list` is one line per report out of the summary the API serves: when, how many
-containers ran of how many, the highest disk percentage, and the load. Enough to
-see that something changed on the 3rd, and then `show --number` to look.
+containers ran of how many, the highest disk percentage, the load, and
+`restart` where one was pending. Enough to see that something changed on the
+3rd, and then `show --number` to look.
 
 **The drift stands under the report**, and under the machine in
 `ha machine view`: one line per disagreement, naming both sides and how old each
 is — "the record says logaffe-prod 1.4.0, the machine reported 1.3.2". **Which
 side is right `ha` does not say**; that is the decision a person or an agent
 makes, and there is no verb that pulls the record after the report.
+
+**`restart` is a column of `ha machine list`** and a field of `ha machine view`,
+carrying the word where the machine's latest report said one is pending and
+nothing where it said otherwise or never said. That is the list somebody works
+off on a Friday afternoon: ten machines in a column, and the two that want
+restarting. No colour, no threshold, no judgement — whether it is tonight or
+Monday is the reader's call.
 
 **`last seen` is on `ha machine list` and `ha machine view`**, relative — "12
 minutes ago", "6 days ago" — and empty where nothing ever came. In `view` it

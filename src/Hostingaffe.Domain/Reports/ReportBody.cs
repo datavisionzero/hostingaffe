@@ -1,3 +1,5 @@
+using Hostingaffe.Domain.Installations;
+
 namespace Hostingaffe.Domain.Reports;
 
 /// <summary>
@@ -34,6 +36,9 @@ public sealed record ReportBody
     public const int MaxPorts = 64;
 
     /// <inheritdoc cref="MaxDisks"/>
+    public const int MaxListening = 128;
+
+    /// <inheritdoc cref="MaxDisks"/>
     public const int MaxMissing = 8;
 
     /// <summary>What one line of a section fits in.</summary>
@@ -50,6 +55,14 @@ public sealed record ReportBody
     public IReadOnlyList<DiskUsage>? Disks { get; init; }
 
     public IReadOnlyList<ContainerState>? Containers { get; init; }
+
+    /// <summary>
+    /// What listens on the machine, one entry per port and protocol. Never a
+    /// process: see <see cref="ListeningPort"/>.
+    /// </summary>
+    public IReadOnlyList<ListeningPort>? Listening { get; init; }
+
+    public UpdatesSection? Updates { get; init; }
 
     /// <summary>What could not be determined, and why. Never null; empty is the happy case.</summary>
     public IReadOnlyList<MissingSection> Missing { get; init; } = [];
@@ -141,6 +154,81 @@ public sealed record ContainerState
 
     /// <summary>As the host spells them — <c>0.0.0.0:443-&gt;443/tcp</c>.</summary>
     public IReadOnlyList<string>? Ports { get; init; }
+}
+
+/// <summary>
+/// One port the machine listens on, and how far the socket is bound
+/// (<c>CONTEXT.md</c>, Report).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>No process, ever.</strong> Not the name, not the command line, not
+/// the arguments. <c>ss -tulpn</c> shows another user's process only as root,
+/// and the collector's promise is that it needs none; a section that were whole
+/// on one machine and half empty on the next, depending on who the cron runs
+/// as, would be worse than one that everywhere says the same. The comparison
+/// this exists for runs against an installation's <c>ports</c>, which are ports
+/// and not processes, so it loses nothing.
+/// </para>
+/// <para>
+/// One entry per port and protocol, however many addresses the port is bound
+/// to, and the widest binding wins: a port on <c>0.0.0.0</c> and on
+/// <c>127.0.0.1</c> is <see cref="Binding.Public"/>, because that is the
+/// honest answer to how far it is reachable.
+/// </para>
+/// </remarks>
+public sealed record ListeningPort
+{
+    public int Port { get; init; }
+
+    /// <summary>The transport, spelled as an installation's port spells it.</summary>
+    public Protocol Protocol { get; init; }
+
+    public Binding Binding { get; init; }
+}
+
+/// <summary>
+/// How far a socket is bound, as a host can tell without asking anything but
+/// the kernel. Closed, and deliberately <strong>not</strong>
+/// <see cref="Scope"/>.
+/// </summary>
+/// <remarks>
+/// A scope is what an operator decided a port is for — <c>private</c> means
+/// "from my own network", which is a firewall's doing and invisible in a
+/// listening socket. A binding is only what the socket says: either it is
+/// reachable from beyond this machine, or it is not.
+/// </remarks>
+public enum Binding
+{
+    /// <summary>Bound to a wildcard or to an address other machines can reach.</summary>
+    Public,
+
+    /// <summary>Bound to loopback alone, and reachable from this machine only.</summary>
+    Loopback,
+}
+
+/// <summary>
+/// What the machine says about its own upkeep. Today one thing: whether it is
+/// waiting for a restart.
+/// </summary>
+/// <remarks>
+/// How many packages have an update is deliberately not here. Counting them
+/// makes the collector distribution-dependent for the first time — apt, dnf,
+/// apk, pacman, each with its own command and its own behaviour when the
+/// package lists are old — and a host on which nothing ran <c>apt update</c>
+/// for weeks would report nothing pending and lie in the most comforting way
+/// there is. The restart is the part that is cheap, near enough the same
+/// everywhere, and the part people forget.
+/// </remarks>
+public sealed record UpdatesSection
+{
+    /// <summary>
+    /// Whether the machine is waiting for a restart. The section is absent
+    /// where that cannot be told, and then <c>missing</c> says why — a
+    /// <c>false</c> from a machine nobody could ask would be the worst of the
+    /// three answers.
+    /// </summary>
+    public bool RebootRequired { get; init; }
 }
 
 /// <summary>A section the collector could not determine, and the reason it gives.</summary>

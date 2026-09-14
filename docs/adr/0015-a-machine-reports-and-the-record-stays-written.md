@@ -103,3 +103,23 @@ says when it last spoke.
 - **The machine's `monitoring` sibling field does not change.** An
   installation's `monitoring` keeps `none · planned · external`; there is no
   `internal`, because a report is not a monitor.
+
+## Since
+
+The set of sections named above is the one this decision was taken with. Two
+have been added since, each by a decision of its own and each still closed:
+
+- **`listening`** — per port and protocol, the port and how far the socket is
+  bound. It carries no process, and that is the whole of what was decided: a
+  process name needs root, and the collector's promise is that it needs none.
+  It gave the comparison a fourth kind, `port`.
+- **`updates`** — whether the machine is waiting for a restart, and nothing
+  more. The count of pending packages was deliberately left out: it would make
+  the collector distribution-dependent, and a host whose package lists are
+  weeks old reports nothing pending and lies in the most comforting way there
+  is.
+
+What that changes about this decision: nothing. A report still sets no field,
+writes no history row, carries no secret, and is still read by no machine
+token. A section proposed that weakened any of those four would be refused
+rather than planned.

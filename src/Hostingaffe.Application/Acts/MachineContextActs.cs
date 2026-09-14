@@ -76,6 +76,12 @@ public sealed class ReadMachineContext(
     public const int NamedContainers = 12;
 
     /// <summary>
+    /// How many listening ports the report section names before it only counts
+    /// them. The same budget as the containers, for the same reason (VISION 16).
+    /// </summary>
+    public const int NamedPorts = 24;
+
+    /// <summary>
     /// Past this, a report is given with its age and not set down as the
     /// present. An agent that concluded from a three-week-old report what is
     /// running now would be worse off than one that knew nothing.
@@ -266,7 +272,8 @@ public sealed class ReadMachineContext(
     /// <remarks>
     /// What is in it: when it last reported, the disks in one line, how many
     /// containers run of how many, every container that is <em>not</em>
-    /// running, and every drift. What is not: the full container table, memory
+    /// running, what listens and how far it is bound, whether a restart is
+    /// waiting, and every drift. What is not: the full container table, memory
     /// and load in detail, and any older report. Those are one `ha report show`
     /// away, and they are exactly the sort of content that fills a context
     /// window without changing a decision (VISION 16).
@@ -325,6 +332,23 @@ public sealed class ReadMachineContext(
             }
         }
 
+        if (report.Body.Listening is { Count: > 0 } listening)
+        {
+            // Public first: an agent about to touch this host asks what is
+            // reachable from off it before it asks anything else.
+            var reachable = listening.Where(one => one.Binding is Binding.Public).ToArray();
+            var loopback = listening.Where(one => one.Binding is Binding.Loopback).ToArray();
+
+            document.Append("Listening: ").Append(Named(reachable, "public"))
+                .Append(reachable.Length > 0 && loopback.Length > 0 ? "; " : string.Empty)
+                .Append(Named(loopback, "loopback")).Append(".\n\n");
+        }
+
+        if (report.Body.Updates is { RebootRequired: true })
+        {
+            document.Append("**This machine is waiting for a restart.**\n\n");
+        }
+
         foreach (var missing in report.Body.Missing)
         {
             document.Append("`").Append(missing.Section).Append("` was not determined (")
@@ -346,6 +370,23 @@ public sealed class ReadMachineContext(
 
             document.Append('\n');
         }
+    }
+
+    /// <summary>The ports of one binding, named up to the budget and counted past it.</summary>
+    private static string Named(IReadOnlyList<ListeningPort> ports, string binding)
+    {
+        if (ports.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var named = string.Join(
+            ", ",
+            ports.Take(NamedPorts).Select(one => $"{one.Port}/{Spelling.Of(one.Protocol)}"));
+
+        return ports.Count > NamedPorts
+            ? $"{named}, and {ports.Count - NamedPorts} more {binding}"
+            : $"{named} {binding}";
     }
 
     /// <summary>How long ago, in the one unit that says it.</summary>
