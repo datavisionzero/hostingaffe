@@ -207,6 +207,7 @@ missing:
 | `containers` | per container: name, image **with its tag**, state, status, health, restarts, started_at, ports, and how many of how many run |
 | `listening` | per port and protocol: the port, `tcp` or `udp`, and the **binding** — and never a process |
 | `updates` | whether the machine is waiting for a restart |
+| `files` | per directory `files sync` wrote into: the installation, the directory, and a **digest** per path the manifest beside them claims — never a content |
 
 Beside them: `collected_at`, the host's clock as it came; `received_at`, the
 instance's clock, which is what the order and `last_seen` are read from; the
@@ -232,6 +233,14 @@ the collector needs none; what the section exists for is the comparison against
 the `ports` of an installation and of the machine, and those are ports rather
 than processes.
 
+The `files` section is the one place a report is about the record rather than
+about the machine alone, and it carries **digests and never contents**. What it
+names is what the manifest `.ha-sync.json` claims — the paths `files sync` wrote,
+which came out of the record in the first place — and nothing else that lies in
+the directory. The directories are named on the cron's own command line, because
+a machine token reads nothing and cannot be told which they are
+([ADR 0017](docs/adr/0017-a-machine-reports-digests-and-the-instance-compares.md)).
+
 The `updates` section says one thing: whether the machine is waiting for a
 restart. How many packages have an update is not in it — counting them makes
 the collector distribution-dependent, and a host whose package lists are weeks
@@ -245,10 +254,22 @@ because the material is the machine's own.
 the tag of a container's image against the version of the installation's latest
 deployment (`version`), an installation the record calls active whose container
 is not running (`container`), `os` and `arch` against the machine's own fields
-(`fact`), and a port against the socket the machine has for it (`port`). Every
-drift names both sides and how old each is; which of them is right the product
-does not say. Where the assignment of a container to an installation is
+(`fact`), a port against the socket the machine has for it (`port`), and a file
+of the record against the digest reported for the path sync wrote it to
+(`file`). Every drift names both sides, what kind of thing the subject is —
+`machine` or `installation` — and how old each side is; which of them is right
+the product does not say. Where the assignment of a container to an installation is
 ambiguous, nothing is claimed.
+
+A `file` drift is the drift check for configuration: three findings, and one
+non-finding. A file of the record whose digest on the host is another one; one
+the record has that lies nowhere on the host; one that has left the record and is
+still lying there. **A file sync never wrote is no finding** — it is what sync
+never touches, and the report never named it. Both sides are named as digests,
+because a file on a host carries no revision, and only the content is compared
+and never the mode bit. **A report that names no directory hears nothing about
+files**, the same way a machine that keeps no ports hears nothing about
+undocumented ones.
 
 A `port` drift reads both sides of the record — an active installation's `ports`
 and the machine's own — against the `listening` section. **A port bound in

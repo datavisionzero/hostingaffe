@@ -201,6 +201,36 @@ export function ReportBody({ report }: { report: Report }) {
         </div>
       )}
 
+      {/* Which directories were compared at all. It matters because the
+          absence of a file drift below means "not checked" for every directory
+          the cron was not given, and "in order" only for the ones it was
+          (ADR 0017). */}
+      {report.files !== null && report.files !== undefined && report.files.length > 0 && (
+        <div className="grid gap-2">
+          <p className="text-xs text-muted-foreground">
+            {`${report.files.length} ${report.files.length === 1 ? "directory" : "directories"} checked against the record`}
+          </p>
+          <Rows>
+            {report.files.map((one) => (
+              <Line key={one.directory}>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{one.directory}</span>
+                <Link
+                  className="w-40 shrink-0 truncate font-mono text-xs text-brand hover:underline"
+                  to={installationPath(one.installation ?? "")}
+                >
+                  {one.installation}
+                </Link>
+                {/* A count of paths, never one of them: what the digests said
+                    is in the drift below, and a path that agrees is not news. */}
+                <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
+                  {`${one.files?.length ?? 0} ${(one.files?.length ?? 0) === 1 ? "file" : "files"}`}
+                </span>
+              </Line>
+            ))}
+          </Rows>
+        </div>
+      )}
+
       {report.updates !== null && report.updates.reboot_required === true && (
         <p className="text-sm">This machine is waiting for a restart.</p>
       )}
@@ -480,12 +510,15 @@ export function DriftList({ drift }: { drift: Drift[] }) {
     <ul className="grid gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
       {drift.map((one) => (
         <li key={`${one.kind}:${one.subject}:${one.field}`}>
-          {one.kind === "fact" ? (
-            <span className="font-mono text-xs">{one.subject}</span>
-          ) : (
+          {/* An installation is linked and a machine is not: the drift is read
+              on the machine's own screen, and a key is unique per entity type
+              and not across them (CONTEXT.md, File). */}
+          {one.subject_kind === "installation" ? (
             <Link className="font-mono text-xs text-brand hover:underline" to={installationPath(one.subject)}>
               {one.subject}
             </Link>
+          ) : (
+            <span className="font-mono text-xs">{one.subject}</span>
           )}{" "}
           <span className="text-muted-foreground">{one.field}</span>: the record says{" "}
           <span className="font-medium">{one.record ?? "nothing"}</span>

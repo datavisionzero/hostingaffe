@@ -649,6 +649,7 @@ nothing else (9). Nothing reaches out to the machine.
 | `containers` | section | per container: name, image *with its tag*, state, status, health, restarts, started_at, ports |
 | `listening` | section | per port and protocol: the port, `tcp` or `udp`, and the binding — `public` or `loopback`. Never a process |
 | `updates` | section | whether the machine is waiting for a restart |
+| `files` | section | per directory `files sync` wrote into: the installation, the directory, and a *digest* per path the manifest beside them claims. Never a content |
 | `missing` | list | the sections the collector could not determine, each with its reason |
 
 A report **belongs to exactly one machine, has no key, and is never edited**.
@@ -677,8 +678,18 @@ have an update is not in it: counting them makes the collector
 distribution-dependent, and a host whose package lists are weeks old would
 report nothing pending and lie in the most comforting way there is.
 
+`files` is the one section that is about the record rather than about the
+machine alone, and it is **digests and never contents**. What it names is what
+the manifest `.ha-sync.json` claims — the paths `files sync` wrote, which came
+out of the record in the first place — and never anything else lying in the
+directory. The directories are named on the cron's own command line, because a
+machine token reads nothing and cannot be told which they are. That is what
+makes the drift check for configuration possible without a token that reads
+([ADR 0017](docs/adr/0017-a-machine-reports-digests-and-the-instance-compares.md)).
+
 Where the two sides disagree — the record says 1.4.0 and the machine reports
-1.3.2 — that is **drift**, and it is the point of the whole thing. The product
+1.3.2, or the `compose.yml` on the disk is not the one the record holds — that
+is **drift**, and it is the point of the whole thing. The product
 shows both sides with their dates and says which is which; which one is right
 is a person's or an agent's decision, and there is no button that pulls the
 record after the report.
@@ -856,8 +867,11 @@ attack surface, configuration included. Consequences:
 - No token that reads is stored on a machine (9.). The one command that reads
   and runs on a host, `files sync`, borrows the session's token and leaves
   nothing behind. The one token that does live on a host, the machine token,
-  writes a report for its own machine and reads nothing at all, so a
-  compromised host is worth no more of the map than it was before — what it
+  writes a report for its own machine and reads nothing at all — the drift
+  check for configuration included, which is why it reports digests rather than
+  asking what the record holds
+  ([ADR 0017](docs/adr/0017-a-machine-reports-digests-and-the-instance-compares.md)) —
+  so a compromised host is worth no more of the map than it was before — what it
   buys an attacker is false reports about the machine they already hold, which
   is why a report never changes the record
   ([ADR 0015](docs/adr/0015-a-machine-reports-and-the-record-stays-written.md),
@@ -1005,9 +1019,17 @@ measurement that writes itself into the record deletes the comparison it was
 worth having. So `ha report send` hands it in on a cron, both sides stay, and
 the drift is a sentence the product shows and does not resolve.
 
-Still open: the same idea applied to files. `ha files sync --check`, reporting
-where the directory on the host differs from the record, is the drift check for
-configuration, and it needs a token that reads (17.).
+The same idea applied to files is **shipped too**, and not the way this section
+expected. `ha files sync --check` was the plan, and it needed a token that
+reads. What shipped instead is a section of the report: the machine sends a
+**digest** per file `files sync` wrote, named per directory on the cron's own
+command line — `ha report send --sync-dir /srv/logaffe` — and the instance
+compares it against the record. The token model is untouched, a machine token
+still reads nothing, and the drift check for configuration is the fifth kind of
+drift
+([ADR 0017](docs/adr/0017-a-machine-reports-digests-and-the-instance-compares.md)).
+A digest is what makes that possible: it says whether the two sides agree without
+the configuration ever leaving the host.
 
 ### 15.2 An installation depends on an installation
 
@@ -1058,8 +1080,6 @@ built.
 - An export shaped for agents — one Markdown index over the whole instance in
   the spirit of `llms.txt` — for a harness that prefers reading a file to
   calling a CLI.
-- A token scoped to one machine, for a host that syncs its own files without
-  an agent's session (17.).
 
 ## 16. How We Measure Success
 
@@ -1085,14 +1105,6 @@ built.
   does a homelab want `desktop` and `sbc`? Closed set either way.
 - **Versions.** Text, or a parsed version for sorting and "newer than"? Text
   until sorting is actually needed.
-- **A machine-scoped token that reads.** Decided for the writing half and
-  still open for the reading one. A machine token exists, and it hands in a
-  report and reads nothing (9.,
-  [ADR 0016](docs/adr/0016-a-machine-token-posts-one-report-and-reads-nothing.md)).
-  What that does not answer is `files sync` from the host itself, which needs a
-  token that reads one machine and its installations. The question is whether
-  that narrower kind is worth its explanation, or whether syncing from a host
-  without an agent's session is simply not something this product does.
 - **Cost.** A single `monthly_cost` on the machine is cheap and often asked
   for, and it is the first step onto a slope (currency, billing period,
   contracts). Deferred, not refused.

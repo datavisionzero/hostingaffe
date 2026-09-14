@@ -352,6 +352,18 @@ public sealed class ReadMachineContext(
             document.Append("**This machine is waiting for a restart.**\n\n");
         }
 
+        if (report.Body.Files is { Count: > 0 } synced)
+        {
+            // Which directories were compared at all, because that is what the
+            // absence of a file drift below means: a directory the cron was not
+            // given is not checked rather than found in order (ADR 0017).
+            document.Append("Files checked: ")
+                .Append(string.Join(
+                    ", ",
+                    synced.Select(one => $"`{one.Directory}` ({one.Files.Count} of `{one.Installation}`)")))
+                .Append(". A directory the cron was not given is not compared.\n\n");
+        }
+
         foreach (var missing in report.Body.Missing)
         {
             document.Append("`").Append(missing.Section).Append("` was not determined (")

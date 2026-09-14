@@ -49,6 +49,16 @@ const report = {
     { port: 18502, protocol: "tcp", binding: "loopback" },
   ],
   updates: { reboot_required: true },
+  files: [
+    {
+      installation: "logaffe-prod",
+      directory: "/srv/logaffe",
+      files: [
+        { path: "compose.yml", sha256: "a".repeat(64) },
+        { path: "Caddyfile", sha256: null },
+      ],
+    },
+  ],
   missing: [],
   drift: [],
 };
@@ -118,6 +128,26 @@ describe("what a machine says about itself (VISION 7, ADR 0015)", () => {
     expect(screen.queryByText(/docker-proxy/)).toBeNull();
   });
 
+  // Which directories were compared, and not a single path of them: what the
+  // digests said is the drift, and a path that agrees is not news (ADR 0017).
+  it("says which directories were checked against the record, and names no path", async () => {
+    renderWith({ "GET /api/machines/ex44/reports/latest": report });
+
+    expect(await screen.findByText("1 directory checked against the record")).toBeInTheDocument();
+    expect(screen.getByText("/srv/logaffe")).toBeInTheDocument();
+    expect(screen.getByText("2 files")).toBeInTheDocument();
+    expect(screen.queryByText("compose.yml")).toBeNull();
+  });
+
+  // A cron that was given no directory hears nothing about files: the section
+  // is absent, and nothing on the screen suggests one was found in order.
+  it("says nothing about files where the report carries none", async () => {
+    renderWith({ "GET /api/machines/ex44/reports/latest": { ...report, files: null } });
+
+    expect(await screen.findByText("2 listening ports")).toBeInTheDocument();
+    expect(screen.queryByText(/checked against the record/)).toBeNull();
+  });
+
   it("says when the machine is waiting for a restart, and says nothing when it is not", async () => {
     renderWith({ "GET /api/machines/ex44/reports/latest": report });
     expect(await screen.findByText("This machine is waiting for a restart.")).toBeInTheDocument();
@@ -183,7 +213,7 @@ describe("what a machine says about itself (VISION 7, ADR 0015)", () => {
 describe("drift: what the record and the machine disagree about (ADR 0015)", () => {
   const drift = [
     {
-      kind: "version", subject: "logaffe-prod", field: "version",
+      kind: "version", subject_kind: "installation", subject: "logaffe-prod", field: "version",
       record: "1.4.0", record_at: "2026-09-08T19:12:00Z",
       reported: "1.3.2", reported_at: report.received_at,
     },
@@ -201,6 +231,48 @@ describe("drift: what the record and the machine disagree about (ADR 0015)", () 
     expect(screen.getByRole("link", { name: "logaffe-prod" }))
       .toHaveAttribute("href", "/installations/logaffe-prod");
     expect(screen.queryByRole("button", { name: /reconcile|apply|sync/i })).not.toBeInTheDocument();
+  });
+
+  // A key is unique per entity type and not across them, so what the subject is
+  // comes from the drift rather than from the shape of the key (CONTEXT.md).
+  it("does not link a drift whose subject is the machine itself", async () => {
+    view({
+      "GET /api/machines/ex44": {
+        ...machine,
+        drift: [
+          {
+            kind: "port", subject_kind: "machine", subject: "ex44", field: "port 22/tcp",
+            record: "public", record_at: "2026-09-08T19:12:00Z",
+            reported: null, reported_at: report.received_at,
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "Drift" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "ex44" })).not.toBeInTheDocument();
+  });
+
+  // The drift check for configuration: a digest on each side, and the
+  // installation it belongs to one click away (ADR 0017).
+  it("names a file whose digest on the host is not the record's", async () => {
+    view({
+      "GET /api/machines/ex44": {
+        ...machine,
+        drift: [
+          {
+            kind: "file", subject_kind: "installation", subject: "logaffe-prod", field: "file compose.yml",
+            record: "ab12cd34ef56", record_at: "2026-09-08T19:12:00Z",
+            reported: "99ff00aabb11", reported_at: report.received_at,
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "Drift" })).toBeInTheDocument();
+    expect(screen.getByText("file compose.yml")).toBeInTheDocument();
+    expect(screen.getByText("ab12cd34ef56")).toBeInTheDocument();
+    expect(screen.getByText("99ff00aabb11")).toBeInTheDocument();
   });
 
   it("says nothing at all where the two sides agree", async () => {

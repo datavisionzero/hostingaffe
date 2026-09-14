@@ -662,6 +662,10 @@ enumerate keys would read something, and this one reads nothing.
   "listening": [ { "port": 22, "protocol": "tcp", "binding": "public" },
                  { "port": 18502, "protocol": "tcp", "binding": "loopback" } ],
   "updates": { "reboot_required": false },
+  "files": [ { "installation": "logaffe-prod", "directory": "/srv/logaffe",
+               "files": [ { "path": "compose.yml",
+                            "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" },
+                          { "path": "Caddyfile", "sha256": null } ] } ],
   "missing": []
 }
 ```
@@ -692,6 +696,32 @@ firewall's doing and invisible in a listening socket. The instance keeps **one
 entry per port and protocol** and the widest binding wins, so a collector that
 named a port twice, once on the wildcard and once on loopback, gets one
 `public` entry back.
+
+**`files` is the drift check for configuration, and it carries digests.** One
+entry per directory `ha files sync` wrote into: the `installation` the manifest
+`.ha-sync.json` beside the files names, the `directory` it lies in, and for
+every path that manifest claims the SHA-256 of what lies there now — lower-case
+hexadecimal, 64 characters, or `null` where nothing lies there any more
+([ADR 0017](adr/0017-a-machine-reports-digests-and-the-instance-compares.md)).
+
+**Never a content.** That is what lets a host say whether its configuration
+still matches the record without handing the configuration over, and it is why
+this section needs no token that reads. The paths it may carry are the record's
+own and are checked against the same rules: `.env` and every `.env.*` but
+`.env.example`, anything under `secrets/`, and anything that climbs out of the
+directory are `validation` here as they are there.
+
+**The manifest is the whole of what a report names.** A file sync never wrote is
+not in it, is not hashed and is not named — the same rule sync keeps, and what
+stops a report from carrying the file names of whatever else lies in a compose
+directory. An empty `files` on a directory is not nothing: it says the machine
+holds that installation's files there and has none of them.
+
+A report carries at most **32 directories** and **128 files each**, and the
+64 KB below is the real ceiling. An `installation` this machine does not have is
+stored as it came and compared against nothing: that is a cron pointed at the
+wrong directory, which is a mistake on the host and not a disagreement between
+two sides.
 
 **`updates` says one thing: `reboot_required`.** How many packages have an
 update is deliberately not there. Counting them makes the collector
@@ -725,7 +755,8 @@ none of them**, its own machine's reports included.
 The series answers `{ "total", "reports" }`, and a `ReportSummary` is what a
 list makes a line of: `number`, `received_at`, `collected_at`, how many
 containers run of how many, the highest disk percentage, `load1`, and
-`reboot_required`. All of it
+`reboot_required`. The `files` section is not in it: what it says is either a
+drift, which is read on the whole report, or a count of paths that agree. All of it
 is counted from the body on read; none of it is stored beside the body it is
 counted from. That is enough for "on the 3rd the disk went from 60 to 91 per
 cent" without fetching two hundred whole bodies to see it.
@@ -757,12 +788,17 @@ report. It is served here rather than assembled by each client, which is what
 keeps the web application and `ha` from saying different things about one host.
 
 ```json
-{"kind": "version", "subject": "logaffe-prod", "field": "version",
- "record": "1.4.0", "record_at": "2026-09-08T19:12:00Z",
+{"kind": "version", "subject_kind": "installation", "subject": "logaffe-prod",
+ "field": "version", "record": "1.4.0", "record_at": "2026-09-08T19:12:00Z",
  "reported": "1.3.2", "reported_at": "2026-09-13T08:00:09Z"}
 ```
 
-`kind` is one of four:
+**`subject_kind` says what the subject is** — `machine` or `installation` —
+because a key is unique per entity type and not across them, and a machine
+`caddy` and an installation `caddy` both exist. It is what lets a client link
+the subject to the thing it names rather than guess from the kind.
+
+`kind` is one of five:
 
 - **`version`** — the tag of a container's image against the version of the
   installation's latest deployment. The most valuable line of the whole
@@ -779,6 +815,11 @@ keeps the web application and `ha` from saying different things about one host.
   18502/tcp` — `record` is the recorded `scope` and `reported` the `binding`;
   `record` is `null` where nothing in the record claims the port, and
   `reported` is `null` where nothing listens there at all.
+- **`file`** — a file of the record against the digest the machine reported for
+  the path `files sync` wrote it to. `field` names the path — `file
+  compose.yml` — and both sides are **digests**, shortened to twelve characters
+  the way a commit is, because that is the one value the two sides have in
+  common: a file on a host carries no revision.
 
 A `scope` and a `binding` are not compared as if they were the same word.
 `public` and `private` both need a socket bound past loopback — how much
@@ -788,6 +829,23 @@ either is drift. `internal` means the port never reaches the host, so silence
 is the agreement and a `public` binding is the disagreement. An installation
 the record does not call `active` is passed over: a planned one is not supposed
 to be listening.
+
+A `file` drift has three shapes and one silence. The record's digest against
+another one is a file changed on the host, or a record that moved with no sync
+since. `reported` is `null` where the record has the file and nothing lies at
+that path. `record` is `null`, `record_at` with it, where sync wrote it once,
+the record has let it go, and it is still lying there. **A path neither side has
+any more makes no drift** — the manifest still names it, nothing lies there, and
+there is nothing to clear. **Only the content is compared and never the mode
+bit**: the manifest hashes bytes, and `files sync` puts the record's mode on the
+file on every run anyway.
+
+**The comparison runs for exactly the directories the report names.** A machine
+whose cron was given no `--sync-dir` reports no `files` and hears nothing about
+them, however much the record holds for it — the same rule the machine's own
+ports keep, and for the same reason: a drift nobody can clear teaches people to
+stop reading the list. It is not a suppression list; a directory that is named
+is compared whole.
 
 **A port bound in public that stands in no record is drift only where the
 machine keeps its own ports.** It is the question the section was wanted for —

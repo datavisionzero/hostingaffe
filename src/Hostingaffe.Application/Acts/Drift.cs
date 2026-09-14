@@ -1,9 +1,13 @@
+using System.Security.Cryptography;
+using System.Text;
 using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Reports;
+
+using File = Hostingaffe.Domain.Files.File;
 
 namespace Hostingaffe.Application.Acts;
 
@@ -28,6 +32,7 @@ namespace Hostingaffe.Application.Acts;
 /// </remarks>
 public sealed record DriftShape(
     DriftKind Kind,
+    AnchorKind SubjectKind,
     string Subject,
     string Field,
     string? Record,
@@ -53,6 +58,12 @@ public enum DriftKind
     /// own ports, one bound in public that stands in no record at all.
     /// </summary>
     Port,
+
+    /// <summary>
+    /// A file of the record against the digest the machine reported for the
+    /// path <c>files sync</c> wrote it to (ADR 0017).
+    /// </summary>
+    File,
 }
 
 /// <summary>
@@ -61,7 +72,8 @@ public enum DriftKind
 /// result rather than each building it, which is how the two are kept from
 /// saying different things about the same host.
 /// </summary>
-public sealed class DriftFinder(IInstallations installations, ISoftware software, IDeployments deployments)
+public sealed class DriftFinder(
+    IInstallations installations, ISoftware software, IDeployments deployments, IFiles files)
 {
     public async Task<IReadOnlyList<DriftShape>> BetweenAsync(
         Machine machine, Report report, CancellationToken cancellationToken)
@@ -73,7 +85,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
 
         Facts(machine, report, drift);
 
-        if (report.Body is { Containers: null, Listening: null })
+        if (report.Body is { Containers: null, Listening: null, Files: null })
         {
             return drift;
         }
@@ -81,6 +93,8 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         var rows = await installations.OnMachineAsync(machine.Id, null, cancellationToken);
 
         Ports(machine, rows, report, drift);
+
+        await AboutFilesAsync(rows, report, drift, cancellationToken);
 
         if (rows.Count == 0 || report.Body.Containers is not { } containers)
         {
@@ -115,7 +129,14 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
             && !string.Equals(machine.Os.Trim(), host.Os.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             drift.Add(new DriftShape(
-                DriftKind.Fact, machine.Key, "os", machine.Os, machine.MeasuredAt, host.Os, report.ReceivedAt));
+                DriftKind.Fact,
+                AnchorKind.Machine,
+                machine.Key,
+                "os",
+                machine.Os,
+                machine.MeasuredAt,
+                host.Os,
+                report.ReceivedAt));
         }
 
         // `arch` is a closed set in the record and whatever `uname -m` says on
@@ -125,6 +146,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         {
             drift.Add(new DriftShape(
                 DriftKind.Fact,
+                AnchorKind.Machine,
                 machine.Key,
                 "arch",
                 Spelling.Of(arch),
@@ -196,7 +218,14 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
 
                 if (installation.Status is Status.Active)
                 {
-                    Listening(installation.Key, port, installation.UpdatedAt, heard, report.ReceivedAt, drift);
+                    Listening(
+                        AnchorKind.Installation,
+                        installation.Key,
+                        port,
+                        installation.UpdatedAt,
+                        heard,
+                        report.ReceivedAt,
+                        drift);
                 }
             }
         }
@@ -204,7 +233,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         foreach (var port in machine.Ports)
         {
             claimed.Add((port.Number, port.Protocol));
-            Listening(machine.Key, port, machine.UpdatedAt, heard, report.ReceivedAt, drift);
+            Listening(AnchorKind.Machine, machine.Key, port, machine.UpdatedAt, heard, report.ReceivedAt, drift);
         }
 
         Undocumented(machine, listening, claimed, report.ReceivedAt, drift);
@@ -244,6 +273,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
             // null and `record_at` with it, because there is no line to date.
             drift.Add(new DriftShape(
                 DriftKind.Port,
+                AnchorKind.Machine,
                 machine.Key,
                 $"port {one.Port}/{Spelling.Of(one.Protocol)}",
                 null,
@@ -254,6 +284,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
     }
 
     private static void Listening(
+        AnchorKind subjectKind,
         string subject,
         Port port,
         DateTimeOffset recordedAt,
@@ -274,7 +305,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
             }
 
             drift.Add(new DriftShape(
-                DriftKind.Port, subject, field, recorded, recordedAt, null, receivedAt));
+                DriftKind.Port, subjectKind, subject, field, recorded, recordedAt, null, receivedAt));
             return;
         }
 
@@ -287,9 +318,134 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         if (disagrees)
         {
             drift.Add(new DriftShape(
-                DriftKind.Port, subject, field, recorded, recordedAt, Spelling.Of(binding), receivedAt));
+                DriftKind.Port, subjectKind, subject, field, recorded, recordedAt, Spelling.Of(binding), receivedAt));
         }
     }
+
+    /// <summary>
+    /// What the record has in an installation's directory against what the
+    /// machine reports lying there — the drift check for configuration that
+    /// VISION 15.1 left open, answered without a token that reads (ADR 0017).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>The comparison runs for exactly the directories the report
+    /// names</strong>, and for no others. A machine whose cron was given no
+    /// <c>--sync-dir</c> reports no files and hears nothing about them: the
+    /// same rule the machine's own ports keep, and for the same reason — a
+    /// drift nobody can clear teaches people to stop reading the list. A
+    /// directory it does name is compared whole, and an empty one is a claim
+    /// too: "I hold this installation's files here and have none of them".
+    /// </para>
+    /// <para>
+    /// Both sides are named as digests, because that is the one value the two
+    /// sides have in common: a file on a host has no revision, and a revision
+    /// is not what a host can be asked for. <strong>Only the content is
+    /// compared</strong>, never the mode bit — the manifest hashes bytes, and
+    /// <c>files sync</c> puts the record's mode on every run anyway.
+    /// </para>
+    /// <para>
+    /// An installation the report names that is not on this machine is passed
+    /// over in silence. It is a cron pointed at the wrong directory, which is a
+    /// mistake on the host and not a disagreement between the two sides.
+    /// </para>
+    /// </remarks>
+    private async Task AboutFilesAsync(
+        IReadOnlyList<Installation> rows,
+        Report report,
+        List<DriftShape> drift,
+        CancellationToken cancellationToken)
+    {
+        if (report.Body.Files is not { Count: > 0 } directories)
+        {
+            return;
+        }
+
+        var byKey = rows.ToDictionary(one => one.Key, StringComparer.Ordinal);
+        var named = directories
+            .Where(one => byKey.ContainsKey(one.Installation))
+            .Select(one => byKey[one.Installation].Id)
+            .ToHashSet();
+
+        if (named.Count == 0)
+        {
+            return;
+        }
+
+        var recorded = (await files.UnderAsync(AnchorKind.Installation, named, null, cancellationToken))
+            .GroupBy(one => one.InstallationId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        foreach (var directory in directories)
+        {
+            if (!byKey.TryGetValue(directory.Installation, out var installation))
+            {
+                continue;
+            }
+
+            InDirectory(
+                installation,
+                directory,
+                recorded.TryGetValue(installation.Id, out var held) ? held : [],
+                report.ReceivedAt,
+                drift);
+        }
+    }
+
+    /// <summary>One directory, path by path, in an order a person can read twice.</summary>
+    private static void InDirectory(
+        Installation installation,
+        SyncedDirectory directory,
+        IReadOnlyList<File> recorded,
+        DateTimeOffset receivedAt,
+        List<DriftShape> drift)
+    {
+        var held = recorded.ToDictionary(one => one.Path, StringComparer.Ordinal);
+        var found = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var file in directory.Files)
+        {
+            found[file.Path] = file.Sha256;
+        }
+
+        foreach (var path in held.Keys.Concat(found.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            var record = held.TryGetValue(path, out var file) ? Digest(file.Content) : null;
+            found.TryGetValue(path, out var reported);
+
+            // What lies there is what the record has, or nothing lies there and
+            // the record has nothing either: the manifest still names a file
+            // both sides have let go of, and there is nothing to clear.
+            if (record == reported)
+            {
+                continue;
+            }
+
+            drift.Add(new DriftShape(
+                DriftKind.File,
+                AnchorKind.Installation,
+                installation.Key,
+                $"file {path}",
+                Short(record),
+                file?.UpdatedAt,
+                Short(reported),
+                receivedAt));
+        }
+    }
+
+    /// <summary>
+    /// The digest of what the record holds, computed the way the host computes
+    /// the one it reports: over the bytes of the content and nothing else.
+    /// </summary>
+    private static string Digest(string content) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+
+    /// <summary>
+    /// As much of a digest as a person compares by eye. The whole one is in
+    /// neither side's way: what a drift is for is saying that the two differ,
+    /// and twelve characters say it the way a commit does.
+    /// </summary>
+    private static string? Short(string? digest) =>
+        digest is null ? null : digest[..Math.Min(12, digest.Length)];
 
     /// <summary>What a host calls an architecture, as the record's closed set, or nothing where it is neither.</summary>
     private static Arch? Architecture(string? said) => said?.Trim().ToLowerInvariant() switch
@@ -381,7 +537,14 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
         }
 
         drift.Add(new DriftShape(
-            DriftKind.Version, installation.Key, "version", deployed.Version, deployed.At, tag, receivedAt));
+            DriftKind.Version,
+            AnchorKind.Installation,
+            installation.Key,
+            "version",
+            deployed.Version,
+            deployed.At,
+            tag,
+            receivedAt));
     }
 
     /// <summary>The record says active, the machine says the container is not running. A statement, not an alarm.</summary>
@@ -395,6 +558,7 @@ public sealed class DriftFinder(IInstallations installations, ISoftware software
 
         drift.Add(new DriftShape(
             DriftKind.Container,
+            AnchorKind.Installation,
             installation.Key,
             "status",
             Spelling.Of(installation.Status),

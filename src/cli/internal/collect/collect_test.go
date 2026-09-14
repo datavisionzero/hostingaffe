@@ -2,6 +2,8 @@ package collect
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/manifest"
 )
 
 // aHost writes the files a Linux machine has, so that the collector is tested
@@ -425,5 +429,202 @@ func TestTheBodyCarriesWhatListensAndTheRestart(t *testing.T) {
 	}
 	if body.Updates == nil || *body.Updates.RebootRequired {
 		t.Fatalf("updates: %+v", body.Updates)
+	}
+}
+
+// aSyncDirectory is a directory `ha files sync` wrote into: the files, and the
+// manifest beside them that says which of them are sync's.
+func aSyncDirectory(t *testing.T, owner string, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	held := manifest.Manifest{Owner: owner, Files: map[string]manifest.File{}}
+	for path, content := range files {
+		full := filepath.Join(dir, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256([]byte(content))
+		held.Files[path] = manifest.File{Revision: 1, Sha256: hex.EncodeToString(sum[:])}
+	}
+
+	document, err := json.MarshalIndent(held, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, manifest.Name), append(document, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func digestOf(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+// Without a directory there is no section, and nothing about files is compared.
+// It is the same rule the machine's own ports keep: a comparison nobody asked
+// for is not made rather than answered with noise (ADR 0017).
+func TestNoSyncDirectoryMeansNoFilesSection(t *testing.T) {
+	report := Collect(context.Background(), ordinary(t), "0.4.0")
+
+	if report.Files != nil {
+		t.Fatalf("files: %+v", report.Files)
+	}
+	for _, missing := range report.Missing {
+		if missing.Section == "files" {
+			t.Fatalf("it complained about a section nobody asked for: %+v", missing)
+		}
+	}
+}
+
+// What the manifest claims is hashed and reported. What lies in the directory
+// besides is not — not its digest and not its name.
+func TestASyncDirectoryIsReportedAsDigests(t *testing.T) {
+	dir := aSyncDirectory(t, "installation logaffe-prod", map[string]string{
+		"compose.yml": "services:\n",
+		"bin/up.sh":   "#!/bin/sh\n",
+	})
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=hunter2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", dir)
+
+	if len(report.Files) != 1 {
+		t.Fatalf("files: %+v", report.Files)
+	}
+	one := report.Files[0]
+	if one.Installation != "logaffe-prod" || one.Directory != dir {
+		t.Fatalf("directory: %+v", one)
+	}
+	if len(one.Files) != 2 {
+		t.Fatalf("files: %+v", one.Files)
+	}
+
+	// In the order the record spells them, so that two reports of the same
+	// directory read the same way.
+	if one.Files[0].Path != "bin/up.sh" || one.Files[1].Path != "compose.yml" {
+		t.Fatalf("order: %+v", one.Files)
+	}
+	if one.Files[1].Sha256 == nil || *one.Files[1].Sha256 != digestOf("services:\n") {
+		t.Fatalf("compose.yml: %+v", one.Files[1])
+	}
+
+	// Nothing of the file's content, and nothing of what else lies there.
+	body, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"services:", "hunter2", ".env"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("the report carries %q:\n%s", forbidden, body)
+		}
+	}
+}
+
+// A path the manifest claims and nothing lies at is reported as nothing, which
+// is the finding: the record has a file the host has not.
+func TestAFileThatLeftTheDiskIsReportedAsNothing(t *testing.T) {
+	dir := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "services:\n"})
+	if err := os.Remove(filepath.Join(dir, "compose.yml")); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", dir)
+
+	one := report.Files[0].Files[0]
+	if one.Path != "compose.yml" || one.Sha256 != nil {
+		t.Fatalf("compose.yml: %+v", one)
+	}
+	for _, missing := range report.Missing {
+		if missing.Section == "files" {
+			t.Fatalf("a file that is gone is a finding, not a section nobody could determine: %+v", missing)
+		}
+	}
+}
+
+// A directory sync never wrote into is said once, and the run goes on: the sign
+// of life is the point, and the other directories are still reported.
+func TestADirectorySyncNeverWroteIntoIsSaidAndSkipped(t *testing.T) {
+	good := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "services:\n"})
+	empty := t.TempDir()
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", empty, good)
+
+	if len(report.Files) != 1 || report.Files[0].Installation != "logaffe-prod" {
+		t.Fatalf("files: %+v", report.Files)
+	}
+
+	var said string
+	for _, missing := range report.Missing {
+		if missing.Section == "files" {
+			said = missing.Reason
+		}
+	}
+	if !strings.Contains(said, empty) {
+		t.Fatalf("missing: %q", said)
+	}
+}
+
+// A manifest naming a machine was written by no `ha` that ever shipped: sync
+// takes no machine (ADR 0008), and the collector says so rather than guessing.
+func TestAManifestThatNamesNoInstallationIsRefused(t *testing.T) {
+	dir := aSyncDirectory(t, "machine ex44", map[string]string{"compose.yml": "services:\n"})
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", dir)
+
+	if report.Files != nil {
+		t.Fatalf("files: %+v", report.Files)
+	}
+	if len(report.Missing) == 0 {
+		t.Fatal("it said nothing")
+	}
+}
+
+// What is not a plain file is not what sync wrote, and it is not opened: a
+// fifo or a device is how a cron stops coming back.
+func TestWhatIsNotAPlainFileIsNotOpened(t *testing.T) {
+	dir := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "services:\n"})
+	at := filepath.Join(dir, "compose.yml")
+	if err := os.Remove(at); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/dev/zero", at); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+
+	report := Collect(context.Background(), ordinary(t), "0.4.0", dir)
+
+	if report.Files[0].Files[0].Sha256 != nil {
+		t.Fatalf("it hashed something: %+v", report.Files[0].Files[0])
+	}
+	if len(report.Missing) == 0 {
+		t.Fatal("it said nothing")
+	}
+}
+
+// The body carries the section as the contract spells it.
+func TestTheBodyCarriesTheSyncedDirectories(t *testing.T) {
+	dir := aSyncDirectory(t, "installation logaffe-prod", map[string]string{"compose.yml": "services:\n"})
+
+	body := Collect(context.Background(), ordinary(t), "0.4.0", dir).Body()
+
+	if body.Files == nil || len(*body.Files) != 1 {
+		t.Fatalf("files: %+v", body.Files)
+	}
+	one := (*body.Files)[0]
+	if one.Installation == nil || *one.Installation != "logaffe-prod" {
+		t.Fatalf("installation: %+v", one)
+	}
+	if one.Files == nil || len(*one.Files) != 1 {
+		t.Fatalf("files: %+v", one.Files)
+	}
+	if file := (*one.Files)[0]; file.Sha256 == nil || *file.Sha256 != digestOf("services:\n") {
+		t.Fatalf("compose.yml: %+v", file)
 	}
 }

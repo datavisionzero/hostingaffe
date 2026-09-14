@@ -304,6 +304,7 @@ be piped straight back into `--description-file -`.
 ```sh
 ha report collect                      # gather and print; nothing is sent
 ha report send [KEY] [--quiet]         # gather and hand in
+ha report send --sync-dir /srv/logaffe # and compare that directory against the record
 ```
 
 These two run **on** the machine they are about, and they are the only commands
@@ -342,6 +343,31 @@ an update is not collected at all — that would make the collector
 distribution-dependent, and a host whose package lists are weeks old would
 report nothing pending and lie in the most comforting way there is.
 
+**`--sync-dir` is what makes the comparison for configuration happen**, and it
+is repeatable: one per directory `ha files sync` wrote an installation's files
+into. What the collector reads there is the manifest `.ha-sync.json` and the
+**digest** of what lies at each path the manifest claims — never a content, and
+never a path the manifest does not name, so that nothing else in a compose
+directory is so much as mentioned. The instance compares the digests against
+the record and reports the disagreement as a `file` drift
+(ADR 0017).
+
+```sh
+ha report send --sync-dir /srv/logaffe --sync-dir /srv/caddy --quiet
+```
+
+The directories are named here rather than read from the record because **a
+machine token reads nothing**, its own installations included (ADR 0016). It is
+a small duplication of what the record already says, it is one line in the
+cron, and `ha report collect --sync-dir …` prints exactly what would go out.
+**A run given no `--sync-dir` reports no files and hears nothing about them**:
+the comparison is not made rather than answered with noise, and that is the
+same rule a machine with no ports written down keeps.
+
+A directory sync never wrote into, one whose manifest cannot be read, and a
+path holding something that is not a plain file are each said once in
+`missing` — the run goes on, and the other directories are still reported.
+
 **A section it could not determine is not a failure.** A host without Docker
 reports no containers, says why in `missing`, and `send` still exits 0: the sign
 of life is the point, and a cron that failed over a missing section is one
@@ -376,6 +402,9 @@ the containers as a table — name, image with its tag, state, since when, how
 often it restarted. A section the collector could not determine stands there
 with its reason: `disks: not determined (df is not on the PATH)`. The line at
 the top answers the question somebody came with — when this report arrived.
+Under the sections, `files` says which directories were compared against the
+record and how many paths each of them holds — not the paths, because what the
+digests said is the drift below and a path that agrees is not news.
 `--json` prints the body as the API answered it, like everywhere else.
 
 `list` is one line per report out of the summary the API serves: when, how many
@@ -385,8 +414,10 @@ containers ran of how many, the highest disk percentage, the load, and
 
 **The drift stands under the report**, and under the machine in
 `ha machine view`: one line per disagreement, naming both sides and how old each
-is — "the record says logaffe-prod 1.4.0, the machine reported 1.3.2". **Which
-side is right `ha` does not say**; that is the decision a person or an agent
+is — "the record says logaffe-prod 1.4.0, the machine reported 1.3.2". A `file`
+drift reads the same way with a digest on each side, shortened to twelve
+characters the way a commit is: "the record says ab12cd34ef56, the machine
+reported 99ff00aabb11". **Which side is right `ha` does not say**; that is the decision a person or an agent
 makes, and there is no verb that pulls the record after the report.
 
 **`restart` is a column of `ha machine list`** and a field of `ha machine view`,

@@ -16,12 +16,9 @@ import (
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/api"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/config"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/exit"
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/manifest"
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/render"
 )
-
-// Manifest is the name of the one piece of state outside Postgres, kept beside
-// the files it is about (VISION 6.1).
-const Manifest = ".ha-sync.json"
 
 // `ha files sync` is the only command that touches a machine, and it pulls: it
 // runs on the host under the token of the SSH session, writes an installation's
@@ -116,26 +113,13 @@ type step struct {
 
 type plan struct {
 	Steps    []step
-	Manifest manifest
-}
-
-// manifest is what sync wrote and what it wrote there: the only way to tell a
-// file it put down from one that was always there. Without it, a command that
-// removes files would be unusable.
-type manifest struct {
-	Owner string                `json:"owner"`
-	Files map[string]manifested `json:"files"`
-}
-
-type manifested struct {
-	Revision int32  `json:"revision"`
-	Sha256   string `json:"sha256"`
+	Manifest manifest.Manifest
 }
 
 // planned decides everything before anything is written, so that `--dry-run`
 // prints exactly what a run would do.
-func planned(dir string, owner anchor, held manifest, wanted []api.File) (*plan, error) {
-	made := manifest{Owner: owner.String(), Files: map[string]manifested{}}
+func planned(dir string, owner anchor, held manifest.Manifest, wanted []api.File) (*plan, error) {
+	made := manifest.Manifest{Owner: owner.String(), Files: map[string]manifest.File{}}
 	steps := []step{}
 	inRecord := map[string]bool{}
 
@@ -144,14 +128,14 @@ func planned(dir string, owner anchor, held manifest, wanted []api.File) (*plan,
 			return nil, &config.UsageError{Message: fmt.Sprintf(
 				"the instance answered with the path %q, which does not stay inside %s.", file.Path, dir)}
 		}
-		if file.Path == Manifest {
+		if file.Path == manifest.Name {
 			return nil, &config.UsageError{Message: fmt.Sprintf(
-				"the record has a file at %s, which is where sync keeps its own manifest.", Manifest)}
+				"the record has a file at %s, which is where sync keeps its own manifest.", manifest.Name)}
 		}
 		inRecord[file.Path] = true
 
 		digest := sha256Of(file.Content)
-		made.Files[file.Path] = manifested{Revision: file.Revision, Sha256: digest}
+		made.Files[file.Path] = manifest.File{Revision: file.Revision, Sha256: digest}
 
 		onDisk, mode, there := onDiskAt(dir, file.Path)
 		was, mine := held.Files[file.Path]
@@ -249,8 +233,8 @@ func apply(dir string, p *plan) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return &config.UsageError{Message: fmt.Sprintf("cannot write into %s: %v", dir, err)}
 	}
-	if err := os.WriteFile(filepath.Join(dir, Manifest), append(document, '\n'), 0o644); err != nil {
-		return &config.UsageError{Message: fmt.Sprintf("cannot write %s: %v", Manifest, err)}
+	if err := os.WriteFile(filepath.Join(dir, manifest.Name), append(document, '\n'), 0o644); err != nil {
+		return &config.UsageError{Message: fmt.Sprintf("cannot write %s: %v", manifest.Name, err)}
 	}
 	return nil
 }
@@ -308,24 +292,10 @@ func (c *syncConflict) ExitCode() int { return exit.Conflict }
 // heldBy reads the manifest, and an unreadable one is a mistake to say out loud
 // rather than to work around: sync would otherwise take every file it once
 // wrote for somebody else's and never clear anything away again.
-func heldBy(dir string) (manifest, error) {
-	held := manifest{Files: map[string]manifested{}}
-
-	document, err := os.ReadFile(filepath.Join(dir, Manifest))
-	if os.IsNotExist(err) {
-		return held, nil
-	}
+func heldBy(dir string) (manifest.Manifest, error) {
+	held, err := manifest.Read(dir)
 	if err != nil {
-		return held, &config.UsageError{Message: fmt.Sprintf("cannot read %s: %v", Manifest, err)}
-	}
-
-	if err := json.Unmarshal(document, &held); err != nil {
-		return held, &config.UsageError{Message: fmt.Sprintf(
-			"%s is not a manifest sync wrote: %v. Remove it to start again, knowing that sync will then take every file there for somebody else's.",
-			filepath.Join(dir, Manifest), err)}
-	}
-	if held.Files == nil {
-		held.Files = map[string]manifested{}
+		return held, &config.UsageError{Message: err.Error()}
 	}
 	return held, nil
 }

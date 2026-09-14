@@ -35,16 +35,30 @@ func newReport(g *globals) *cobra.Command {
 // reason: what would leave the host is printed before anything leaves it. It
 // needs no token and no instance and runs on a machine with no network.
 func newReportCollect(g *globals) *cobra.Command {
-	return &cobra.Command{
+	var dirs []string
+	cmd := &cobra.Command{
 		Use: "collect", Short: "Gather what this host can say about itself and print it. Nothing is sent.", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			report := collect.Collect(cmd.Context(), collect.Machine(), version.Version)
+			report := collect.Collect(cmd.Context(), collect.Machine(), version.Version, dirs...)
 
 			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
 			return encoder.Encode(report)
 		},
 	}
+	syncDirs(cmd, &dirs)
+	return cmd
+}
+
+// syncDirs is where `files sync` wrote, named on the command line because the
+// collector cannot be told by the instance: a machine token reads nothing, its
+// own installations included (ADR 0016). What it reads there is the manifest
+// and the digests of the paths the manifest claims — never a content, which is
+// what keeps the comparison for configuration on this side of "no secrets"
+// (ADR 0017).
+func syncDirs(cmd *cobra.Command, dirs *[]string) {
+	cmd.Flags().StringArrayVar(dirs, "sync-dir", nil,
+		"a `directory` `ha files sync` wrote an installation's files into; repeat it for each one")
 }
 
 // newReportSend is what the cron runs. A run that fails is not caught up
@@ -53,6 +67,7 @@ func newReportCollect(g *globals) *cobra.Command {
 func newReportSend(g *globals) *cobra.Command {
 	var tokenFile string
 	var quiet bool
+	var dirs []string
 	cmd := &cobra.Command{
 		Use: "send [KEY]", Short: "Gather and hand in. The machine is this host; its token says which one.", Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,7 +81,7 @@ func newReportSend(g *globals) *cobra.Command {
 				return err
 			}
 
-			report := collect.Collect(cmd.Context(), collect.Machine(), version.Version)
+			report := collect.Collect(cmd.Context(), collect.Machine(), version.Version, dirs...)
 
 			resp, err := c.HandInReportWithResponse(cmd.Context(), key, report.Body())
 			if err != nil {
@@ -98,6 +113,7 @@ func newReportSend(g *globals) *cobra.Command {
 		"the file this machine's token lies in, mode 0600; "+config.EnvToken+" wins over it")
 	cmd.Flags().BoolVar(&quiet, "quiet", false,
 		"say nothing on success, so that a cron writes no mail every quarter of an hour")
+	syncDirs(cmd, &dirs)
 	return cmd
 }
 

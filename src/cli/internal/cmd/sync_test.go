@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/exit"
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/manifest"
 )
 
 // syncing answers an installation's files: whatever the test says it has.
@@ -80,7 +81,7 @@ func TestSyncWritesTheFilesAndThenHasNothingToDo(t *testing.T) {
 
 	// The manifest is beside the files, and it is the only state outside the
 	// instance.
-	if _, err := os.Stat(filepath.Join(dir, Manifest)); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, manifest.Name)); err != nil {
 		t.Fatalf("no manifest: %v", err)
 	}
 
@@ -223,8 +224,8 @@ func TestOneChangedOnTheHostAndGoneFromTheRecordIsKept(t *testing.T) {
 	}
 
 	// And the manifest has forgotten it: it is not sync's any more.
-	held := manifest{}
-	if err := json.Unmarshal([]byte(read(t, filepath.Join(dir, Manifest))), &held); err != nil {
+	held := manifest.Manifest{}
+	if err := json.Unmarshal([]byte(read(t, filepath.Join(dir, manifest.Name))), &held); err != nil {
 		t.Fatal(err)
 	}
 	if _, still := held.Files["compose.yml"]; still {

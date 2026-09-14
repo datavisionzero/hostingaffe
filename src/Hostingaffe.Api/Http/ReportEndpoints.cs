@@ -30,7 +30,7 @@ public static class ReportEndpoints
                 {
                     var receipt = await hand.ExecuteAsync(
                         key,
-                        request ?? new HandInReportRequest(null, null, null, null, null, null, null, null, null),
+                        request ?? new HandInReportRequest(null, null, null, null, null, null, null, null, null, null),
                         cancellationToken);
 
                     return Results.Created(
@@ -39,7 +39,7 @@ public static class ReportEndpoints
             .RequireAuthorization(MachineTokenAuthentication.Policy)
             .WithMetadata(new BodyLimit(ReportWrites.MaxBodyBytes))
             .WithName("HandInReport")
-            .WithSummary("Hand in a report for the machine the presented machine token belongs to. Authenticated with that token and with nothing else: a user token and an agent token are refused here, because someone who could post a report by hand could forge the drift comparison. Every section may be left out; what the collector could not determine goes in `missing`, with its reason. At most one report per machine per minute, and at most 64 KB.")
+            .WithSummary("Hand in a report for the machine the presented machine token belongs to. Authenticated with that token and with nothing else: a user token and an agent token are refused here, because someone who could post a report by hand could forge the drift comparison. Every section may be left out; what the collector could not determine goes in `missing`, with its reason. `files` carries a digest per path and never a content, which is what lets the comparison for configuration run under a token that reads nothing. At most one report per machine per minute, and at most 64 KB.")
             .Produces<ReportReceiptShape>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

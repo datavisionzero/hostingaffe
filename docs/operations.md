@@ -158,9 +158,10 @@ directory.
 ## A machine that reports for itself
 
 A host can hand in a **report** every quarter of an hour: a sign of life, plus
-disk usage, memory, load, what Docker runs, what listens on which port, and
-whether the machine is waiting for a restart. The record stays written and the
-report stays beside it — nothing here changes a field
+disk usage, memory, load, what Docker runs, what listens on which port, whether
+the machine is waiting for a restart, and — where you ask for it — whether the
+files sync wrote are still the ones the record has. The record stays written and
+the report stays beside it — nothing here changes a field
 ([ADR 0015](adr/0015-a-machine-reports-and-the-record-stays-written.md)).
 
 Setting it up is three steps, and none of them is automated: `ha` writes no
@@ -179,6 +180,20 @@ container environment, no process command lines, no file contents, and no name
 of any process that is listening. That is the same line that keeps secret
 values out of the record, and `collect` is how anyone checks it without reading
 the code.
+
+To have the files compared too, name the directories sync wrote into:
+
+```sh
+ha report collect --sync-dir /srv/logaffe --sync-dir /srv/caddy
+```
+
+What that adds to the JSON is one entry per directory: the installation the
+manifest `.ha-sync.json` names, the directory, and a **digest** per path that
+manifest claims. **Never a content, and never a path the manifest does not
+name** — so nothing else in the directory is so much as mentioned, `.env`
+included. The instance compares the digests against the record and reports the
+disagreement as drift
+([ADR 0017](adr/0017-a-machine-reports-digests-and-the-instance-compares.md)).
 
 The listening ports come out of `/proc/net`, which is why they carry no process
 name and why nothing here needs root. Whether a restart is pending is the file
@@ -220,6 +235,13 @@ would be reading something.
 */15 * * * * . /etc/hostingaffe.env && /usr/local/bin/ha report send --quiet
 ```
 
+Add a `--sync-dir` per directory sync wrote into, if you want the files
+compared as well:
+
+```cron
+*/15 * * * * . /etc/hostingaffe.env && /usr/local/bin/ha report send --quiet --sync-dir /srv/logaffe
+```
+
 Or with a systemd timer, on a host that has no cron:
 
 ```ini
@@ -232,6 +254,8 @@ Type=oneshot
 EnvironmentFile=/etc/hostingaffe.env
 ExecStart=/usr/local/bin/ha report send --quiet
 ```
+
+The `--sync-dir` flags belong on that `ExecStart` line, one per directory.
 
 ```ini
 # /etc/systemd/system/hostingaffe-report.timer
@@ -269,6 +293,21 @@ or it is closed.
 That is deliberate: SSH would otherwise stand in every drift list of every
 machine for ever, and a drift nobody can clear teaches people to stop reading
 the list. The comparison against an installation's `ports` runs either way.
+
+**5. Name the directories sync wrote into.** Also optional, and what turns the
+`files` section from nothing at all into the drift check for configuration:
+a `--sync-dir` per directory, on the cron line or the `ExecStart`.
+
+With them named, a `compose.override.yml` somebody edited on the host, one the
+record has that never arrived, and one that left the record and is still lying
+there are each a drift somebody can clear — either the record is brought up to
+date or the disk is. Only the content is compared, never the mode bit.
+
+**A host given no `--sync-dir` hears nothing about files**, for the same reason
+a machine with no port written down hears nothing about undocumented ones. The
+duplication is on purpose: the directories are on the cron line because the
+machine token reads nothing, its own installations included, and that is what
+lets it lie on the host at all.
 
 **Checking that it arrives.** From wherever you work:
 

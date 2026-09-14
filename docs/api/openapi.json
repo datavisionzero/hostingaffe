@@ -4766,7 +4766,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Hand in a report for the machine the presented machine token belongs to. Authenticated with that token and with nothing else: a user token and an agent token are refused here, because someone who could post a report by hand could forge the drift comparison. Every section may be left out; what the collector could not determine goes in `missing`, with its reason. At most one report per machine per minute, and at most 64 KB.",
+        "summary": "Hand in a report for the machine the presented machine token belongs to. Authenticated with that token and with nothing else: a user token and an agent token are refused here, because someone who could post a report by hand could forge the drift comparison. Every section may be left out; what the collector could not determine goes in `missing`, with its reason. `files` carries a digest per path and never a content, which is what lets the comparison for configuration run under a token that reads nothing. At most one report per machine per minute, and at most 64 KB.",
         "operationId": "HandInReport",
         "parameters": [
           {
@@ -7108,6 +7108,7 @@
       "Drift": {
         "required": [
           "kind",
+          "subject_kind",
           "subject",
           "field",
           "record",
@@ -7119,6 +7120,9 @@
         "properties": {
           "kind": {
             "$ref": "#/components/schemas/DriftKind"
+          },
+          "subject_kind": {
+            "$ref": "#/components/schemas/AnchorKind"
           },
           "subject": {
             "type": "string"
@@ -7156,7 +7160,8 @@
           "version",
           "container",
           "fact",
-          "port"
+          "port",
+          "file"
         ],
         "type": "string"
       },
@@ -7377,6 +7382,15 @@
                 "$ref": "#/components/schemas/UpdatesRequest"
               }
             ]
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SyncedDirectoryRequest"
+            }
           },
           "missing": {
             "type": [
@@ -9312,6 +9326,7 @@
           "containers",
           "listening",
           "updates",
+          "files",
           "missing",
           "drift"
         ],
@@ -9394,6 +9409,15 @@
                 "$ref": "#/components/schemas/UpdatesSection"
               }
             ]
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SyncedDirectory"
+            }
           },
           "missing": {
             "type": "array",
@@ -9776,6 +9800,89 @@
           "retired"
         ],
         "type": "string"
+      },
+      "SyncedDirectory": {
+        "type": "object",
+        "properties": {
+          "installation": {
+            "type": "string"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncedFile"
+            }
+          }
+        }
+      },
+      "SyncedDirectoryRequest": {
+        "required": [
+          "installation",
+          "directory",
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "installation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "directory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SyncedFileRequest"
+            }
+          }
+        }
+      },
+      "SyncedFile": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SyncedFileRequest": {
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "TokenRef": {
         "required": [

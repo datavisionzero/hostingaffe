@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hostingaffe.Domain;
+using Hostingaffe.Domain.Files;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Reports;
 
@@ -26,6 +27,7 @@ public sealed record HandInReportRequest(
     IReadOnlyList<ContainerRequest>? Containers,
     IReadOnlyList<ListeningRequest>? Listening,
     UpdatesRequest? Updates,
+    IReadOnlyList<SyncedDirectoryRequest>? Files,
     IReadOnlyList<MissingRequest>? Missing)
 {
     /// <inheritdoc cref="ReportWrites.Closed"/>
@@ -93,6 +95,24 @@ public sealed record UpdatesRequest(bool? RebootRequired)
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
+/// <summary>
+/// One directory holding an installation's files, and the digest of what lies
+/// at each path the manifest beside them claims. <strong>Never a
+/// content</strong> (ADR 0017).
+/// </summary>
+/// <inheritdoc cref="HandInReportRequest"/>
+public sealed record SyncedDirectoryRequest(
+    string? Installation, string? Directory, IReadOnlyList<SyncedFileRequest>? Files)
+{
+    [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
+}
+
+/// <inheritdoc cref="SyncedDirectoryRequest"/>
+public sealed record SyncedFileRequest(string? Path, string? Sha256)
+{
+    [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
+}
+
 /// <inheritdoc cref="HandInReportRequest"/>
 public sealed record MissingRequest(string? Section, string? Reason)
 {
@@ -144,6 +164,7 @@ public static class ReportWrites
             Containers = Containers(request.Containers),
             Listening = Listening(request.Listening),
             Updates = Updates(request.Updates),
+            Files = Files(request.Files),
             Missing = Missing(request.Missing),
         };
     }
@@ -319,6 +340,79 @@ public static class ReportWrites
             RebootRequired = given.RebootRequired
                 ?? throw Refusal.Validation("updates.reboot_required", "The value is required."),
         };
+    }
+
+    /// <summary>
+    /// The sync directories, checked against the same rules the record keeps
+    /// for a path and a directory — so that a path bearing a secret is refused
+    /// here as it is refused there, and a digest is a digest.
+    /// </summary>
+    /// <remarks>
+    /// The installation is taken as a key and looked up nowhere: the comparison
+    /// happens on read, and a report that names an installation this machine
+    /// does not have is stored as it came and compared against nothing
+    /// (ADR 0015).
+    /// </remarks>
+    private static IReadOnlyList<SyncedDirectory>? Files(IReadOnlyList<SyncedDirectoryRequest>? given)
+    {
+        if (given is null)
+        {
+            return null;
+        }
+
+        AtMost("files", given.Count, ReportBody.MaxSyncedDirectories);
+
+        return
+        [
+            .. given.Select(directory =>
+            {
+                Closed("A report's directory", directory.UnknownFields);
+                AtMost("files.files", directory.Files?.Count ?? 0, ReportBody.MaxSyncedFiles);
+
+                return new SyncedDirectory
+                {
+                    Installation = Validated.Field(
+                        "files.installation",
+                        () => Key.Normalize(directory.Installation ?? string.Empty, "files.installation")),
+                    Directory = Validated.Field(
+                        "files.directory",
+                        () => FileDirectory.Normalize(directory.Directory, "files.directory")),
+                    Files = directory.Files is null
+                        ? []
+                        : [.. directory.Files.Select(file =>
+                        {
+                            Closed("A report's file", file.UnknownFields);
+
+                            return new SyncedFile
+                            {
+                                Path = Validated.Field(
+                                    "files.path",
+                                    () => FilePath.Normalize(file.Path ?? string.Empty, "files.path")),
+                                Sha256 = Digest(file.Sha256),
+                            };
+                        })],
+                };
+            }),
+        ];
+    }
+
+    /// <summary>
+    /// A SHA-256 as the collector spells it, or nothing where nothing lies at
+    /// the path any more — which is a finding and not an omission.
+    /// </summary>
+    private static string? Digest(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var digest = value.Trim();
+
+        return digest.Length == 64 && digest.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')
+            ? digest
+            : throw Refusal.Validation(
+                "files.sha256", "A digest is the SHA-256 of the file, 64 characters of lower-case hexadecimal.");
     }
 
     private static IReadOnlyList<MissingSection> Missing(IReadOnlyList<MissingRequest>? given)

@@ -97,6 +97,7 @@ generated from `docs/api/openapi.json` (planaffe ADR 0003, 0005).
 cmd/ha              the binary
 internal/cmd        the command tree, one file per object
 internal/collect    what a host says about itself, gathered on the host
+internal/manifest   `.ha-sync.json`, the one piece of state outside the instance
 internal/client     the HTTP client, idempotency keys, version skew
 internal/config     which instance, and as whom: the two ladders (ADR 0005)
 internal/keychain   where a person's session lives, and nowhere else quietly

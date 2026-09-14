@@ -474,6 +474,281 @@ public sealed class DriftTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, written.StatusCode);
     }
 
+    // The drift check for configuration VISION 15.1 left open: the machine
+    // reports a digest per path and the instance compares, so that nothing on
+    // the host needs a token that reads (ADR 0017).
+    [Fact]
+    public async Task The_record_has_one_content_and_the_machine_reports_another()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+        await AFile(admin, "compose.yml", "services:\n");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "compose.yml", sha256 = Digest("edited on the host\n") }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+
+        Assert.Equal("file", one.GetProperty("kind").GetString());
+        Assert.Equal("installation", one.GetProperty("subject_kind").GetString());
+        Assert.Equal("logaffe-prod", one.GetProperty("subject").GetString());
+        Assert.Equal("file compose.yml", one.GetProperty("field").GetString());
+
+        // Both sides as digests, because that is the one value the two have in
+        // common: a file on a host carries no revision.
+        Assert.Equal(Digest("services:\n")[..12], one.GetProperty("record").GetString());
+        Assert.Equal(Digest("edited on the host\n")[..12], one.GetProperty("reported").GetString());
+        Assert.Equal(JsonValueKind.String, one.GetProperty("record_at").ValueKind);
+    }
+
+    [Fact]
+    public async Task The_digests_agree_and_nothing_is_said()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+        await AFile(admin, "compose.yml", "services:\n");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "compose.yml", sha256 = Digest("services:\n") }]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// A file of the record that lies nowhere on the host: the record's side is
+    /// named and the machine's is nothing, as a port nothing listens on is.
+    /// </summary>
+    [Fact]
+    public async Task A_file_of_the_record_the_host_does_not_have()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+        await AFile(admin, "compose.yml", "services:\n");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "compose.yml", sha256 = (string?)null }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("file", one.GetProperty("kind").GetString());
+        Assert.Equal(Digest("services:\n")[..12], one.GetProperty("record").GetString());
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("reported").ValueKind);
+    }
+
+    /// <summary>
+    /// The other way round: sync wrote it once, the record has let it go, and
+    /// it is still lying there. The record says nothing, and that is the whole
+    /// finding.
+    /// </summary>
+    [Fact]
+    public async Task A_file_that_left_the_record_and_still_lies_there()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "old.yml", sha256 = Digest("what it used to say\n") }]);
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("file", one.GetProperty("kind").GetString());
+        Assert.Equal("file old.yml", one.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("record").ValueKind);
+        Assert.Equal(JsonValueKind.Null, one.GetProperty("record_at").ValueKind);
+        Assert.Equal(Digest("what it used to say\n")[..12], one.GetProperty("reported").GetString());
+    }
+
+    /// <summary>
+    /// Both sides have let it go: the manifest still names a path, nothing lies
+    /// there, and the record has nothing either. There is nothing to clear.
+    /// </summary>
+    [Fact]
+    public async Task A_path_neither_side_has_any_more_is_not_a_finding()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "old.yml", sha256 = (string?)null }]);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// The rule that keeps the list readable, and the one the machine's own
+    /// ports already keep: a report that names no directory is told nothing
+    /// about files, however much the record holds.
+    /// </summary>
+    [Fact]
+    public async Task A_report_that_names_no_directory_hears_nothing_about_files()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+        await AFile(admin, "compose.yml", "services:\n");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Reports(machine, "ghcr.io/datavisionzero/logaffe:1.4.0", "running");
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// A cron pointed at a directory of an installation that is not on this
+    /// machine is a mistake on the host, not a disagreement between two sides.
+    /// </summary>
+    [Fact]
+    public async Task A_directory_of_an_installation_this_machine_does_not_have_is_passed_over()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new
+                    {
+                        installation = "somewhere-else",
+                        directory = "/srv/elsewhere",
+                        files = new[] { new { path = "compose.yml", sha256 = Digest("anything\n") } },
+                    },
+                },
+            },
+            Ct);
+        Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
+    /// <summary>
+    /// The section is kept as it came and served back, so that the machine
+    /// screen can say which directories were compared at all.
+    /// </summary>
+    [Fact]
+    public async Task The_report_carries_back_which_directories_were_checked()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Holds(machine, [new { path = "compose.yml", sha256 = Digest("services:\n") }]);
+
+        var read = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/reports/latest", Ct);
+        var directory = read.GetProperty("files").EnumerateArray().Single();
+
+        Assert.Equal("logaffe-prod", directory.GetProperty("installation").GetString());
+        Assert.Equal("/srv/logaffe", directory.GetProperty("directory").GetString());
+        Assert.Single(directory.GetProperty("files").EnumerateArray());
+    }
+
+    /// <summary>A content is never taken, whatever a client calls the field.</summary>
+    [Fact]
+    public async Task A_report_that_carries_a_content_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new
+                    {
+                        installation = "logaffe-prod",
+                        directory = "/srv/logaffe",
+                        files = new[] { new { path = "compose.yml", content = "services:\n" } },
+                    },
+                },
+            },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, handed.StatusCode);
+    }
+
+    /// <summary>The paths that bear secrets are refused here as the record refuses them.</summary>
+    [Fact]
+    public async Task A_report_that_names_a_path_the_record_refuses_is_refused()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "ghcr.io/datavisionzero/logaffe", version: "1.4.0");
+
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new
+                    {
+                        installation = "logaffe-prod",
+                        directory = "/srv/logaffe",
+                        files = new[] { new { path = ".env", sha256 = Digest("SECRET=hunter2\n") } },
+                    },
+                },
+            },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, handed.StatusCode);
+    }
+
+    /// <summary>The digest of a content, as the host computes the one it reports.</summary>
+    private static string Digest(string content) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content)));
+
+    /// <summary>One file of the installation, at its first revision.</summary>
+    private static async Task AFile(HttpClient admin, string path, string content)
+    {
+        using var created = await admin.PostAsJsonAsync(
+            "/api/installations/logaffe-prod/files", new { path, content }, Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    /// <summary>What the machine says lies in the directory sync wrote into.</summary>
+    private static async Task Holds(HttpClient machine, object[] files)
+    {
+        using var handed = await machine.PostAsJsonAsync(
+            "/api/machines/ex44/reports",
+            new
+            {
+                collected_at = "2026-09-13T08:00:00Z",
+                files = new[]
+                {
+                    new { installation = "logaffe-prod", directory = "/srv/logaffe", files },
+                },
+            },
+            Ct);
+
+        Assert.Equal(HttpStatusCode.Created, handed.StatusCode);
+    }
+
     private static async Task<JsonElement> Drift(HttpClient client, string address) =>
         (await client.GetFromJsonAsync<JsonElement>(address, Ct)).GetProperty("drift");
 

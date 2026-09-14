@@ -660,6 +660,22 @@ func Report(w io.Writer, r api.Report) {
 		}
 	}
 
+	// Which directories were compared at all — because the absence of a file
+	// drift below means "not checked" for every directory the cron was not
+	// given, and "in order" only for the ones it was (ADR 0017).
+	if r.Files != nil && len(*r.Files) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "files: %d %s checked\n", len(*r.Files), plural(len(*r.Files), "directory", "directories"))
+		for _, one := range *r.Files {
+			count := 0
+			if one.Files != nil {
+				count = len(*one.Files)
+			}
+			fmt.Fprintf(w, "  %-40s %-20s %d %s\n",
+				or(one.Directory), or(one.Installation), count, plural(count, "file", "files"))
+		}
+	}
+
 	if r.Updates != nil && r.Updates.RebootRequired != nil {
 		fmt.Fprintln(w)
 		if *r.Updates.RebootRequired {
@@ -707,6 +723,15 @@ func ReportSummaries(w io.Writer, page api.ReportPage) {
 			r.Number, r.ReceivedAt.Format("2006-01-02 15:04"), containers, disk, load,
 			Ago(now, r.ReceivedAt), restart)
 	}
+}
+
+// plural is the word for a count, because "1 directories" is the kind of
+// sentence that makes a reader doubt the number beside it.
+func plural(count int, one, many string) string {
+	if count == 1 {
+		return one
+	}
+	return many
 }
 
 // Drift prints what the record and the machine disagree about: one sentence

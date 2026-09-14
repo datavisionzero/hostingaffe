@@ -46,6 +46,7 @@ material value to understanding the decision.
 - [0014 – An installation depends on an installation, and the reverse is derived](./0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)
 - [0015 – A machine reports, and the record stays written](./0015-a-machine-reports-and-the-record-stays-written.md)
 - [0016 – A machine token posts one report and reads nothing](./0016-a-machine-token-posts-one-report-and-reads-nothing.md)
+- [0017 – A machine reports digests, and the instance compares](./0017-a-machine-reports-digests-and-the-instance-compares.md)
 
 ## Adopted from planaffe
 

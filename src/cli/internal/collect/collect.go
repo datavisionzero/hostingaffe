@@ -23,9 +23,12 @@ package collect
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -36,6 +39,7 @@ import (
 	"time"
 
 	"github.com/datavisionzero/hostingaffe/src/cli/internal/api"
+	"github.com/datavisionzero/hostingaffe/src/cli/internal/manifest"
 )
 
 // What the instance takes at most, held here too so that a collector never
@@ -46,7 +50,16 @@ const (
 	MaxPorts      = 64
 	MaxListening  = 128
 	MaxMissing    = 8
+
+	MaxSyncedDirectories = 32
+	MaxSyncedFiles       = 128
 )
+
+// MaxHashedBytes is how much of a file this will read to hash it. A file of the
+// record is a megabyte at most, so anything past this is not what the record
+// has whatever its digest turns out to be — and reading it would be a cron
+// stalling on whatever somebody put at that path.
+const MaxHashedBytes = 16 << 20
 
 // CommandTimeout is what any one command gets. A hanging `docker` must not hold
 // the run: the next quarter of an hour is not far away, and a report that never
@@ -67,7 +80,33 @@ type Report struct {
 	Containers  []Container `json:"containers"`
 	Listening   []Listening `json:"listening"`
 	Updates     *Updates    `json:"updates"`
+	Files       []Synced    `json:"files"`
 	Missing     []Missing   `json:"missing"`
+}
+
+// Synced is one directory `ha files sync` wrote an installation's files into,
+// and the digest of what lies at each of those paths now.
+//
+// **The manifest is the whole of what is reported.** A file sync never wrote is
+// not in it and is not named here — the same rule sync itself keeps, and what
+// keeps the names of whatever else lies in a compose directory off the wire.
+// Every path here came out of the record in the first place.
+//
+// **A digest and never a content.** That is what lets a machine say whether its
+// configuration still matches the record without handing the configuration
+// over, and it is why this needs no token that reads (ADR 0016, ADR 0017).
+type Synced struct {
+	Installation string       `json:"installation"`
+	Directory    string       `json:"directory"`
+	Files        []SyncedFile `json:"files"`
+}
+
+// SyncedFile is one path the manifest claims, and what lies there now.
+type SyncedFile struct {
+	Path string `json:"path"`
+	// Sha256 is nothing where nothing lies at the path any more, which is a
+	// finding rather than an omission.
+	Sha256 *string `json:"sha256"`
 }
 
 // Host is the machine as it describes itself.
@@ -178,9 +217,13 @@ func run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	return out, nil
 }
 
-// Collect gathers everything it can and says what it could not. It never fails:
-// what is not there is named in Missing, and the report goes out regardless.
-func Collect(ctx context.Context, env Environment, agent string) Report {
+// It never fails: what is not there is named in Missing, and the report goes
+// out regardless.
+// Collect gathers everything it can and says what it could not. Where dirs are
+// given, each is a directory `files sync` wrote into, and what lies there is
+// hashed and reported beside the rest; where none are, the section is absent
+// and nothing about files is compared (ADR 0017).
+func Collect(ctx context.Context, env Environment, agent string, dirs ...string) Report {
 	report := Report{CollectedAt: env.now().UTC(), Agent: agent, Missing: []Missing{}}
 
 	if host, err := collectHost(ctx, env); err != nil {
@@ -219,7 +262,117 @@ func Collect(ctx context.Context, env Environment, agent string) Report {
 		report.Updates = updates
 	}
 
+	// A directory that could not be read is said once, beside the ones that
+	// could: the section carries what was determined and `missing` names what
+	// was not, so that a finding absent for want of a reading is not read as a
+	// directory in order.
+	if len(dirs) > 0 {
+		synced, complaints := collectFiles(dirs)
+		if synced != nil {
+			report.Files = synced
+		}
+		if len(complaints) > 0 {
+			report.missing("files", errors.New(strings.Join(complaints, "; ")))
+		}
+	}
+
 	return report
+}
+
+// collectFiles reads the manifest beside each directory and hashes what lies at
+// the paths it claims. Nothing else in the directory is looked at, let alone
+// named.
+func collectFiles(dirs []string) ([]Synced, []string) {
+	var synced []Synced
+	var complaints []string
+
+	for _, dir := range dirs {
+		if len(synced) >= MaxSyncedDirectories {
+			complaints = append(complaints, fmt.Sprintf(
+				"%s and the ones after it were left out: a report carries %d directories at most", dir, MaxSyncedDirectories))
+			break
+		}
+
+		held, err := manifest.Read(dir)
+		if err != nil {
+			complaints = append(complaints, fmt.Sprintf("%s: %v", dir, err))
+			continue
+		}
+		if held.Owner == "" {
+			complaints = append(complaints, fmt.Sprintf("%s: sync has never written there", dir))
+			continue
+		}
+
+		key, ok := held.InstallationKey()
+		if !ok {
+			complaints = append(complaints, fmt.Sprintf("%s: %s is not an installation's directory", dir, held.Owner))
+			continue
+		}
+
+		one := Synced{Installation: key, Directory: dir, Files: []SyncedFile{}}
+
+		paths := make([]string, 0, len(held.Files))
+		for path := range held.Files {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+
+		for _, path := range paths {
+			if len(one.Files) >= MaxSyncedFiles {
+				complaints = append(complaints, fmt.Sprintf(
+					"%s carries more than the %d files a report holds", dir, MaxSyncedFiles))
+				break
+			}
+
+			digest, err := hashAt(dir, path)
+			if err != nil {
+				complaints = append(complaints, fmt.Sprintf("%s/%s: %v", dir, path, err))
+			}
+			one.Files = append(one.Files, SyncedFile{Path: path, Sha256: digest})
+		}
+
+		synced = append(synced, one)
+	}
+
+	if len(complaints) > MaxMissing {
+		complaints = complaints[:MaxMissing]
+	}
+	return synced, complaints
+}
+
+// hashAt is the digest of what lies at the path, or nothing where nothing does.
+// Anything that is not a plain file is nothing: a symlink, a socket or a device
+// is not what sync wrote there, and opening one is how a cron stops coming back.
+func hashAt(dir, path string) (*string, error) {
+	at := filepath.Join(dir, filepath.FromSlash(path))
+
+	info, err := os.Lstat(at)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("what lies there is not a plain file")
+	}
+	if info.Size() > MaxHashedBytes {
+		return nil, fmt.Errorf("it is larger than the %d bytes this reads", int64(MaxHashedBytes))
+	}
+
+	file, err := os.Open(at)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	sum := sha256.New()
+	if _, err := io.CopyN(sum, file, MaxHashedBytes+1); err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+
+	digest := hex.EncodeToString(sum.Sum(nil))
+	return &digest, nil
 }
 
 func (r *Report) missing(section string, err error) {
@@ -898,6 +1051,22 @@ func (r Report) Body() api.HandInReportRequest {
 	if r.Updates != nil {
 		reboot := r.Updates.RebootRequired
 		body.Updates = &api.UpdatesRequest{RebootRequired: &reboot}
+	}
+
+	if r.Files != nil {
+		synced := make([]api.SyncedDirectoryRequest, 0, len(r.Files))
+		for _, one := range r.Files {
+			files := make([]api.SyncedFileRequest, 0, len(one.Files))
+			for _, file := range one.Files {
+				files = append(files, api.SyncedFileRequest{Path: text(file.Path), Sha256: file.Sha256})
+			}
+			synced = append(synced, api.SyncedDirectoryRequest{
+				Installation: text(one.Installation),
+				Directory:    text(one.Directory),
+				Files:        &files,
+			})
+		}
+		body.Files = &synced
 	}
 
 	missing := make([]api.MissingRequest, 0, len(r.Missing))

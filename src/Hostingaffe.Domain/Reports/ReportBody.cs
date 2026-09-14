@@ -41,6 +41,12 @@ public sealed record ReportBody
     /// <inheritdoc cref="MaxDisks"/>
     public const int MaxMissing = 8;
 
+    /// <inheritdoc cref="MaxDisks"/>
+    public const int MaxSyncedDirectories = 32;
+
+    /// <summary>What one directory may carry, which is what a sync directory holds.</summary>
+    public const int MaxSyncedFiles = 128;
+
     /// <summary>What one line of a section fits in.</summary>
     public const int LineMaxLength = 200;
 
@@ -63,6 +69,13 @@ public sealed record ReportBody
     public IReadOnlyList<ListeningPort>? Listening { get; init; }
 
     public UpdatesSection? Updates { get; init; }
+
+    /// <summary>
+    /// Where <c>files sync</c> put an installation's files, and a digest of
+    /// what lies at each path now. Never a content
+    /// (<see cref="SyncedFile.Sha256"/>).
+    /// </summary>
+    public IReadOnlyList<SyncedDirectory>? Files { get; init; }
 
     /// <summary>What could not be determined, and why. Never null; empty is the happy case.</summary>
     public IReadOnlyList<MissingSection> Missing { get; init; } = [];
@@ -229,6 +242,61 @@ public sealed record UpdatesSection
     /// three answers.
     /// </summary>
     public bool RebootRequired { get; init; }
+}
+
+/// <summary>
+/// One directory on the host that holds an installation's files, as the
+/// manifest beside them says, and what lies at each of those paths now
+/// (ADR 0017).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>The manifest is the whole of what is reported.</strong> A file
+/// <c>files sync</c> never wrote is not in it and is not named here — which is
+/// the same rule sync itself keeps, and what stops a report from carrying the
+/// names of whatever else lies in a compose directory. Every path here came out
+/// of the record in the first place, so nothing about the directory leaves the
+/// machine that the record did not already hold.
+/// </para>
+/// <para>
+/// An empty <see cref="Files"/> is not nothing: it says the machine holds this
+/// installation's files here and has none of them, which is a comparison worth
+/// making against a record that has three.
+/// </para>
+/// </remarks>
+public sealed record SyncedDirectory
+{
+    /// <summary>The installation whose files lie there, by key. Never a machine: sync takes none (ADR 0008).</summary>
+    public string Installation { get; init; } = null!;
+
+    /// <summary>Where the directory lies on the machine, absolute.</summary>
+    public string Directory { get; init; } = null!;
+
+    /// <summary>One entry per path the manifest claims, and nothing else.</summary>
+    public IReadOnlyList<SyncedFile> Files { get; init; } = [];
+}
+
+/// <summary>
+/// One file sync wrote into the directory, and the digest of what lies at that
+/// path now.
+/// </summary>
+/// <remarks>
+/// <strong>A digest and never a content.</strong> That is what lets a machine
+/// say whether its configuration still matches the record without handing the
+/// configuration over, and it is why this section needs no token that reads
+/// (ADR 0016, ADR 0017). The paths it can carry are the record's own, and the
+/// record refuses the ones that bear secrets.
+/// </remarks>
+public sealed record SyncedFile
+{
+    /// <summary>The path under the directory, relative, as the record spells it.</summary>
+    public string Path { get; init; } = null!;
+
+    /// <summary>
+    /// The SHA-256 of the file's bytes, lower-case hexadecimal — or nothing
+    /// where nothing lies at that path any more.
+    /// </summary>
+    public string? Sha256 { get; init; }
 }
 
 /// <summary>A section the collector could not determine, and the reason it gives.</summary>

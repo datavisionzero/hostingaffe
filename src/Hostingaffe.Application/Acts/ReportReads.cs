@@ -40,6 +40,7 @@ public sealed record ReportShape(
     IReadOnlyList<ContainerState>? Containers,
     IReadOnlyList<ListeningPort>? Listening,
     UpdatesSection? Updates,
+    IReadOnlyList<SyncedDirectory>? Files,
     IReadOnlyList<MissingSection> Missing,
     IReadOnlyList<DriftShape> Drift);
 
@@ -87,6 +88,7 @@ public sealed class ReportAssembler(DriftFinder drift)
             report.Body.Containers,
             report.Body.Listening,
             report.Body.Updates,
+            report.Body.Files,
             report.Body.Missing,
             await drift.BetweenAsync(machine, report, cancellationToken));
     }
