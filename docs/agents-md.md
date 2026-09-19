@@ -59,6 +59,18 @@ Its `secrets` line names each secret and the file its value lies in —
 at `0600`, to restore, and to keep out of a repository is in the document you
 already read. The value is not there and never is.
 
+**What has been going on there** is the other half of arriving:
+
+```sh
+ha history --machine caddy --since 7d
+```
+
+Every change to the record of that host, newest first, with the deployments
+among them — one line per act, whatever number of fields it touched. `context`
+says what is true now; this says what somebody changed to make it true, and with
+which note. Read it when you are picking work back up, or before you undo
+something that looks wrong.
+
 File *contents* are not in it. They are one call away:
 
 ```sh
@@ -196,6 +208,7 @@ Its shape is what `ha export --dir` writes, so an export can be read back in.
 
 ```sh
 ha machine context KEY                  # everything about a host, before you touch it
+ha history --machine KEY --since 7d     # what has been going on there
 ha search "…"                           # where was that again
 ha files get PATH --installation KEY    # one file; --json gives the revision with it
 ha files put PATH --installation KEY --file ./x --revision N --note "…"

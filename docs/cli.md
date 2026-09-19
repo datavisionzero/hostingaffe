@@ -198,6 +198,7 @@ user's own repository.
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
 | `ha report` | `collect` and `send` on the host itself; `show` and `list` from anywhere |
 | `ha search` | one call over every field, every Markdown body and every file |
+| `ha history` | what has been going on, across every subject, deployments among it |
 | `ha export` | the whole record as a Markdown tree with the files in place, plus JSON |
 | `ha page` | `list`, `view`, `add`, `set`, `rename`, `delete`, `restore`, `history`, `check` |
 | `ha login`, `ha logout`, `ha status` | signing this machine in, out, and what it holds (ADR 0005) |
@@ -596,6 +597,46 @@ Two words are two words: `caddy /srv/caddy` is a word search and nothing else.
 A port is a number rather than a word and is looked up as one, which is what
 makes the first example answer. A file answers for the revision it is at, and a
 deleted row is not a hit.
+
+## What has been going on
+
+```sh
+ha history                         # the last page of everything, newest first
+ha history --machine ex44          # and everything that hangs on that machine
+ha history --since 7d              # a window rather than a page
+ha history --kind deployment       # only the versions that moved
+```
+
+`ha <object> history KEY` is what became of one thing, oldest first. This is the
+other question — what has been going on — and it is the whole record at once,
+newest first, with the **deployments among it** (`docs/api.md`, The history). A
+line per act: when, who, what it happened to, on which machine, and the fields
+that changed.
+
+**One act is one line** however many fields it touched, because an act is one
+thing that happened. A deployment is a line like any other, and its change is
+the version it went to:
+
+```
+2026-09-18 19:12  maintainer       deployment    logaffe-prod #7   ex44   version 0.4.1 → 0.5.0  (LOG-88)
+2026-09-18 08:00  maintainer       machine       ex44              ex44   status planned → active
+```
+
+**`--machine` means what hangs on it**, not what names it: the machine's own
+changes, its installations', the deployments of those, the files of both and the
+pages attached to either. `--kind` keeps one kind of subject — `machine`,
+`software`, `installation`, `deployment`, `file` or `page`.
+
+**`--since` is the window, and it is `ha`'s own.** The instance answers a page;
+`--since 24h`, `7d`, `2w`, any Go duration, or an RFC 3339 moment reads on until
+the events leave the window. Without it, one page — `--limit` says how big, and
+the instance caps it at 200 whatever is asked. A span `ha` cannot read is exit 2,
+said before anything goes out.
+
+A subject that has been deleted keeps its events, because the last thing that
+happened to a machine somebody removed is that somebody removed it. Where the
+purge has taken the row the subject prints as `-`, and the event still says its
+kind, its moment and who.
 
 ## Pages, and what they link to
 

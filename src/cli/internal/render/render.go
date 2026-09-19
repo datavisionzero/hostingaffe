@@ -284,6 +284,45 @@ func History(w io.Writer, entries []api.HistoryEntry) {
 	}
 }
 
+// HistoryEvents prints the reading across every subject, newest first: when,
+// who, what it happened to, on which machine, and what changed. One line per
+// act, because one act is one thing that happened however many fields it
+// touched — and a deployment is a line like any other, whose change is the
+// version it went to.
+func HistoryEvents(w io.Writer, events []api.HistoryEvent) {
+	for _, e := range events {
+		subject := "-"
+		if e.Subject != nil {
+			subject = *e.Subject
+		}
+		if e.Number != nil {
+			subject = fmt.Sprintf("%s #%d", subject, *e.Number)
+		}
+
+		fmt.Fprintf(w, "%s  %-16s %-13s %-30s %-14s %s",
+			e.At.Format("2006-01-02 15:04"), e.Actor.Name, e.SubjectKind, subject, or(e.Machine), changed(e.Changes))
+		if e.Note != nil && *e.Note != "" {
+			fmt.Fprintf(w, "  (%s)", *e.Note)
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+// changed is the fields of one act, in the order it wrote them. A field with
+// neither value — a text that records that it changed, and the acts named
+// `created`, `deleted` and `restored` — is the field and nothing else.
+func changed(changes []api.FieldChange) string {
+	spelled := make([]string, 0, len(changes))
+	for _, c := range changes {
+		if c.OldValue == nil && c.NewValue == nil {
+			spelled = append(spelled, c.Field)
+			continue
+		}
+		spelled = append(spelled, fmt.Sprintf("%s %s → %s", c.Field, or(c.OldValue), or(c.NewValue)))
+	}
+	return strings.Join(spelled, ", ")
+}
+
 // A field and what it says, for the lines that print only what is filled in.
 type field struct{ label, value string }
 
