@@ -19,6 +19,7 @@ tests/Hostingaffe.IntegrationTests  the real thing against a real Postgres
 deploy/                         Dockerfile, Compose, `.env.example`
 docs/api/openapi.json           the contract, captured and checked in
 docs/agents-md.md               the AGENTS.md block a user copies into their own repository
+skills/                         the two agent skills shipped for agents working on a user's hosts
 ```
 
 ## The four layers

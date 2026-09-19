@@ -16,7 +16,8 @@ conventions, [`CONTEXT.md`](CONTEXT.md), [`docs/codebase.md`](docs/codebase.md),
 [`docs/operations.md`](docs/operations.md), [`docs/api.md`](docs/api.md),
 [`docs/storage.md`](docs/storage.md), [`docs/agents-md.md`](docs/agents-md.md),
 [`docs/adr/`](docs/adr/) and [`deploy/`](deploy/) all exist. A new one is linked
-here when it is created.
+here when it is created — [`docs/skills.md`](docs/skills.md) is the latest,
+describing the skills under [`skills/`](skills/).
 
 [`docs/agents-md.md`](docs/agents-md.md) is the odd one out: it is not about
 working *in* this repository but about working on a host whose record lives in
@@ -24,6 +25,13 @@ a hostingaffe instance. It holds the block a user copies into the `AGENTS.md`
 of their own repository ([Vision §8](Vision.md#8-what-an-agent-does-here)), and
 every command in it has to keep working — a block that names a verb `ha` no
 longer has is worse than no block.
+
+[`skills/`](skills/) is the same kind of thing one level up: two agent skills a
+user installs into the agent that works on their hosts, described in
+[`docs/skills.md`](docs/skills.md). They are procedures around `ha`, not
+instructions for operating any particular software — that stays in the record,
+in the runbook pages of the installation. The commands in them carry the same
+duty as the block's: a renamed verb is renamed there too, in the same commit.
 
 ## Language
 

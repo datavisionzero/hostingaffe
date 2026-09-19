@@ -98,12 +98,29 @@ take the `pg_dump` first — that is the way back.
 re-decided. The CLI is Go, so that it is one static binary with no runtime on a
 host that has enough on it already.
 
+## Agent skills
+
+Two optional [agent skills](docs/skills.md) for the agent that works on your
+hosts: bringing a software to a new version, and taking something new onto a
+machine. Each is a procedure around `ha` — which questions to ask, in which
+order to write, and the record that must not be left unwritten at the end.
+**How** a given installation is operated stays where it belongs, in its runbook
+in the record, so the skills do not go stale with it.
+
+```sh
+npx skills@latest add datavisionzero/hostingaffe -g
+```
+
+The folders under [`skills/`](skills) are the distribution; cloning this
+repository does not install them.
+
 | | |
 | --- | --- |
 | [`Vision.md`](Vision.md) · [`CONTEXT.md`](CONTEXT.md) | what this is, and the words it is named after |
 | [`docs/install.md`](docs/install.md) · [`docs/operations.md`](docs/operations.md) | installing one, and running it: variables, backup, restore |
 | [`docs/cli.md`](docs/cli.md) · [`docs/api.md`](docs/api.md) | the console, and the HTTP contract under it |
 | [`docs/agents-md.md`](docs/agents-md.md) | the block to copy into your own repository |
+| [`docs/skills.md`](docs/skills.md) · [`skills/`](skills) | the two skills for an agent working on your hosts |
 | [`docs/codebase.md`](docs/codebase.md) · [`docs/storage.md`](docs/storage.md) · [`docs/adr/`](docs/adr/) | the layout, the data model, and the decisions |
 
 MIT. All of it — no `ee/` directory, no feature behind a second license.
