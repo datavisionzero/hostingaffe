@@ -70,6 +70,26 @@ describe("the machines (VISION 6.2)", () => {
     expect(screen.getAllByText("restart")).toHaveLength(1);
   });
 
+  // The chips are the closed sets; the name of a machine is not one of them,
+  // and half a name is what somebody actually remembers. It narrows what the
+  // instance already answered, because a team's machines are a screenful.
+  it("narrows by a typed word, over the key and the name alike", async () => {
+    const instance = installInstance({
+      "GET /api/machines": [aMachine("web-01"), { ...aMachine("db-01"), name: "The database" }],
+    });
+
+    renderAt("/machines", <MachinesView />);
+
+    await screen.findByRole("link", { name: /web-01/ });
+    const before = instance.calls.length;
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Find" }), "database");
+
+    await waitFor(() => expect(screen.queryByRole("link", { name: /web-01/ })).not.toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /db-01/ })).toBeInTheDocument();
+    expect(instance.calls).toHaveLength(before);
+  });
+
   // A filtered list is something people send each other, so it is in the
   // address and not in a component's memory.
   it("takes its narrowing from the address and puts it back there", async () => {

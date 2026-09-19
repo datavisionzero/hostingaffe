@@ -157,6 +157,29 @@ it("searches the wiki out of the URL, and says when nothing matched", async () =
   expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
 });
 
+// The anchor is the only structure this wiki has, so it is also the one
+// narrowing worth a control: what is written about this host, and nothing else.
+it("narrows the wiki to one machine, and asks the instance for it", async () => {
+  const instance = installInstance({
+    "GET /api/pages": (request) =>
+      new URL(request.url).searchParams.get("machine") === "caddy" ? [attached] : [attached, summary],
+    "GET /api/machines": [{ key: "caddy", name: "The reverse proxy", kind: "vps", status: "active" }],
+  });
+  renderAt("/pages", <Routes><Route path="/pages" element={<PagesView />} /></Routes>);
+  const user = userEvent.setup();
+
+  await screen.findByRole("link", { name: /architecture/ });
+
+  await user.click(screen.getByRole("combobox", { name: "Machine" }));
+  await user.click(await screen.findByRole("option", { name: /caddy/ }));
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole("link", { name: /Architecture/ })).not.toBeInTheDocument();
+  });
+  const asked = instance.calls.map((call) => new URL(call.url)).find((url) => url.searchParams.get("machine") === "caddy");
+  expect(asked?.pathname).toBe("/api/pages");
+});
+
 it("opens the page itself: the Markdown and who changed it last", async () => {
   renderPage();
 

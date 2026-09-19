@@ -1,9 +1,8 @@
-import { useId } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, type Schemas } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Filters, type Filter } from "@/shared/Filters";
+import { word } from "@/shared/narrowing";
 import { PageHeader } from "@/shared/PageHeader";
 import { useAsk } from "@/shared/ask";
 import { pagePath } from "@/shell/views";
@@ -28,17 +27,23 @@ const filters: Filter[] = [{ name: "kind", label: "Kind", values: ["runbook", "d
  * Grouping is not narrowing. The search still reaches every page and is what a
  * reader navigates by, since it is what the product put in a folder tree's
  * place (VISION 7); the groups only say where a match lives.
+ *
+ * Narrowing to one machine is the other way round: it keeps the groups and
+ * drops the rest, which is what somebody wants who is working on that machine
+ * and not looking anything up.
  */
 export function PagesView() {
   const [params, setParams] = useSearchParams();
   // The filter lives in the URL: a pasted link says what it shows.
   const query = params.get("q") ?? "";
-  const kind = params.get("kind") ?? undefined;
-  const searchId = useId();
-  const at = `${query}|${kind ?? ""}`;
+  const kind = word(params, "kind");
+  // The endpoint knows the anchor, so this one narrowing is asked for rather
+  // than applied here: a page of a machine is a page the instance can find.
+  const machine = word(params, "machine");
+  const at = `${query}|${kind ?? ""}|${machine ?? ""}`;
 
   const { asked } = useAsk<PageSummary[]>(at, (signal) =>
-    api.GET("/api/pages", { params: { query: { q: query === "" ? undefined : query, kind } }, signal }));
+    api.GET("/api/pages", { params: { query: { q: query === "" ? undefined : query, kind, machine } }, signal }));
 
   // An anchor carries a key and no name, so the names are read once for the
   // whole screen — retired machines among them, since a page outlives what it
@@ -61,37 +66,31 @@ export function PagesView() {
     for (const installation of installations.asked.value) names.set(`installation:${installation.key}`, installation.name);
   }
 
-  const narrowed = query !== "" || kind !== undefined;
-
-  const set = (name: string, value: string | undefined) => {
-    const kept = new URLSearchParams(params);
-    if (value === undefined) kept.delete(name);
-    else kept.set(name, value);
-    setParams(kept, { replace: true });
-  };
+  const narrowed = query !== "" || kind !== undefined || machine !== undefined;
 
   return (
     <>
       <PageHeader title="Pages" meta={asked.at === "known" ? `${asked.value.length}` : undefined}>
         <Button size="sm" render={<Link to="/pages/new" />}>New page</Button>
       </PageHeader>
-      <div className="grid gap-2 border-b px-4 py-2">
-        {/* The search is what this wiki has instead of a tree, so it stands
-            above the list rather than behind a filter sheet. */}
-        <div className="grid gap-1 text-sm font-medium">
-          <label htmlFor={searchId}>Search</label>
-          <Input
-            id={searchId}
-            name="q"
-            type="search"
-            placeholder="Words in the title or the body"
-            value={query}
-            onChange={(event) => set("q", event.target.value === "" ? undefined : event.target.value)}
-          />
-        </div>
-      </div>
-
-      <Filters filters={filters} params={params} setParams={setParams} />
+      {/* The search is what this wiki has instead of a tree, so it stands above
+          the list rather than behind a filter sheet — and the machine beside
+          it, because "what is written about this host" is the other way in. */}
+      <Filters
+        filters={filters}
+        params={params}
+        setParams={setParams}
+        find={{ label: "Search", placeholder: "Words in the title or the body", value: query }}
+        pick={{
+          name: "machine",
+          label: "Machine",
+          placeholder: "Any machine",
+          empty: machines.asked.at === "known" ? "No machine of that name." : "Asking the instance…",
+          choices: machines.asked.at === "known"
+            ? machines.asked.value.map((one) => ({ id: one.key, name: one.key, hint: one.name }))
+            : [],
+        }}
+      />
 
       {asked.at === "asking" && <p aria-busy className="p-4 text-sm text-muted-foreground">Loading…</p>}
       {asked.at === "failed" && <p className="p-4 text-sm text-destructive">{asked.why}</p>}
