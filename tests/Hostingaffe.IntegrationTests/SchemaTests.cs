@@ -122,7 +122,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "device_login_code_hash", "device_login_user_code",
                 "file_letters", "file_on_installation", "file_on_machine",
                 "file_revision_letters", "file_revision_search", "file_search",
-                "history_subject",
+                "history_subject", "history_when",
                 "identity_email", "identity_metadata_identity", "identity_name",
                 "installation_depends_on_target",
                 "installation_key", "installation_letters", "installation_machine", "installation_search",

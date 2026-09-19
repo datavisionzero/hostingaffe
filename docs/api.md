@@ -1045,6 +1045,70 @@ anything a deletion took with it.
 order a cursor could walk; a word that occurs in every file would otherwise
 answer with the whole record, which is not an answer.
 
+### The history
+
+| | |
+|---|---|
+| `GET /api/history` | every change to the record, newest first, with the deployments mixed in |
+
+A subject's own `…/history` answers what became of that one thing, oldest
+first. This is the other question — what has been going on — and it is asked of
+the whole record at once:
+
+```json
+{"at": "2026-09-18T19:12:04.118231Z",
+ "actor": {"id": "…", "kind": "user", "name": "alex"},
+ "subject_kind": "installation", "subject": "logaffe-prod", "number": null,
+ "machine": "ex44",
+ "changes": [{"field": "status", "old_value": "planned", "new_value": "active"},
+             {"field": "backup", "old_value": "planned", "new_value": "active"}],
+ "note": "the box is live", "cursor": "MjAyNi0wOS0xOFQxOToxMjowNC4x…"}
+```
+
+**One act is one event.** A history row is one field, and a `PATCH` over three
+of them wrote three rows carrying the same actor, the same moment and the same
+note; here they are one event with three changes, in the order they were
+written. Nothing in the table moves — the folding is a reading, and
+`…/history` on the subject still answers row by row.
+
+**A deployment is an event, and it is not a history row.** It stays what
+`CONTEXT.md` says it is, a record of its own, and this reading puts it beside
+the changes because "logaffe-prod went from 0.4.1 to 0.5.0" is the answer
+somebody asking what happened is looking for. Its `subject_kind` is
+`deployment`, its `subject` is the installation it lives under, its `number` is
+the deployment's, and its one change is the version — `old_value` the version
+before it in the order every derived value uses, `new_value` its own. What the
+recording of a deployment wrote into the history beside it is left out here,
+because that is the same event a second time; a **correction** to a deployment
+is a change like any other and appears as one.
+
+**`machine` is what hangs on a machine**, not what names it: the machine's own
+changes, its installations', the deployments of those, the files of both, and
+the pages attached to either. A software belongs to no machine and is in no
+machine's reading; a page of the instance is in none either. `kind` keeps one
+kind of subject — `machine`, `software`, `installation`, `file`, `page` or
+`deployment` — and a word outside that set is `validation`.
+
+**A deleted subject keeps its events.** The history survives the deletion of
+what it describes and the purge with it (VISION 7), and a reading of what
+happened that dropped the deletions would answer the opposite of what it was
+asked: the last thing that happened to a machine somebody removed is that
+somebody removed it. Where the purge has taken the row, `subject` is `null` and
+the event still says its kind, its moment and who.
+
+**There is no notion of an interesting event.** Every act is one line and the
+reader decides. A filter that hid the dull ones would be a rule nobody can see,
+and a short list that is quietly wrong is worse than a long one. Reports are
+not in it at all, for the reason the glossary already gives: a cron reporting
+every quarter of an hour has changed nothing.
+
+**Walked with a cursor, not an offset.** `limit` defaults to 50 and never
+exceeds 200, and every event carries the `cursor` that continues the reading
+after it: the next page is `before=` the last one's. It is opaque — what it
+holds is this reading's sort key, which is the moment plus the side and the row
+it came from, so that two events sharing a moment cannot hide each other. A
+cursor that is not one this reading handed out is `cursor-invalid`.
+
 ### Pages
 
 | | |

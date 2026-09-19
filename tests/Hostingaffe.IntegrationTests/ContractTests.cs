@@ -45,6 +45,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/device/approvals", "/api/device/logins", "/api/device/logins/{code}",
                 "/api/device/refusals", "/api/device/tokens",
                 "/api/email-changes/confirm",
+                "/api/history",
                 "/api/import",
                 "/api/installations", "/api/installations/{key}",
                 "/api/installations/{key}/deployments", "/api/installations/{key}/deployments/{number}",

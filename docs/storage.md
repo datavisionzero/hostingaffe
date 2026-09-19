@@ -817,6 +817,7 @@ create table history (
 );
 
 create index history_subject on history (subject, subject_id, id);
+create index history_when    on history (at desc, id desc);
 ```
 
 **A row names its subject rather than being a column of it.** One table for
@@ -831,6 +832,15 @@ points at an id nothing answers to.
 **`generated always as identity`**: a caller cannot bring its own id, so the
 order of the ids is the order the rows were written and nothing else. That is
 what makes `order by id` the history's order.
+
+**Two indexes, because there are two questions.** `history_subject` is
+everything about one thing, in the order it was written, which is what a detail
+screen asks. `history_when` is the other one: what happened lately, across every
+subject, newest first (`api.md`, The history). That reading groups the rows of
+one act — same subject, same actor, same `at`, same note — and mixes the
+deployments in by time, which is why it walks the table by the moment and not by
+the id: a deployment's `at` may be backfilled, and an order that is not the two
+sides' shared one would interleave them wrongly.
 
 **A list records what it became.** `urls`, `secrets` and `ports` write their
 entries as one line, separated by commas; a port reads as `443/tcp:public`

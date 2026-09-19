@@ -420,6 +420,91 @@
         }
       }
     },
+    "/api/history": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every change to the record, newest first, with the deployments mixed in. The rows one act wrote are one event carrying the fields it changed, and a deployment is an event whose one change is the version. `machine` keeps what belongs to one machine — its own changes and those of its installations, their deployments, the files of both and the pages attached to them — and `kind` keeps one kind of subject. `limit` defaults to 50 and never exceeds 200; `before` is the `cursor` of the last event of the page before this one. A subject that has been deleted keeps its events: the last thing that happened to it is that somebody deleted it.",
+        "operationId": "ReadHistory",
+        "parameters": [
+          {
+            "name": "machine",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEvent"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/import": {
       "post": {
         "tags": [
@@ -7187,6 +7272,31 @@
         ],
         "type": "string"
       },
+      "FieldChange": {
+        "required": [
+          "field",
+          "old_value",
+          "new_value"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "old_value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "new_value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "File": {
         "required": [
           "owner",
@@ -7447,6 +7557,66 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "HistoryEvent": {
+        "required": [
+          "at",
+          "actor",
+          "subject_kind",
+          "subject",
+          "number",
+          "machine",
+          "changes",
+          "note",
+          "cursor"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/IdentityRef"
+          },
+          "subject_kind": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "number": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "machine": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": "string"
           }
         }
       },
