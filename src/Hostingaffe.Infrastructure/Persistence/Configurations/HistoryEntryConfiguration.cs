@@ -47,8 +47,11 @@ public sealed class HistoryEntryConfiguration : IEntityTypeConfiguration<History
         builder.Property(h => h.NewValue).HasColumnName("new_value");
         builder.Property(h => h.Note).HasColumnName("note");
 
-        // The one way the history is read: everything about one subject, in the
-        // order it was written.
+        // The two ways the history is read: everything about one subject, in
+        // the order it was written — and, across every subject, what happened
+        // lately, which walks the tail of the table by the moment and stops at
+        // a page.
         builder.HasIndex(h => new { h.Subject, h.SubjectId, h.Id }).HasDatabaseName("history_subject");
+        builder.HasIndex(h => new { h.At, h.Id }).HasDatabaseName("history_when").IsDescending();
     }
 }

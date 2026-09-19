@@ -139,6 +139,7 @@ func newRoot(env Env) *cobra.Command {
 	root.AddCommand(newPage(g))
 	root.AddCommand(newReport(g))
 	root.AddCommand(newSearch(g))
+	root.AddCommand(newHistory(g))
 	root.AddCommand(newExport(g))
 	root.AddCommand(newLogin(g), newLogout(g), newStatus(g))
 	root.AddCommand(identityCommands(g)...)

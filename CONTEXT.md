@@ -363,6 +363,13 @@ Deployments are not history entries. They are records of their own, because a
 deployment is what an operator wants to *read*, while the history is what they
 consult when something looks wrong.
 
+**Read across every subject, the two are one list.** "What happened lately" is
+the history of everything at once, and it is served with the deployments mixed
+in — a version that changed is the event somebody asking that question is
+looking for. It is a reading and nothing else: no deployment becomes a history
+row, nothing is written, and the rows one act wrote are folded into one event on
+the way out (`docs/api.md`, The history).
+
 **A report is not a history entry either.** The history is who changed the
 record; a cron reporting every quarter of an hour has changed nothing, and a
 report that wrote a row would bury every real change under ninety-six of them

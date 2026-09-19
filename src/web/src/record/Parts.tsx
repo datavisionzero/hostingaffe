@@ -11,7 +11,7 @@ import { useAsk, type Asked } from "@/shared/ask";
 import { Nothing, Section } from "@/shared/Detail";
 import { size } from "@/shared/size";
 import { day, moment } from "@/shared/when";
-import { filePath, installationPath } from "./addresses";
+import { filePath, historyPath, installationPath } from "./addresses";
 
 type Anchor = Schemas["Anchor"];
 type FileSummary = Schemas["FileSummary"];
@@ -34,14 +34,16 @@ export function StatusBadge({ status }: { status: Status }) {
 }
 
 /** A section that says what its own request said, rather than emptying the screen. */
-export function Asks<T>({ title, meta, asked, children }: {
+export function Asks<T>({ title, meta, asked, action, children }: {
   title: string;
   meta?: string;
   asked: Asked<T>;
+  /** What can be done with this section, or where it goes on. */
+  action?: React.ReactNode;
   children: (value: T) => React.ReactNode;
 }) {
   return (
-    <Section title={title} meta={asked.at === "known" ? meta : undefined}>
+    <Section title={title} meta={asked.at === "known" ? meta : undefined} action={action}>
       {asked.at === "asking" && <p aria-busy className="text-sm text-muted-foreground">Loading…</p>}
       {asked.at === "failed" && <p className="text-sm text-destructive">{asked.why}</p>}
       {asked.at === "known" && children(asked.value)}
@@ -186,9 +188,29 @@ export function Attached({ to }: { to: Anchor }) {
  * survives the deletion of its subject and the purge (VISION 7), which is why
  * it is a section of the screen and not a property of the object.
  */
-export function History({ asked }: { asked: Asked<HistoryEntry[]> }) {
+export function History({ asked, everything }: {
+  asked: Asked<HistoryEntry[]>;
+  /**
+   * Where the whole story is: this section is the fields of this one row, and
+   * what happened around it — its installations, their deployments, the files
+   * of both — is the reading at `/history`.
+   */
+  everything?: { machine: string };
+}) {
   return (
-    <Asks title="History" meta={asked.at === "known" ? `${asked.value.length}` : undefined} asked={asked}>
+    <Asks
+      title="History"
+      meta={asked.at === "known" ? `${asked.value.length}` : undefined}
+      asked={asked}
+      action={everything !== undefined && (
+        <Link
+          className="text-xs text-brand hover:underline"
+          to={historyPath({ machine: everything.machine })}
+        >
+          Everything on {everything.machine}
+        </Link>
+      )}
+    >
       {(entries) => entries.length === 0 ? (
         <Nothing>Nothing has changed since this was written down.</Nothing>
       ) : (

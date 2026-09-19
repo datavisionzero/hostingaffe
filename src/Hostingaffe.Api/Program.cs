@@ -141,6 +141,7 @@ builder.Services.AddScoped<ReadMachine>();
 builder.Services.AddScoped<ReadMachineHistory>();
 builder.Services.AddScoped<ReadMachineContext>();
 builder.Services.AddScoped<Search>();
+builder.Services.AddScoped<ReadHistory>();
 builder.Services.AddScoped<ImportRecord>();
 builder.Services.AddScoped<CreateMachine>();
 builder.Services.AddScoped<ChangeMachine>();
@@ -297,6 +298,7 @@ api.MapDeployments();
 api.MapReports();
 api.MapPages();
 api.MapSearch();
+api.MapHistory();
 api.MapImport();
 api.MapSmtp();
 

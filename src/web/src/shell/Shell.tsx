@@ -1,6 +1,6 @@
 import { CommandIcon } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router";
+import { Link, Route, Routes, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -8,6 +8,8 @@ import { PagesView } from "@/pages/PagesView";
 import { MachinesView } from "@/record/MachinesView";
 import { InstallationsView } from "@/record/InstallationsView";
 import { SoftwareListView } from "@/record/SoftwareListView";
+import { OverviewView } from "@/record/OverviewView";
+import { HistoryView } from "@/record/HistoryView";
 import { SettingsView } from "@/settings/SettingsView";
 import { AdminView } from "@/settings/AdminView";
 import { AccountMenu } from "./AccountMenu";
@@ -106,7 +108,7 @@ export function Shell() {
         </header>
 
         <Routes>
-          <Route path="/" element={<Navigate to="/machines" replace />} />
+          <Route path="/" element={<OverviewView />} />
           <Route path="/settings/*" element={<SettingsView />} />
           <Route path="/admin/*" element={<AdminView />} />
           <Route path="/machines" element={<MachinesView />} />
@@ -119,6 +121,7 @@ export function Shell() {
           <Route path="/installations" element={<InstallationsView />} />
           <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
           <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />
+          <Route path="/history" element={<HistoryView />} />
           <Route path="/pages" element={<PagesView />} />
           <Route path="/pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
           <Route path="/pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />

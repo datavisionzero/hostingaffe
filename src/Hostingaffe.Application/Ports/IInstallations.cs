@@ -40,6 +40,14 @@ public interface IInstallations
     Task<IReadOnlyList<Installation>> OnMachineAsync(
         Guid machineId, DateTimeOffset? deletedAt, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// How many active installations each of these machines carries — the
+    /// number a tile says beside the host. A machine with none is absent from
+    /// the map rather than present with a zero.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, int>> ActiveCountsAsync(
+        IEnumerable<Guid> machineIds, CancellationToken cancellationToken);
+
     /// <summary>How many live installations still hang on a software — the number a refusal names.</summary>
     Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken);
 

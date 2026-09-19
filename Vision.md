@@ -288,6 +288,12 @@ The web interface follows planaffe's — the same shell, the same list density,
 the same keyboard habits — because that interface is already good and our users
 already know it. Its screens:
 
+- **Overview** as the front page: one tile per machine, carrying what has
+  lately happened on it — the newest deployment and the version it went to, how
+  many changes fall inside the window, when the machine last reported, whether
+  it is waiting for a restart, how many drift findings its report makes. A
+  click leads to that machine's history
+  ([ADR 0018](docs/adr/0018-the-front-page-is-a-tile-per-machine.md)).
 - **Machines** as the central list: name, kind, provider, OS, addresses, number
   of installations, when last measured. Sorted and filtered from the URL.
 - **Machine** detail: the fields, the installations on it with their current
@@ -302,6 +308,9 @@ already know it. Its screens:
   version — the screen that answers "where do I have to update Caddy?".
 - **Deployments**: one timeline across the instance, newest first, filterable
   by machine, installation and software.
+- **History**: what has been going on, across every subject, with the
+  deployments among it — newest first, grouped by the day it happened on,
+  narrowed to one machine or one kind of thing.
 - **Pages**: runbooks, decisions and notes, by slug, with who touched what last.
 - **Search** across every field, every Markdown body and every file.
 - Every Markdown editor is a text area with a preview; every change to text or
@@ -312,7 +321,10 @@ already know it. Its screens:
   from the navigation. A person types the code `ha` printed and approves, and
   the machine at the other end collects a token of theirs (6.1).
 
-There is no dashboard, no diagram, no chart.
+There is no diagram and no chart, and the overview is not a dashboard of
+metrics: every number on it comes out of the record, there is no time series
+behind any of them, and no threshold or colour says which of them is a problem
+(5, ADR 0018).
 
 ### 6.3 HTTP API
 

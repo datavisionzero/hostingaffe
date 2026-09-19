@@ -83,6 +83,19 @@ public sealed class Installations(HostingaffeDbContext context) : IInstallations
             .Where(i => i.MachineId == machineId && (deletedAt == null ? i.DeletedAt == null : i.DeletedAt == deletedAt))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> ActiveCountsAsync(
+        IEnumerable<Guid> machineIds, CancellationToken cancellationToken)
+    {
+        var wanted = machineIds?.Distinct().ToArray() ?? [];
+
+        return wanted.Length == 0
+            ? new Dictionary<Guid, int>()
+            : await context.Installations
+                .Where(i => wanted.Contains(i.MachineId) && i.DeletedAt == null && i.Status == Status.Active)
+                .GroupBy(i => i.MachineId)
+                .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
+    }
+
     public Task<int> CountOnSoftwareAsync(Guid softwareId, CancellationToken cancellationToken) =>
         context.Installations.CountAsync(i => i.SoftwareId == softwareId && i.DeletedAt == null, cancellationToken);
 

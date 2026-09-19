@@ -21,10 +21,19 @@ public static class MachineEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        door.MapGet(string.Empty, (string? status, string? kind, bool? retired, ListMachines list, CancellationToken cancellationToken) =>
-                list.ExecuteAsync(status, kind, retired ?? false, cancellationToken))
+        door.MapGet(
+                string.Empty,
+                (string? status, string? kind, bool? retired, string? activity,
+                 ListMachines list, CancellationToken cancellationToken) =>
+                    list.ExecuteAsync(status, kind, retired ?? false, activity, cancellationToken))
             .WithName("ListMachines")
-            .WithSummary("Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. Retired machines are left out unless `retired=true` or `status=retired`; not paginated.");
+            .WithSummary(
+                "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. "
+                + "Retired machines are left out unless `retired=true` or `status=retired`; not paginated. "
+                + "`activity` — a count of hours or days, `24h` or `7d`, at most `90d` — adds what has been going on "
+                + "per row: how many acts and how many deployments fall inside the window, the newest deployment "
+                + "whenever it was, how many installations are active, and how many drift findings the latest report "
+                + "makes. Without it, none of that is read and the answer is what it always was.");
 
         door.MapPost(string.Empty, async (CreateMachineRequest? request, string? note, CreateMachine create, CancellationToken cancellationToken) =>
             {
