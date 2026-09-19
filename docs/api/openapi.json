@@ -1683,7 +1683,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. Retired machines are left out unless `retired=true` or `status=retired`; not paginated.",
+        "summary": "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. Retired machines are left out unless `retired=true` or `status=retired`; not paginated. `activity` — a count of hours or days, `24h` or `7d`, at most `90d` — adds what has been going on per row: how many acts and how many deployments fall inside the window, the newest deployment whenever it was, how many installations are active, and how many drift findings the latest report makes. Without it, none of that is read and the answer is what it always was.",
         "operationId": "ListMachines",
         "parameters": [
           {
@@ -1705,6 +1705,13 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "activity",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -7041,6 +7048,38 @@
           }
         }
       },
+      "DeploymentLine": {
+        "required": [
+          "installation",
+          "number",
+          "version",
+          "previous",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "installation": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "string"
+          },
+          "previous": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "DeploymentSummary": {
         "required": [
           "number",
@@ -8844,6 +8883,48 @@
           }
         }
       },
+      "MachineActivity": {
+        "required": [
+          "window",
+          "changes",
+          "deployments",
+          "latest",
+          "installations",
+          "drift"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deployments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeploymentLine"
+              }
+            ]
+          },
+          "installations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "drift": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "MachineContext": {
         "required": [
           "key",
@@ -8941,6 +9022,16 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "activity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MachineActivity"
+              }
+            ]
           }
         }
       },

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hostingaffe.Application.Ports;
@@ -24,7 +25,79 @@ public sealed record MachineSummaryShape(
     DateTimeOffset? MeasuredAt,
     DateTimeOffset? LastSeen,
     bool? RebootRequired,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    MachineActivityShape? Activity = null);
+
+/// <summary>
+/// What has been going on on one machine, as a list says it per row
+/// (<c>docs/api.md</c>, Machines): the counts inside a window, the newest
+/// deployment whenever it was, how many installations are active, and how many
+/// findings the latest report disagrees with the record about.
+/// </summary>
+/// <remarks>
+/// It is asked for and not served by default. Every number in it costs
+/// something the plain list does not pay — the drift most of all, which reads
+/// the latest report of every machine against its installations — and a list
+/// that is read to find a key should not pay for a screen that is read to see
+/// what happened.
+/// </remarks>
+/// <param name="Window">The window the two counts are over, as it was asked for.</param>
+/// <param name="Latest">The newest deployment on the machine, whenever it was. Outside the window on purpose.</param>
+public sealed record MachineActivityShape(
+    string Window,
+    int Changes,
+    int Deployments,
+    DeploymentLineShape? Latest,
+    int Installations,
+    int Drift);
+
+/// <summary>The version an installation went to, and the one before it.</summary>
+public sealed record DeploymentLineShape(
+    string Installation, int Number, string Version, string? Previous, DateTimeOffset At);
+
+/// <summary>
+/// How far back the two counts of an activity reach: <c>24h</c>, <c>7d</c> —
+/// a number and the unit it is in.
+/// </summary>
+/// <remarks>
+/// A window and not a pair of dates, because it is a list's question and not a
+/// report's: "lately" is what a tile says, and the caller spells how long that
+/// is. Ninety days is the furthest, because beyond it the number stops being
+/// news and the reading it counts gets expensive.
+/// </remarks>
+public sealed record ActivityWindow(string Spelled, TimeSpan Span)
+{
+    /// <summary>The longest window anyone gets.</summary>
+    public static readonly TimeSpan Longest = TimeSpan.FromDays(90);
+
+    /// <exception cref="Refusal"><c>validation</c> on <c>activity</c>.</exception>
+    public static ActivityWindow? Read(string? asked)
+    {
+        var spelled = asked?.Trim();
+
+        if (string.IsNullOrEmpty(spelled))
+        {
+            return null;
+        }
+
+        var unit = spelled[^1];
+        var span = int.TryParse(spelled[..^1], NumberStyles.None, CultureInfo.InvariantCulture, out var count)
+                && count > 0
+            ? unit switch
+            {
+                'h' => TimeSpan.FromHours(count),
+                'd' => TimeSpan.FromDays(count),
+                _ => (TimeSpan?)null,
+            }
+            : null;
+
+        return span is { } window && window <= Longest
+            ? new ActivityWindow(spelled, window)
+            : throw Refusal.Validation(
+                "activity",
+                "An activity window is a count of hours or days — 24h, 7d — and at most 90d.");
+    }
+}
 
 /// <summary>The complete machine: every field of VISION 7, and who touched it.</summary>
 public sealed record MachineShape(
@@ -143,9 +216,16 @@ public sealed record ChangeMachineRequest(
 /// collector could not tell — a <c>false</c> from a machine nobody could ask
 /// would be the worst of the three answers.
 /// </remarks>
-public sealed class MachineAssembler(IIdentities identities, IMachines machines, IReports reports, DriftFinder drift)
+public sealed class MachineAssembler(
+    IIdentities identities,
+    IMachines machines,
+    IReports reports,
+    IHistory history,
+    IInstallations installations,
+    DriftFinder drift,
+    TimeProvider clock)
 {
-    public static MachineSummaryShape Summary(Machine machine, Report? latest)
+    public static MachineSummaryShape Summary(Machine machine, Report? latest, MachineActivityShape? activity = null)
     {
         ArgumentNullException.ThrowIfNull(machine);
 
@@ -160,20 +240,63 @@ public sealed class MachineAssembler(IIdentities identities, IMachines machines,
             machine.MeasuredAt,
             latest?.ReceivedAt,
             latest?.Body.Updates?.RebootRequired,
-            machine.UpdatedAt);
+            machine.UpdatedAt,
+            activity);
     }
 
     public async Task<IReadOnlyList<MachineSummaryShape>> SummariesAsync(
-        IReadOnlyList<Machine> rows, CancellationToken cancellationToken)
+        IReadOnlyList<Machine> rows, CancellationToken cancellationToken) =>
+        await SummariesAsync(rows, null, cancellationToken);
+
+    /// <summary>
+    /// The same list, and what has been going on on each row where a window was
+    /// asked for.
+    /// </summary>
+    /// <remarks>
+    /// The counts and the newest deployment are two statements for the whole
+    /// list, and the active installations a third: what a tile screen shows is
+    /// one question, not one per machine. The drift is the exception and is
+    /// read per machine that has reported, because it compares that report
+    /// against that machine's installations — it is the one number here that
+    /// costs, which is why none of this is served unless it was asked for.
+    /// </remarks>
+    public async Task<IReadOnlyList<MachineSummaryShape>> SummariesAsync(
+        IReadOnlyList<Machine> rows, ActivityWindow? window, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(rows);
 
         var latest = await reports.LatestManyAsync(rows.Select(row => row.Id), cancellationToken);
 
-        return
-        [
-            .. rows.Select(row => Summary(row, latest.GetValueOrDefault(row.Id))),
-        ];
+        if (window is null)
+        {
+            return [.. rows.Select(row => Summary(row, latest.GetValueOrDefault(row.Id)))];
+        }
+
+        var activity = await history.ActivityAsync(clock.GetUtcNow() - window.Span, cancellationToken);
+        var running = await installations.ActiveCountsAsync(rows.Select(row => row.Id), cancellationToken);
+
+        var shapes = new List<MachineSummaryShape>(rows.Count);
+
+        foreach (var row in rows)
+        {
+            var report = latest.GetValueOrDefault(row.Id);
+            var happened = activity.GetValueOrDefault(row.Key);
+            var findings = report is null
+                ? 0
+                : (await drift.BetweenAsync(row, report, cancellationToken)).Count;
+
+            shapes.Add(Summary(row, report, new MachineActivityShape(
+                window.Spelled,
+                happened?.Changes ?? 0,
+                happened?.Deployments ?? 0,
+                happened?.Latest is { } line
+                    ? new DeploymentLineShape(line.Installation, line.Number, line.Version, line.Previous, line.At)
+                    : null,
+                running.GetValueOrDefault(row.Id),
+                findings)));
+        }
+
+        return shapes;
     }
 
     public async Task<MachineShape> CompleteAsync(Machine machine, CancellationToken cancellationToken)
@@ -263,13 +386,14 @@ public static class MachineLookup
 public sealed class ListMachines(IMachines machines, MachineAssembler assembler)
 {
     public async Task<IReadOnlyList<MachineSummaryShape>> ExecuteAsync(
-        string? status, string? kind, bool retired, CancellationToken cancellationToken) =>
+        string? status, string? kind, bool retired, string? activity, CancellationToken cancellationToken) =>
         await assembler.SummariesAsync(
             await machines.ListAsync(
                 Validated.Field("status", () => Spelling.Read<Status>(status, "status")),
                 Validated.Field("kind", () => Spelling.Read<MachineKind>(kind, "kind")),
                 retired,
                 cancellationToken),
+            ActivityWindow.Read(activity),
             cancellationToken);
 }
 

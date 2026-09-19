@@ -289,7 +289,7 @@ collected in time is expired rather than approved.
 
 | | |
 |---|---|
-| `GET /api/machines` | every machine as a slim `MachineSummary`, by key; `status` and `kind` filter |
+| `GET /api/machines` | every machine as a slim `MachineSummary`, by key; `status`, `kind` and `activity` |
 | `POST /api/machines` | `key` and `kind` are required, everything else may arrive later |
 | `GET /api/machines/{key}` | the complete machine |
 | `PATCH /api/machines/{key}` | any field but the key; `If-Match` guards it |
@@ -299,6 +299,33 @@ collected in time is expired rather than approved.
 | `GET /api/machines/{key}/token` | whether it has a machine token, and what became of the last one |
 | `POST /api/machines/{key}/token` | issue one; `rotate=true` replaces an existing one |
 | `DELETE /api/machines/{key}/token` | revoke it |
+
+**`activity` says what has been going on, per row.** It is a window — a count
+of hours or days, `24h`, `7d`, at most `90d` — and every summary then carries an
+`activity` beside its fields:
+
+```json
+{"window": "7d", "changes": 4, "deployments": 1,
+ "latest": {"installation": "logaffe-prod", "number": 7, "version": "0.5.0",
+            "previous": "0.4.1", "at": "2026-09-18T19:12:04.118231Z"},
+ "installations": 7, "drift": 2}
+```
+
+`changes` and `deployments` are the events of The history below, counted over
+the same reading a screen would show — what hangs on that machine, not what
+names it — so a count and the list beside it can never disagree. `latest` is the
+newest deployment on the machine **whenever it was**: a window that hid it would
+answer "nothing" where the truth is "nothing for six months", which is the more
+useful sentence. `installations` counts the active ones, and `drift` is how many
+findings the machine's latest report makes against the record (Drift, below); a
+machine that has never reported has none.
+
+**It is asked for and never served by default.** Every number in it costs
+something the plain list does not pay, the drift most of all: it reads the
+latest report of every machine against that machine's installations. Fifty
+machines with an installation, a deployment and a report each answer in about a
+quarter of a second, which is what a screen of tiles can pay and a list somebody
+opens to find a key should not.
 
 The key is the address and is **immutable**: `key` in a change body is
 `unknown-field`, not a rename. Both request objects are closed — a field they

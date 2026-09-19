@@ -34,7 +34,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
     /// backwards and backwards is where the cursor still reads.
     /// </para>
     /// </remarks>
-    private const string Statement = """
+    private const string Events = """
         with changes as (
             select h.at                                      as at,
                    'history'                                 as source,
@@ -48,6 +48,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
                        order by h.id)                        as changes
             from history h
             where (@before_at is null or h.at <= @before_at)
+              and (@since is null or h.at >= @since)
               -- The birth of a deployment is the deployment, which is read
               -- from its own table two branches down. The row the recording
               -- wrote beside it would be that same event a second time; every
@@ -72,13 +73,15 @@ public sealed class History(HostingaffeDbContext context) : IHistory
             from deployment d
             where d.deleted_at is null
               and (@before_at is null or d.at <= @before_at)
+              and (@since is null or d.at >= @since)
         ),
         events as (
             select * from changes
             union all
             select * from deployments
-        )
-        select e.at, e.source, e.ident, e.kind, e.actor_id, e.note, e.changes::text,
+        ),
+        resolved as (
+        select e.at, e.source, e.ident, e.kind, e.actor_id, e.note, e.changes::text as changes,
                case e.kind
                    when 'machine'      then m.key
                    when 'software'     then s.key
@@ -113,13 +116,60 @@ public sealed class History(HostingaffeDbContext context) : IHistory
         left join deployment   d   on e.kind = 'deployment'   and d.id  = e.subject_id
         left join installation di  on di.id  = d.installation_id
         left join machine      dim on dim.id = di.machine_id
-        where (@kind is null or e.kind = @kind)
-          and (@machine is null
-               or coalesce(m.key, im.key, fm.key, fim.key, pm.key, pim.key, dim.key) = @machine)
+        )
+        """;
+
+    /// <summary>
+    /// The reading itself: the tail that narrows, orders and cuts. Everything
+    /// above it is the two sides resolved to what they are about.
+    /// </summary>
+    private const string Reading = Events + """
+        select at, source, ident, kind, actor_id, note, changes,
+               subject, number, machine, owner_kind, owner_key
+        from resolved
+        where (@kind is null or kind = @kind)
+          and (@machine is null or machine = @machine)
           and (@before_at is null
-               or (e.at, e.source, e.ident) < (@before_at, @before_source, @before_ident))
-        order by e.at desc, e.source desc, e.ident desc
+               or (at, source, ident) < (@before_at, @before_source, @before_ident))
+        order by at desc, source desc, ident desc
         limit @limit
+        """;
+
+    /// <summary>
+    /// The same events, counted per machine and per side: what a list of
+    /// machines says per row. A machine nothing happened on produces no row.
+    /// </summary>
+    private const string Counted = Events + """
+        select machine, source, count(*)
+        from resolved
+        where machine is not null
+        group by machine, source
+        """;
+
+    /// <summary>
+    /// The newest deployment of each machine, whenever it was: the one line a
+    /// tile carries. The window does not reach it — "nothing was deployed for
+    /// six months" is the answer, and an empty field would be a different one.
+    /// </summary>
+    private const string Newest = """
+        with ranked as (
+            select i.machine_id                              as machine_id,
+                   i.key                                     as installation,
+                   d.number                                  as number,
+                   d.version                                 as version,
+                   d.at                                      as at,
+                   lag(d.version) over (
+                       partition by d.installation_id order by d.at, d.number) as previous,
+                   row_number() over (
+                       partition by i.machine_id order by d.at desc, d.number desc) as rank
+            from deployment d
+            join installation i on i.id = d.installation_id
+            where d.deleted_at is null and i.deleted_at is null
+        )
+        select m.key, r.installation, r.number, r.version, r.previous, r.at
+        from ranked r
+        join machine m on m.id = r.machine_id
+        where r.rank = 1
         """;
 
     public void Add(HistoryEntry entry) => context.History.Add(entry);
@@ -147,7 +197,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
 
         try
         {
-            await using var command = new NpgsqlCommand(Statement, connection);
+            await using var command = new NpgsqlCommand(Reading, connection);
             if (context.Database.CurrentTransaction?.GetDbTransaction() is NpgsqlTransaction transaction)
             {
                 command.Transaction = transaction;
@@ -167,6 +217,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
             {
                 Value = before is { } moment ? moment.At : DBNull.Value,
             });
+            command.Parameters.Add(new NpgsqlParameter("since", NpgsqlDbType.TimestampTz) { Value = DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("before_source", NpgsqlDbType.Text)
             {
                 Value = before is { } side ? side.Source : DBNull.Value,
@@ -205,6 +256,93 @@ public sealed class History(HostingaffeDbContext context) : IHistory
             {
                 await connection.CloseAsync();
             }
+        }
+    }
+
+    public async Task<IReadOnlyDictionary<string, MachineActivity>> ActivityAsync(
+        DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+        var opened = connection.State != System.Data.ConnectionState.Open;
+        if (opened)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            var changes = new Dictionary<string, int>(StringComparer.Ordinal);
+            var deployments = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            await using (var counted = new NpgsqlCommand(Counted, connection))
+            {
+                Join(counted);
+                counted.Parameters.Add(new NpgsqlParameter("before_at", NpgsqlDbType.TimestampTz) { Value = DBNull.Value });
+                counted.Parameters.Add(new NpgsqlParameter("since", NpgsqlDbType.TimestampTz) { Value = since });
+
+                await using var reader = await counted.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    var machine = reader.GetString(0);
+                    var side = reader.GetString(1);
+                    var many = (int)reader.GetInt64(2);
+
+                    if (side == "deployment")
+                    {
+                        deployments[machine] = many;
+                    }
+                    else
+                    {
+                        changes[machine] = many;
+                    }
+                }
+            }
+
+            var newest = new Dictionary<string, DeploymentLine>(StringComparer.Ordinal);
+
+            await using (var latest = new NpgsqlCommand(Newest, connection))
+            {
+                Join(latest);
+
+                await using var reader = await latest.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    newest[reader.GetString(0)] = new DeploymentLine(
+                        reader.GetString(1),
+                        reader.GetInt32(2),
+                        reader.GetString(3),
+                        reader.IsDBNull(4) ? null : reader.GetString(4),
+                        reader.GetFieldValue<DateTimeOffset>(5));
+                }
+            }
+
+            return changes.Keys
+                .Concat(deployments.Keys)
+                .Concat(newest.Keys)
+                .Distinct(StringComparer.Ordinal)
+                .ToDictionary(
+                    machine => machine,
+                    machine => new MachineActivity(
+                        changes.GetValueOrDefault(machine),
+                        deployments.GetValueOrDefault(machine),
+                        newest.GetValueOrDefault(machine)),
+                    StringComparer.Ordinal);
+        }
+        finally
+        {
+            if (opened)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    /// <summary>A statement runs inside the transaction there is one, like every other read here.</summary>
+    private void Join(NpgsqlCommand command)
+    {
+        if (context.Database.CurrentTransaction?.GetDbTransaction() is NpgsqlTransaction transaction)
+        {
+            command.Transaction = transaction;
         }
     }
 

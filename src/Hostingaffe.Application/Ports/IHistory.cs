@@ -52,6 +52,20 @@ public sealed record HistoryEvent(
     IReadOnlyList<FieldChange> Changes,
     string? Note);
 
+/// <summary>
+/// What happened on one machine inside a window, counted rather than listed —
+/// what a list of machines shows per row, where the reading shows the events
+/// themselves.
+/// </summary>
+/// <param name="Changes">Acts on the machine and on what hangs on it, in the window.</param>
+/// <param name="Deployments">Deployments of its installations, in the window.</param>
+/// <param name="Latest">The newest deployment of any of them, whenever it was, and nothing where there is none.</param>
+public sealed record MachineActivity(int Changes, int Deployments, DeploymentLine? Latest);
+
+/// <summary>The version an installation went to, and the one before it.</summary>
+public sealed record DeploymentLine(
+    string Installation, int Number, string Version, string? Previous, DateTimeOffset At);
+
 /// <summary>The history rows: appended, never edited (<c>CONTEXT.md</c>).</summary>
 public interface IHistory
 {
@@ -74,4 +88,12 @@ public interface IHistory
         HistoryCursor? before,
         int limit,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The same reading, counted per machine over a window, with the newest
+    /// deployment of each — for a list that says what has been going on per
+    /// row rather than showing it. A machine nothing happened on is absent.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, MachineActivity>> ActivityAsync(
+        DateTimeOffset since, CancellationToken cancellationToken);
 }
