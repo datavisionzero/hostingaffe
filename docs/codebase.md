@@ -139,7 +139,9 @@ they share — a file list, the pages attached to something, the history, the
 guarded description — because those screens are the same screen several times
 over and a section that drifted on one of them would read like another product.
 `addresses.ts` is where every address of the record is spelled, so that a key
-is escaped the same way everywhere.
+is escaped the same way everywhere, and `changes.ts` is the one reading of a
+history value — a moment as a date, a birth that does not print its own subject
+back — so that the section and the reading cannot say the same line differently.
 
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —

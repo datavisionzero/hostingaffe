@@ -444,7 +444,7 @@ func newFileHistory(g *globals) *cobra.Command {
 			if g.json {
 				return render.JSON(cmd.OutOrStdout(), entries)
 			}
-			render.History(cmd.OutOrStdout(), *entries)
+			render.History(cmd.OutOrStdout(), *entries, args[0])
 			return nil
 		},
 	}

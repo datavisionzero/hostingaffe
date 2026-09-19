@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
@@ -271,11 +272,17 @@ func Secrets(secrets []api.Secret) string {
 // field, from what to what, and the note that came with the change. A row with
 // neither value — a text that records that it changed, and the acts named
 // `created`, `deleted` and `restored` — prints the field and stops there.
-func History(w io.Writer, entries []api.HistoryEntry) {
+//
+// `subject` is the address of the thing this is the history of, so that a birth
+// carrying that address as its new value prints `created` and nothing else: the
+// path would otherwise stand twice on one line, and there is nothing to read in
+// the repetition.
+func History(w io.Writer, entries []api.HistoryEntry, subject string) {
 	for _, e := range entries {
-		fmt.Fprintf(w, "%s  %-16s %-14s", e.At.Format("2006-01-02 15:04"), e.Actor.Name, e.Field)
-		if e.OldValue != nil || e.NewValue != nil {
-			fmt.Fprintf(w, " %s → %s", or(e.OldValue), or(e.NewValue))
+		old, now := values(e.Field, e.OldValue, e.NewValue, subject)
+		fmt.Fprintf(w, "%s  %-16s %-14s", e.At.Format(stamp), e.Actor.Name, e.Field)
+		if old != nil || now != nil {
+			fmt.Fprintf(w, " %s → %s", or(old), or(now))
 		}
 		if e.Note != nil {
 			fmt.Fprintf(w, "  (%s)", *e.Note)
@@ -300,7 +307,7 @@ func HistoryEvents(w io.Writer, events []api.HistoryEvent) {
 		}
 
 		fmt.Fprintf(w, "%s  %-16s %-13s %-30s %-14s %s",
-			e.At.Format("2006-01-02 15:04"), e.Actor.Name, e.SubjectKind, subject, or(e.Machine), changed(e.Changes))
+			e.At.Format(stamp), e.Actor.Name, e.SubjectKind, subject, or(e.Machine), changed(e.Changes, address(e.Subject)))
 		if e.Note != nil && *e.Note != "" {
 			fmt.Fprintf(w, "  (%s)", *e.Note)
 		}
@@ -311,16 +318,63 @@ func HistoryEvents(w io.Writer, events []api.HistoryEvent) {
 // changed is the fields of one act, in the order it wrote them. A field with
 // neither value — a text that records that it changed, and the acts named
 // `created`, `deleted` and `restored` — is the field and nothing else.
-func changed(changes []api.FieldChange) string {
+func changed(changes []api.FieldChange, subject string) string {
 	spelled := make([]string, 0, len(changes))
 	for _, c := range changes {
-		if c.OldValue == nil && c.NewValue == nil {
+		old, now := values(c.Field, c.OldValue, c.NewValue, subject)
+		if old == nil && now == nil {
 			spelled = append(spelled, c.Field)
 			continue
 		}
-		spelled = append(spelled, fmt.Sprintf("%s %s → %s", c.Field, or(c.OldValue), or(c.NewValue)))
+		spelled = append(spelled, fmt.Sprintf("%s %s → %s", c.Field, or(old), or(now)))
 	}
 	return strings.Join(spelled, ", ")
+}
+
+// The one spelling of a moment in the history, which is the one every line of
+// the reading already carries in its first column.
+const stamp = "2006-01-02 15:04"
+
+// An RFC 3339 moment and nothing looser. The instance writes every timestamp
+// this way (`docs/api.md`), so a value that matches is one — and a value that
+// does not is left exactly as it is. A date is not guessed out of a string that
+// merely starts with four digits.
+var rfc3339 = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$`)
+
+// values is the two sides of one change as a person reads them, and the one
+// place that rule lives: `ha`, the history of a detail screen and the reading at
+// `/history` are three views of the same line, and one of them saying it
+// differently would read like another product.
+//
+// Two rules, and nothing is guessed beyond them. A moment is written the way the
+// line's own timestamp is written, because a raw `2026-09-19T08:00:00.000000Z`
+// beside a column of dates is the one value on the screen nobody spelled. And a
+// birth whose new value is the subject's own address has no new value worth
+// printing: `file compose.override.yml created → compose.override.yml` says the
+// path twice.
+//
+// The stored row is untouched — this is the reading of it (`docs/storage.md`).
+func values(field string, old, now *string, subject string) (*string, *string) {
+	if field == "created" && subject != "" && now != nil && *now == subject {
+		now = nil
+	}
+	return written(old), written(now)
+}
+
+// written is one value as it is printed: a moment as a date, anything else as it
+// stands.
+func written(value *string) *string {
+	if value == nil || *value == "" || !rfc3339.MatchString(*value) {
+		return value
+	}
+
+	at, err := time.Parse(time.RFC3339, *value)
+	if err != nil {
+		return value
+	}
+
+	spelled := at.Format(stamp)
+	return &spelled
 }
 
 // A field and what it says, for the lines that print only what is filled in.
@@ -362,6 +416,15 @@ func body(w io.Writer, text string) {
 	if text != "" {
 		fmt.Fprintf(w, "\n%s\n", text)
 	}
+}
+
+// address is the subject as values reads it: the empty string where the purge
+// has taken it, which is a subject nothing repeats.
+func address(subject *string) string {
+	if subject == nil {
+		return ""
+	}
+	return *subject
 }
 
 // or prints nothing as a dash: a column with no value is not a column with a

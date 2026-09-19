@@ -98,6 +98,50 @@ describe("what has been going on (VISION 6.2)", () => {
     expect(screen.getByText("gone")).toBeInTheDocument();
   });
 
+  /**
+   * The birth of a file: the subject is the path, and a `created` carrying that
+   * same path as its new value says the word twice over.
+   */
+  it("does not print a birth's subject back at it", async () => {
+    feed([
+      anEvent({
+        subject_kind: "file",
+        subject: "compose.override.yml",
+        owner: { kind: "installation", key: "logaffe-prod" },
+        changes: [{ field: "created", old_value: null, new_value: "compose.override.yml" }],
+        cursor: "born",
+      }),
+    ]);
+
+    const line = await screen.findByRole("listitem");
+
+    expect(line).toHaveTextContent("created");
+    expect(line.textContent).not.toContain("→");
+    // Once, as the subject; the change adds nothing to it.
+    expect(line.textContent?.match(/compose\.override\.yml/g)).toHaveLength(1);
+  });
+
+  it("writes a moment the way every other date on the screen is written", async () => {
+    feed([
+      anEvent({
+        subject_kind: "machine",
+        subject: "ex44",
+        changes: [
+          { field: "os", old_value: "Debian 12", new_value: "Debian 13" },
+          { field: "measured_at", old_value: null, new_value: "2026-09-19T08:00:00.000000Z" },
+        ],
+        cursor: "measured",
+      }),
+    ]);
+
+    const line = await screen.findByRole("listitem");
+
+    expect(line).toHaveTextContent(new Date("2026-09-19T08:00:00.000000Z").toLocaleString());
+    expect(line.textContent).not.toContain("2026-09-19T08:00:00.000000Z");
+    // And a value that is no moment is untouched beside it.
+    expect(line).toHaveTextContent("Debian 13");
+  });
+
   it("walks on from the cursor of the last event it shows", async () => {
     const instance = feed(Array.from({ length: 50 }, (_, index) => anEvent({ cursor: `c${String(index)}` })));
 

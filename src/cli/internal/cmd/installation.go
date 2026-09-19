@@ -318,7 +318,7 @@ func newInstallationHistory(g *globals) *cobra.Command {
 			if g.json {
 				return render.JSON(cmd.OutOrStdout(), resp.JSON200)
 			}
-			render.History(cmd.OutOrStdout(), *resp.JSON200)
+			render.History(cmd.OutOrStdout(), *resp.JSON200, args[0])
 			return nil
 		},
 	}

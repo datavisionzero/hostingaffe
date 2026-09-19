@@ -164,7 +164,7 @@ export function InstallationView() {
         <Deployments asked={deployments.asked} />
         <Files owner={{ kind: "installation", key: installation.key }} />
         <Attached to={{ kind: "installation", key: installation.key }} />
-        <History asked={history.asked} everything={{ machine: installation.machine }} />
+        <History asked={history.asked} subject={installation.key} everything={{ machine: installation.machine }} />
         <About of={installation} />
       </div>
     </>

@@ -137,7 +137,7 @@ export function MachineView() {
 
         <Files owner={{ kind: "machine", key: machine.key }} />
         <Attached to={{ kind: "machine", key: machine.key }} />
-        <History asked={history.asked} everything={{ machine: machine.key }} />
+        <History asked={history.asked} subject={machine.key} everything={{ machine: machine.key }} />
         <ReportHistory machine={machine.key} />
         <ReportingToken machine={machine.key} />
 

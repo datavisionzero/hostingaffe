@@ -622,6 +622,17 @@ the version it went to:
 2026-09-18 08:00  maintainer       machine       ex44              ex44   status planned → active
 ```
 
+**The values are read, not repeated.** A birth whose new value is the address of
+the thing that was born prints `created` and stops there — `file
+compose.override.yml created → compose.override.yml` says the path twice and
+there is nothing in the repetition to read. A value that is a timestamp is
+written the way the line's own `when` is written, rather than as the raw
+`2026-09-19T08:00:00.000000Z` the column holds; a value that is not one is
+printed exactly as it stands, because nothing here is guessed. Both rules are the
+web application's too, and `ha <object> history KEY` keeps them as well. What is
+stored is untouched: this is the reading of it, and `--json` still hands over the
+row as the instance answered it.
+
 **`--machine` means what hangs on it**, not what names it: the machine's own
 changes, its installations', the deployments of those, the files of both and the
 pages attached to either. `--kind` keeps one kind of subject — `machine`,

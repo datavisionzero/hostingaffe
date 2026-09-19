@@ -12,6 +12,7 @@ import { Nothing, Section } from "@/shared/Detail";
 import { size } from "@/shared/size";
 import { day, moment } from "@/shared/when";
 import { filePath, historyPath, installationPath } from "./addresses";
+import { values } from "./changes";
 
 type Anchor = Schemas["Anchor"];
 type FileSummary = Schemas["FileSummary"];
@@ -188,8 +189,14 @@ export function Attached({ to }: { to: Anchor }) {
  * survives the deletion of its subject and the purge (VISION 7), which is why
  * it is a section of the screen and not a property of the object.
  */
-export function History({ asked, everything }: {
+export function History({ asked, subject, everything }: {
   asked: Asked<HistoryEntry[]>;
+  /**
+   * The address of the row this is the history of. A birth whose new value is
+   * that address says the same word twice, and this is what lets the section
+   * leave it out — the same rule the reading at `/history` keeps.
+   */
+  subject?: string;
   /**
    * Where the whole story is: this section is the fields of this one row, and
    * what happened around it — its installations, their deployments, the files
@@ -215,23 +222,27 @@ export function History({ asked, everything }: {
         <Nothing>Nothing has changed since this was written down.</Nothing>
       ) : (
         <ol className="grid gap-2 text-sm">
-          {[...entries].reverse().map((entry) => (
-            <li key={entry.id} className="grid gap-0.5 border-l-2 pl-3">
-              <span className="text-xs text-muted-foreground">
-                {moment(entry.at)} · {entry.actor.name}
-              </span>
-              <span className="min-w-0 break-words">
-                <span className="font-mono text-xs">{entry.field}</span>
-                {entry.old_value !== null && entry.old_value !== "" && (
-                  <> <span className="text-muted-foreground line-through">{entry.old_value}</span></>
+          {[...entries].reverse().map((entry) => {
+            const value = values(entry, subject);
+
+            return (
+              <li key={entry.id} className="grid gap-0.5 border-l-2 pl-3">
+                <span className="text-xs text-muted-foreground">
+                  {moment(entry.at)} · {entry.actor.name}
+                </span>
+                <span className="min-w-0 break-words">
+                  <span className="font-mono text-xs">{entry.field}</span>
+                  {value.old !== null && (
+                    <> <span className="text-muted-foreground line-through">{value.old}</span></>
+                  )}
+                  {value.new !== null && <> → {value.new}</>}
+                </span>
+                {entry.note !== null && entry.note !== "" && (
+                  <span className="text-xs text-muted-foreground italic">{entry.note}</span>
                 )}
-                {entry.new_value !== null && entry.new_value !== "" && <> → {entry.new_value}</>}
-              </span>
-              {entry.note !== null && entry.note !== "" && (
-                <span className="text-xs text-muted-foreground italic">{entry.note}</span>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
     </Asks>

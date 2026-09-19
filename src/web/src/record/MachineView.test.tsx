@@ -94,6 +94,32 @@ describe("a machine (VISION 6.2)", () => {
     ).toBeInTheDocument();
   });
 
+  /**
+   * The history section reads its values the way the reading at `/history` does:
+   * a moment is a date, and a birth does not print the machine's key back.
+   */
+  it("writes a moment in the history as a date, and says a birth once", async () => {
+    view({
+      "GET /api/machines/web-01/history": [
+        {
+          id: 1, actor: identity, at: "2026-09-02T10:00:00Z",
+          field: "created", old_value: null, new_value: "web-01", note: null,
+        },
+        {
+          id: 2, actor: identity, at: "2026-09-19T08:00:00Z",
+          field: "measured_at", old_value: null, new_value: "2026-09-19T08:00:00.000000Z", note: null,
+        },
+      ],
+    });
+
+    const created = await screen.findByText("created");
+    expect(created.parentElement?.textContent).toBe("created");
+
+    const measured = screen.getByText("measured_at");
+    expect(measured.parentElement).toHaveTextContent(new Date("2026-09-19T08:00:00.000000Z").toLocaleString());
+    expect(measured.parentElement?.textContent).not.toContain("2026-09-19T08:00:00.000000Z");
+  });
+
   // Every section stands on its own: the fields are the answer somebody came
   // for, and a history that failed must not take them with it.
   it("keeps the screen when one of its sections fails", async () => {

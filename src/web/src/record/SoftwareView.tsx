@@ -84,7 +84,7 @@ export function SoftwareView() {
         />
 
         <Installations of={{ software: software.key }} />
-        <History asked={history.asked} />
+        <History asked={history.asked} subject={software.key} />
         <About of={software} />
       </div>
     </>

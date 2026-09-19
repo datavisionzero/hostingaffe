@@ -9,6 +9,7 @@ import { word } from "@/shared/narrowing";
 import { dayName, time } from "@/shared/when";
 import { pagePath } from "@/shell/views";
 import { filePath, installationPath, machinePath, softwarePath } from "./addresses";
+import { values } from "./changes";
 
 type HistoryEvent = Schemas["HistoryEvent"];
 type MachineSummary = Schemas["MachineSummary"];
@@ -243,21 +244,27 @@ function address(event: HistoryEvent): string | undefined {
  *
  * A text records that it changed and not how (`docs/storage.md`), so a body
  * with no values says exactly that; a deployment's one change is its version,
- * and the version before it where there was one.
+ * and the version before it where there was one. The values are spelled by the
+ * one helper the section of a detail page uses too, so a birth does not print
+ * its own subject back and a moment is a date rather than a column's raw form.
  */
 function Changes({ event }: { event: HistoryEvent }) {
   return (
     <>
-      {event.changes.map((change, index) => (
-        <span key={`${change.field}:${String(index)}`}>
-          {index > 0 && <span className="text-muted-foreground">, </span>}
-          <span className="font-mono text-xs">{change.field}</span>
-          {change.old_value !== null && change.old_value !== "" && (
-            <> <span className="text-muted-foreground line-through">{change.old_value}</span></>
-          )}
-          {change.new_value !== null && change.new_value !== "" && <> → {change.new_value}</>}
-        </span>
-      ))}
+      {event.changes.map((change, index) => {
+        const value = values(change, event.subject);
+
+        return (
+          <span key={`${change.field}:${String(index)}`}>
+            {index > 0 && <span className="text-muted-foreground">, </span>}
+            <span className="font-mono text-xs">{change.field}</span>
+            {value.old !== null && (
+              <> <span className="text-muted-foreground line-through">{value.old}</span></>
+            )}
+            {value.new !== null && <> → {value.new}</>}
+          </span>
+        );
+      })}
     </>
   );
 }
