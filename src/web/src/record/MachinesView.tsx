@@ -5,6 +5,7 @@ import { useAsk } from "@/shared/ask";
 import { ago, day } from "@/shared/when";
 import { machinePath } from "./addresses";
 import { Filters, type Filter } from "@/shared/Filters";
+import { found, word } from "@/shared/narrowing";
 import { StatusBadge } from "./Parts";
 
 type MachineSummary = Schemas["MachineSummary"];
@@ -27,13 +28,16 @@ const filters: Filter[] = [
  */
 export function MachinesView() {
   const [params, setParams] = useSearchParams();
-  const status = params.get("status") ?? undefined;
-  const kind = params.get("kind") ?? undefined;
+  const status = word(params, "status");
+  const kind = word(params, "kind");
   const retired = params.get("retired") === "yes";
   // "Which machine has said nothing for longest" is one click, and it is done
   // here rather than by the endpoint: one team's machines are a screenful, and
   // an order is not a filter.
   const byLastSeen = params.get("quietest") === "yes";
+  // The word is not part of what the endpoint is asked either: a team's
+  // machines are a screenful, and this narrows the screenful.
+  const find = params.get("q") ?? "";
   const at = `${status ?? ""}|${kind ?? ""}|${retired}`;
 
   const { asked } = useAsk<MachineSummary[]>(at, (signal) =>
@@ -44,16 +48,21 @@ export function MachinesView() {
       signal,
     }));
 
-  const narrowed = status !== undefined || kind !== undefined || retired;
+  const rows = asked.at === "known"
+    ? ordered(asked.value, byLastSeen).filter((machine) => found(find, machine.key, machine.name))
+    : [];
+
+  const narrowed = find !== "" || status !== undefined || kind !== undefined || retired;
 
   return (
     <>
-      <PageHeader title="Machines" meta={asked.at === "known" ? `${asked.value.length}` : undefined} />
+      <PageHeader title="Machines" meta={asked.at === "known" ? `${rows.length}` : undefined} />
 
       <Filters
         filters={filters}
         params={params}
         setParams={setParams}
+        find={{ label: "Find", placeholder: "Part of a key or a name", value: find }}
         also={[
           { name: "retired", label: "Include retired", on: retired },
           { name: "quietest", label: "Quietest first", on: byLastSeen },
@@ -63,7 +72,7 @@ export function MachinesView() {
       {asked.at === "asking" && <p aria-busy className="p-4 text-sm text-muted-foreground">Loading…</p>}
       {asked.at === "failed" && <p className="p-4 text-sm text-destructive">{asked.why}</p>}
 
-      {asked.at === "known" && asked.value.length === 0 && (
+      {asked.at === "known" && rows.length === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
           <p className="font-medium">{narrowed ? "Nothing matches." : "No machines yet."}</p>
           {!narrowed && (
@@ -76,9 +85,9 @@ export function MachinesView() {
         </div>
       )}
 
-      {asked.at === "known" && asked.value.length > 0 && (
+      {asked.at === "known" && rows.length > 0 && (
         <ul className="divide-y">
-          {ordered(asked.value, byLastSeen).map((machine) => (
+          {rows.map((machine) => (
             <li key={machine.key}>
               <Link to={machinePath(machine.key)} className="flex min-h-10 items-center gap-3 px-4 py-1 hover:bg-accent">
                 <span className="w-48 shrink-0 truncate font-mono text-xs text-muted-foreground">{machine.key}</span>
