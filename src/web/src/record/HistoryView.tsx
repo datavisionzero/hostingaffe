@@ -146,7 +146,9 @@ function Feed({ machine, kind }: { machine?: string; kind?: string }) {
                 {day}
               </h2>
               <ul className="divide-y">
-                {ofThatDay.map((event) => <Event key={event.cursor} event={event} />)}
+                {ofThatDay.map((event) => (
+                  <Event key={event.cursor} event={event} ofOneMachine={machine !== undefined} />
+                ))}
               </ul>
             </section>
           ))}
@@ -168,10 +170,10 @@ function Feed({ machine, kind }: { machine?: string; kind?: string }) {
 }
 
 /** One event as a line: when, who, and what happened to what. */
-function Event({ event }: { event: HistoryEvent }) {
+function Event({ event, ofOneMachine }: { event: HistoryEvent; ofOneMachine: boolean }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-1.5 text-sm">
-      <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{time(event.at)}</span>
+      <span className="w-16 shrink-0 font-mono text-xs whitespace-nowrap text-muted-foreground">{time(event.at)}</span>
       <span className="w-28 shrink-0 truncate text-xs text-muted-foreground">{event.actor.name}</span>
 
       <span className="min-w-0 flex-1">
@@ -182,12 +184,14 @@ function Event({ event }: { event: HistoryEvent }) {
         )}
       </span>
 
-      {/* Which machine it happened on, where the reading is not already one
-          machine's. It is the last column for the same reason it is on the
-          machine list: it is what a reader scans down. */}
-      <span className="hidden w-32 shrink-0 truncate text-right font-mono text-xs text-muted-foreground sm:block">
-        {event.machine ?? ""}
-      </span>
+      {/* Which machine it happened on. A reading that is already one machine's
+          leaves the column out rather than printing the same key down the
+          whole screen. */}
+      {!ofOneMachine && (
+        <span className="hidden w-32 shrink-0 truncate text-right font-mono text-xs text-muted-foreground sm:block">
+          {event.machine ?? ""}
+        </span>
+      )}
     </li>
   );
 }

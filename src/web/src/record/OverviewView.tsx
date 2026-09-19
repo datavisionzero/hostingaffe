@@ -63,7 +63,7 @@ export function OverviewView() {
       )}
 
       {rows.length > 0 && (
-        <ul className="grid min-h-0 flex-1 gap-3 overflow-auto p-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid min-h-0 flex-1 content-start gap-3 overflow-auto p-4 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((machine) => <Tile key={machine.key} machine={machine} window={window} />)}
         </ul>
       )}
