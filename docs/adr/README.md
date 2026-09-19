@@ -47,6 +47,7 @@ material value to understanding the decision.
 - [0015 – A machine reports, and the record stays written](./0015-a-machine-reports-and-the-record-stays-written.md)
 - [0016 – A machine token posts one report and reads nothing](./0016-a-machine-token-posts-one-report-and-reads-nothing.md)
 - [0017 – A machine reports digests, and the instance compares](./0017-a-machine-reports-digests-and-the-instance-compares.md)
+- [0018 – The front page is a tile per machine, and it is not monitoring](./0018-the-front-page-is-a-tile-per-machine.md)
 
 ## Adopted from planaffe
 

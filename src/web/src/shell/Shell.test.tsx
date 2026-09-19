@@ -100,14 +100,16 @@ describe("the shell (ADR 0006)", () => {
   });
 
   // One instance holds one team's infrastructure (VISION 9), so `/` is the
-  // record and not a choice of where to stand — and the machines are the
-  // central list of it (VISION 6.2).
-  it("lands on the machines from /", async () => {
+  // record and not a choice of where to stand — and what stands there is the
+  // overview: the machines as tiles, and what lately happened on each
+  // (ADR 0018).
+  it("stands on the overview at /", async () => {
     shell("/");
 
     await waitFor(() =>
-      expect(screen.getByRole("navigation").querySelector('a[aria-current="page"]')).toHaveAttribute("href", "/machines"),
+      expect(screen.getByRole("navigation").querySelector('a[aria-current="page"]')).toHaveAttribute("href", "/"),
     );
+    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
   });
 
   it("offers what can be created from the palette", async () => {
