@@ -56,6 +56,62 @@ public sealed class DriftTests(PostgresFixture postgres)
         Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
     }
 
+    /// <summary>
+    /// The record keeps the short form every Compose file writes, and the
+    /// daemon reports the same image with Docker's <c>docker.io/</c> in front.
+    /// The two are one name, so the comparison happens — before, it silently
+    /// did not, and no drift looked exactly like no disagreement.
+    /// </summary>
+    [Fact]
+    public async Task A_short_image_name_and_the_one_the_report_carries_are_the_same_image()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "acme/widget", version: "2.26.3");
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Reports(machine, "docker.io/acme/widget:2.25.0", "running");
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("version", one.GetProperty("kind").GetString());
+        Assert.Equal("2.26.3", one.GetProperty("record").GetString());
+        Assert.Equal("2.25.0", one.GetProperty("reported").GetString());
+    }
+
+    /// <summary>And an image of the library, where <c>library/</c> is the part nobody writes.</summary>
+    [Fact]
+    public async Task An_image_of_the_library_is_matched_however_either_side_spells_it()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "caddy", version: "2.11.4");
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Reports(machine, "docker.io/library/caddy:2.10.0", "running");
+
+        var one = (await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray().Single();
+        Assert.Equal("version", one.GetProperty("kind").GetString());
+        Assert.Equal("2.11.4", one.GetProperty("record").GetString());
+        Assert.Equal("2.10.0", one.GetProperty("reported").GetString());
+    }
+
+    /// <summary>
+    /// Two different images stay two: the normalisation makes the same image
+    /// match itself, not everything match everything.
+    /// </summary>
+    [Fact]
+    public async Task A_container_of_another_registry_answers_to_no_docker_hub_installation()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await AHost(admin, image: "caddy", version: "2.11.4");
+        using var machine = instance.ClientWith(await instance.AddMachineTokenAsync("ex44"));
+        await Reports(machine, "ghcr.io/library/caddy:2.10.0", "running");
+
+        Assert.Empty((await Drift(admin, "/api/machines/ex44/reports/latest")).EnumerateArray());
+    }
+
     [Fact]
     public async Task An_installation_the_record_calls_active_whose_container_is_not_running()
     {

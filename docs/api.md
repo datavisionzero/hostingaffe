@@ -430,7 +430,10 @@ deployments.
 
 `image` is a container image name **without a tag** — `caddy`,
 `ghcr.io/datavisionzero/logaffe`. A `:tag` is `validation`, and so is a digest:
-what was deployed belongs to a deployment. `homepage` and `repository` are
+what was deployed belongs to a deployment. The short form a Compose file writes
+is the right one to keep: drift matches a container to an installation through
+Docker's own reading of the name, so `caddy` and `docker.io/library/caddy` are
+the same image. `homepage` and `repository` are
 absolute `http` or `https` addresses.
 
 Deleting is not here yet: a software with installations is not deleted at all,
@@ -909,7 +912,14 @@ deliberately not here.
 
 **Where the assignment is ambiguous, nothing is claimed.** A container is
 matched to an installation by the image name *without* its tag, which the
-software already carries, plus the machine it lies on. Two installations of the
+software already carries, plus the machine it lies on. The name is read the way
+Docker itself writes it, so the two sides match on the image rather than on the
+spelling: `caddy`, `library/caddy` and `docker.io/library/caddy` are one name,
+and so are `acme/widget` and `docker.io/acme/widget`. That matters because the
+Docker API is inconsistent about the prefix — it reports one container with
+`docker.io/` and the next without — while a record keeps the short form that
+stands in every Compose file. Another registry is left as it is:
+`ghcr.io/library/caddy` is not `caddy`. Two installations of the
 same software on one machine, or two containers out of one image, produce no
 drift at all: the report is shown and the reader compares the two rows. A wrong
 sentence is worse than none. So does a software whose `image` is empty, an

@@ -468,22 +468,25 @@ public sealed class DriftFinder(
         await Task.CompletedTask;
 
         // The assignment runs over the image name without its tag, which the
-        // software already carries. Nothing is guessed and nothing is stored:
+        // software already carries, and through Docker's own normalisation, so
+        // that the short form a Compose file writes and the long one a report
+        // carries are the same name. Nothing is guessed and nothing is stored:
         // the connection is made on read and is nowhere a column (ADR 0015).
         var byImage = new Dictionary<string, List<Installation>>(StringComparer.OrdinalIgnoreCase);
         foreach (var installation in rows)
         {
             if (images.TryGetValue(installation.SoftwareId, out var image))
             {
-                byImage.TryAdd(image.Trim(), []);
-                byImage[image.Trim()].Add(installation);
+                var name = Normalised(image);
+                byImage.TryAdd(name, []);
+                byImage[name].Add(installation);
             }
         }
 
         var containersByImage = new Dictionary<string, List<ContainerState>>(StringComparer.OrdinalIgnoreCase);
         foreach (var container in containers.Where(one => !string.IsNullOrWhiteSpace(one.Image)))
         {
-            var name = WithoutTag(container.Image!);
+            var name = Normalised(container.Image!);
             containersByImage.TryAdd(name, []);
             containersByImage[name].Add(container);
         }
@@ -588,6 +591,64 @@ public sealed class DriftFinder(
 
         var colon = name.LastIndexOf(':');
         return colon > name.LastIndexOf('/') ? name[..colon] : name;
+    }
+
+    /// <summary>
+    /// The image name the way Docker itself writes it, and without its tag:
+    /// what the record's side and the report's side are matched on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The Docker API is inconsistent about the registry: the same daemon
+    /// reports <c>docker.io/acme/widget:1.2.3</c> for one container and
+    /// <c>acme/gadget:1.2.3</c> for the next. A record keeps the short form,
+    /// because that is what stands in every Compose file and on every project's
+    /// page — and an exact comparison then quietly makes no comparison at all,
+    /// which looks on the screen exactly like "in order".
+    /// </para>
+    /// <para>
+    /// Docker's rules are short and are the ones applied here: where the first
+    /// segment does not look like a host — no dot, no colon, and not
+    /// <c>localhost</c> — the registry is <c>docker.io</c>; and a Docker Hub
+    /// name with no path of its own is under <c>library/</c>. So <c>nginx</c>,
+    /// <c>library/nginx</c> and <c>docker.io/library/nginx</c> are one name,
+    /// while <c>ghcr.io/datavisionzero/planaffe</c> is left as it stands.
+    /// </para>
+    /// <para>
+    /// A read function and nothing more: no schema, no column, and no stored
+    /// row is touched (ADR 0015).
+    /// </para>
+    /// </remarks>
+    public static string Normalised(string image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        var name = WithoutTag(image);
+        if (name.Length == 0)
+        {
+            return name;
+        }
+
+        var slash = name.IndexOf('/', StringComparison.Ordinal);
+        var first = slash < 0 ? string.Empty : name[..slash];
+
+        // What tells a registry from the first step of a path: it looks like a
+        // host, or it is `localhost`, which is the one host without a dot.
+        var registry = first.Length > 0
+            && (first.Contains('.', StringComparison.Ordinal)
+                || first.Contains(':', StringComparison.Ordinal)
+                || string.Equals(first, "localhost", StringComparison.OrdinalIgnoreCase));
+
+        if (!registry)
+        {
+            return slash < 0 ? $"docker.io/library/{name}" : $"docker.io/{name}";
+        }
+
+        var rest = name[(slash + 1)..];
+        return string.Equals(first, "docker.io", StringComparison.OrdinalIgnoreCase)
+            && !rest.Contains('/', StringComparison.Ordinal)
+            ? $"{first}/library/{rest}"
+            : name;
     }
 
     /// <summary>The tag of an image reference, or nothing where it carries none.</summary>
