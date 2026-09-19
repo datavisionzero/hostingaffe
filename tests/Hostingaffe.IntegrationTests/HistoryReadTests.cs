@@ -102,6 +102,16 @@ public sealed class HistoryReadTests(PostgresFixture postgres)
         var mine = await EventsAsync(admin, $"{Address}?machine=ex44");
 
         Assert.All(mine, one => Assert.Equal("ex44", Field(one, "machine")));
+
+        // A file and a page say what they hang on, the way a search hit does:
+        // a path is an address only under its owner.
+        var written = mine.Single(one => Field(one, "subject_kind") == "file");
+        Assert.Equal("installation", written.GetProperty("owner").GetProperty("kind").GetString());
+        Assert.Equal("logaffe-prod", written.GetProperty("owner").GetProperty("key").GetString());
+
+        var written_down = mine.Single(one => Field(one, "subject_kind") == "page");
+        Assert.Equal("machine", written_down.GetProperty("owner").GetProperty("kind").GetString());
+        Assert.Equal("ex44", written_down.GetProperty("owner").GetProperty("key").GetString());
         Assert.Equal(
             ["page", "file", "installation", "deployment", "machine"],
             mine.Select(one => Field(one, "subject_kind")));

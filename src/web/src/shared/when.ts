@@ -42,3 +42,15 @@ export function ago(value: string | null | undefined, now: Date = new Date()): s
 
   return relative.format(0, "minute");
 }
+
+/** The heading a day's worth of events stands under. */
+export function dayName(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+}
+
+/** The time of day alone, for a list that already says which day it is on. */
+export function time(value: string): string {
+  return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}

@@ -1059,7 +1059,7 @@ the whole record at once:
 {"at": "2026-09-18T19:12:04.118231Z",
  "actor": {"id": "…", "kind": "user", "name": "alex"},
  "subject_kind": "installation", "subject": "logaffe-prod", "number": null,
- "machine": "ex44",
+ "machine": "ex44", "owner": null,
  "changes": [{"field": "status", "old_value": "planned", "new_value": "active"},
              {"field": "backup", "old_value": "planned", "new_value": "active"}],
  "note": "the box is live", "cursor": "MjAyNi0wOS0xOFQxOToxMjowNC4x…"}
@@ -1081,6 +1081,10 @@ before it in the order every derived value uses, `new_value` its own. What the
 recording of a deployment wrote into the history beside it is left out here,
 because that is the same event a second time; a **correction** to a deployment
 is a change like any other and appears as one.
+
+**A file and a page carry their `owner`**, the way a search hit does: a path is
+an address only under the thing it belongs to, and a slug is read beside what it
+hangs on. Everything else has none.
 
 **`machine` is what hangs on a machine**, not what names it: the machine's own
 changes, its installations', the deployments of those, the files of both, and

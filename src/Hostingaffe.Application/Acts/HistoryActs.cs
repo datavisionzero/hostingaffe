@@ -22,6 +22,7 @@ public sealed record HistoryEventShape(
     string? Subject,
     int? Number,
     string? Machine,
+    AnchorShape? Owner,
     IReadOnlyList<FieldChangeShape> Changes,
     string? Note,
     string Cursor);
@@ -89,6 +90,7 @@ public sealed class ReadHistory(
                 one.Subject,
                 one.Number,
                 one.Machine,
+                one.Owner is { } owner ? new AnchorShape(owner.Kind, owner.Key) : null,
                 [.. one.Changes.Select(change => new FieldChangeShape(change.Field, change.OldValue, change.NewValue))],
                 one.Note,
                 Write(one.Cursor))),

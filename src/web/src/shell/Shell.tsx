@@ -8,6 +8,7 @@ import { PagesView } from "@/pages/PagesView";
 import { MachinesView } from "@/record/MachinesView";
 import { InstallationsView } from "@/record/InstallationsView";
 import { SoftwareListView } from "@/record/SoftwareListView";
+import { HistoryView } from "@/record/HistoryView";
 import { SettingsView } from "@/settings/SettingsView";
 import { AdminView } from "@/settings/AdminView";
 import { AccountMenu } from "./AccountMenu";
@@ -119,6 +120,7 @@ export function Shell() {
           <Route path="/installations" element={<InstallationsView />} />
           <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
           <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />
+          <Route path="/history" element={<HistoryView />} />
           <Route path="/pages" element={<PagesView />} />
           <Route path="/pages/new" element={<Suspense fallback={<Busy title="Loading the screen…" />}><NewPageView /></Suspense>} />
           <Route path="/pages/:slug" element={<Suspense fallback={<Busy title="Loading the screen…" />}><PageView /></Suspense>} />

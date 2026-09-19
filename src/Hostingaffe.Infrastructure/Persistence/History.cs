@@ -88,7 +88,15 @@ public sealed class History(HostingaffeDbContext context) : IHistory
                    when 'deployment'   then di.key
                end                                           as subject,
                case when e.kind = 'deployment' then d.number end as number,
-               coalesce(m.key, im.key, fm.key, fim.key, pm.key, pim.key, dim.key) as machine
+               coalesce(m.key, im.key, fm.key, fim.key, pm.key, pim.key, dim.key) as machine,
+               case when e.kind = 'file' and f.machine_id      is not null then 'machine'
+                    when e.kind = 'file' and f.installation_id is not null then 'installation'
+                    when e.kind = 'page' and p.machine_id      is not null then 'machine'
+                    when e.kind = 'page' and p.installation_id is not null then 'installation'
+               end                                           as owner_kind,
+               case when e.kind = 'file' then coalesce(fm.key, fi.key)
+                    when e.kind = 'page' then coalesce(pm.key, pi.key)
+               end                                           as owner_key
         from events e
         left join machine      m   on e.kind = 'machine'      and m.id  = e.subject_id
         left join software     s   on e.kind = 'software'     and s.id  = e.subject_id
@@ -183,6 +191,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
                     reader.IsDBNull(7) ? null : reader.GetString(7),
                     reader.IsDBNull(8) ? null : reader.GetInt32(8),
                     reader.IsDBNull(9) ? null : reader.GetString(9),
+                    Owner(reader),
                     reader.GetGuid(4),
                     Changes(reader.GetString(6)),
                     reader.IsDBNull(5) ? null : reader.GetString(5)));
@@ -198,6 +207,16 @@ public sealed class History(HostingaffeDbContext context) : IHistory
             }
         }
     }
+
+    /// <summary>
+    /// What a file belongs to or a page hangs on, where the event is about one
+    /// of those. The id is nothing here: a reading names an anchor by its kind
+    /// and its key, which is what an address is built from.
+    /// </summary>
+    private static Anchor? Owner(NpgsqlDataReader reader) =>
+        reader.IsDBNull(10) || reader.IsDBNull(11)
+            ? null
+            : new Anchor(Spelling.Read<AnchorKind>(reader.GetString(10), "owner")!.Value, Guid.Empty, reader.GetString(11));
 
     /// <summary>
     /// The fields of one act, as the statement aggregated them: in the order

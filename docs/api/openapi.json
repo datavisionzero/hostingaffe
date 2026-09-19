@@ -7568,6 +7568,7 @@
           "subject",
           "number",
           "machine",
+          "owner",
           "changes",
           "note",
           "cursor"
@@ -7601,6 +7602,16 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Anchor"
+              }
             ]
           },
           "changes": {

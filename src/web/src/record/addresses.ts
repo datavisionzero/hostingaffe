@@ -34,6 +34,22 @@ export function filePath(owner: Anchor, path: string): string {
   return `${under}/files/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+/**
+ * The reading of what happened, narrowed the way the screen narrows it.
+ *
+ * It is an address like any other of the record: a link to one machine's
+ * history is what a person sends somebody else, so the narrowing lives in the
+ * query and not in the screen.
+ */
+export function historyPath(narrowed?: { machine?: string; kind?: string }): string {
+  const query = new URLSearchParams();
+
+  if (narrowed?.machine !== undefined) query.set("machine", narrowed.machine);
+  if (narrowed?.kind !== undefined) query.set("kind", narrowed.kind);
+
+  return query.size === 0 ? "/history" : `/history?${query.toString()}`;
+}
+
 /** Where an anchor leads — what a file belongs to, what a page hangs on. */
 export function anchorPath(anchor: Anchor): string {
   return anchor.kind === "machine" ? machinePath(anchor.key) : installationPath(anchor.key);

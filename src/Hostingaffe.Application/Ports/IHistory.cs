@@ -1,3 +1,4 @@
+using Hostingaffe.Domain;
 using Hostingaffe.Domain.History;
 
 namespace Hostingaffe.Application.Ports;
@@ -38,6 +39,7 @@ public sealed record HistoryCursor(DateTimeOffset At, string Source, string Iden
 /// <param name="Subject">Its address — a key, a path, a slug, or the installation a deployment lives under. Nothing where the purge has taken the row.</param>
 /// <param name="Number">The deployment's number, and nothing on anything else.</param>
 /// <param name="Machine">The key of the machine it belongs to, or nothing where it belongs to none.</param>
+/// <param name="Owner">What a file belongs to or a page hangs on, and nothing for the rest.</param>
 public sealed record HistoryEvent(
     DateTimeOffset At,
     HistoryCursor Cursor,
@@ -45,6 +47,7 @@ public sealed record HistoryEvent(
     string? Subject,
     int? Number,
     string? Machine,
+    Anchor? Owner,
     Guid ActorId,
     IReadOnlyList<FieldChange> Changes,
     string? Note);

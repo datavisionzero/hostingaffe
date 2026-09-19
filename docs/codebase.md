@@ -129,8 +129,10 @@ src/api         the generated client and its wrapper
 
 `src/record` is the product's own screens (VISION 6.2): a list and a detail for
 each of the machines, the software and the installations, and one file screen
-serving both of the things a file can hang on. `Reports.tsx` is the machine
-screen's other half — what the machine says about itself, the series of it, and
+serving both of the things a file can hang on. `HistoryView.tsx` is the one
+screen that is about all of them at once — what has been going on, the whole
+record's history with the deployments among it, walked by the cursor the
+endpoint hands out. `Reports.tsx` is the machine screen's other half — what the machine says about itself, the series of it, and
 the token it reports under. `Parts.tsx` holds the sections
 they share — a file list, the pages attached to something, the history, the
 guarded description — because those screens are the same screen several times
@@ -140,7 +142,8 @@ is escaped the same way everywhere.
 
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/machines`, `/software`, `/installations`, `/pages`, `/settings`, `/admin` —
+`/machines`, `/software`, `/installations`, `/history`, `/pages`, `/settings`,
+`/admin` —
 because the API is out of the way under `/api`; in development Vite forwards
 that one prefix to the API and serves everything else itself. A detail screen
 arrives in a chunk of its own; the lists come with the frame.

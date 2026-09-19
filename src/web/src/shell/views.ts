@@ -1,4 +1,4 @@
-import { BoxIcon, FileTextIcon, PackageIcon, ServerIcon, type LucideIcon } from "lucide-react";
+import { BoxIcon, ClockIcon, FileTextIcon, PackageIcon, ServerIcon, type LucideIcon } from "lucide-react";
 
 /**
  * The views of the instance, as ADR 0006 lists them, in the order the
@@ -39,6 +39,14 @@ export const views: View[] = [
     icon: PackageIcon,
     group: "views",
     hint: "What the installations are installations of.",
+  },
+  {
+    id: "history",
+    label: "History",
+    path: "/history",
+    icon: ClockIcon,
+    group: "views",
+    hint: "What has been going on, newest first.",
   },
   {
     id: "pages",
