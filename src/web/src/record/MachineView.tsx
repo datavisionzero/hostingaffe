@@ -7,6 +7,7 @@ import { Failed, Fields, Section, Waiting } from "@/shared/Detail";
 import { ago, moment } from "@/shared/when";
 import { About, Attached, Description, Files, History, Installations, StatusBadge } from "./Parts";
 import { DriftList, LastReport, ReportHistory, ReportingToken } from "./Reports";
+import { ProviderAssignment } from "./ProviderAssignment";
 
 type Machine = Schemas["Machine"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -70,7 +71,6 @@ export function MachineView() {
                   {machine.host}
                 </Link>
               )],
-              ["Provider", machine.provider],
               ["Plan", machine.plan],
               ["Location", machine.location],
               ["Operating system", machine.os],
@@ -82,6 +82,8 @@ export function MachineView() {
             ]}
           />
         </Section>
+
+        <ProviderAssignment machine={machine} onWritten={again} />
 
         <Section title="Addresses">
           <Fields

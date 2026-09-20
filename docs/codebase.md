@@ -125,7 +125,7 @@ ADRs 0004, 0007, 0017). Its API layer is generated from the same
 
 ```
 src/shell       the frame: sidebar, palette, shortcuts, routing
-src/record      the machines, the software, the installations and the files
+src/record      the providers, machines, software, installations and files
 src/pages       the wiki
 src/session     sign-in, activation, recovery, and approving a `ha login`
 src/settings    personal settings and instance administration
@@ -135,7 +135,7 @@ src/api         the generated client and its wrapper
 ```
 
 `src/record` is the product's own screens (VISION 6.2): a list and a detail for
-each of the machines, the software and the installations, and one file screen
+each of the providers, machines, software and installations, and one file screen
 serving both of the things a file can hang on. `OverviewView.tsx` and
 `HistoryView.tsx` are the two that are about all of them at once: the front
 page, one tile per machine with what lately happened on it (ADR 0018), and the
@@ -152,7 +152,7 @@ back — so that the section and the reading cannot say the same line differentl
 
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/` for the overview, `/machines`, `/software`, `/installations`, `/history`,
+`/` for the overview, `/machines`, `/providers`, `/software`, `/installations`, `/history`,
 `/pages`, `/settings`, `/admin` —
 because the API is out of the way under `/api`; in development Vite forwards
 that one prefix to the API and serves everything else itself. A detail screen

@@ -8,6 +8,7 @@ import { PagesView } from "@/pages/PagesView";
 import { MachinesView } from "@/record/MachinesView";
 import { InstallationsView } from "@/record/InstallationsView";
 import { SoftwareListView } from "@/record/SoftwareListView";
+import { ProviderListView } from "@/record/ProviderListView";
 import { OverviewView } from "@/record/OverviewView";
 import { HistoryView } from "@/record/HistoryView";
 import { SettingsView } from "@/settings/SettingsView";
@@ -28,6 +29,8 @@ const NewPageView = lazy(() => import("@/pages/PageView").then((module) => ({ de
 // and stay with it.
 const MachineView = lazy(() => import("@/record/MachineView").then((module) => ({ default: module.MachineView })));
 const SoftwareView = lazy(() => import("@/record/SoftwareView").then((module) => ({ default: module.SoftwareView })));
+const ProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.ProviderView })));
+const NewProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.NewProviderView })));
 const InstallationView = lazy(() => import("@/record/InstallationView").then((module) => ({ default: module.InstallationView })));
 const FileView = lazy(() => import("@/record/FileView").then((module) => ({ default: module.FileView })));
 
@@ -118,6 +121,9 @@ export function Shell() {
           <Route path="/machines/:key/files/*" element={<Screen><FileView owner="machine" /></Screen>} />
           <Route path="/software" element={<SoftwareListView />} />
           <Route path="/software/:key" element={<Screen><SoftwareView /></Screen>} />
+          <Route path="/providers" element={<ProviderListView />} />
+          <Route path="/providers/new" element={<Screen><NewProviderView /></Screen>} />
+          <Route path="/providers/:key" element={<Screen><ProviderView /></Screen>} />
           <Route path="/installations" element={<InstallationsView />} />
           <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
           <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />

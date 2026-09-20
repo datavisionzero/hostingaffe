@@ -24,6 +24,7 @@ function shell(path: string) {
     "GET /api/pages": (request) =>
       new URL(request.url).searchParams.get("q") === "nothing" ? [] : [aPage("architecture", "The web shell")],
     "GET /api/machines": [],
+    "GET /api/providers": [],
     "GET /api/search": [
       {
         kind: "file", key: "logaffe.service", name: "", number: null,
@@ -60,6 +61,13 @@ describe("the shell (ADR 0006)", () => {
     for (const view of views) {
       expect(within(navigation).getByRole("link", { name: view.label })).toHaveAttribute("href", view.path);
     }
+  });
+
+  it("opens the provider route from navigation", async () => {
+    shell("/providers");
+    expect(await screen.findByRole("heading", { name: "Providers" })).toBeInTheDocument();
+    expect(await screen.findByText("No providers yet.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add provider" })).toHaveAttribute("href", "/providers/new");
   });
 
   // A heading over an empty list is a promise the application does not keep.
