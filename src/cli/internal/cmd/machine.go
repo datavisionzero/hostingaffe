@@ -133,7 +133,7 @@ func (m *machineFields) flags(cmd *cobra.Command) {
 	f.StringVar(&m.hostname, "hostname", "", "the name it answers to on the network")
 	f.StringVar(&m.kind, "kind", "", "vps, dedicated, vm or local")
 	f.StringVar(&m.host, "host", "", "the machine a `vm` runs on, by key; refused on every other kind")
-	f.StringVar(&m.provider, "provider", "", "who it is rented from")
+	f.StringVar(&m.provider, "provider", "", "a provider key on a non-VM; a VM inherits its host's provider")
 	f.StringVar(&m.plan, "plan", "", "what it is rented as")
 	f.StringVar(&m.location, "location", "", "where it stands")
 	f.StringVar(&m.os, "os", "", "the operating system it runs")

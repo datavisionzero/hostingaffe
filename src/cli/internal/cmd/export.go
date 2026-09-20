@@ -52,6 +52,7 @@ func newExport(g *globals) *cobra.Command {
 				return render.JSON(cmd.OutOrStdout(), map[string]any{
 					"dir":           dir,
 					"machines":      len(record.Machines),
+					"providers":     len(record.Providers),
 					"software":      len(record.Software),
 					"pages":         len(record.Pages),
 					"installations": record.installations(),
@@ -59,8 +60,8 @@ func newExport(g *globals) *cobra.Command {
 				})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(),
-				"%s: %d machines, %d installations, %d software, %d files, %d pages.\n",
-				dir, len(record.Machines), record.installations(), len(record.Software), record.files(), len(record.Pages))
+				"%s: %d machines, %d providers, %d installations, %d software, %d files, %d pages.\n",
+				dir, len(record.Machines), len(record.Providers), record.installations(), len(record.Software), record.files(), len(record.Pages))
 			return nil
 		},
 	}
@@ -74,9 +75,10 @@ func newExport(g *globals) *cobra.Command {
 // though an import reads past them: the export is what hands the record back,
 // and a reader of it is not only an import.
 type record struct {
-	Machines []machineRecord  `json:"machines"`
-	Software []softwareRecord `json:"software"`
-	Pages    []pageRecord     `json:"pages"`
+	Providers []providerRecord `json:"providers"`
+	Machines  []machineRecord  `json:"machines"`
+	Software  []softwareRecord `json:"software"`
+	Pages     []pageRecord     `json:"pages"`
 }
 
 type machineRecord struct {
@@ -95,6 +97,11 @@ type installationRecord struct {
 
 type softwareRecord struct {
 	api.Software
+	History []api.HistoryEntry `json:"history"`
+}
+
+type providerRecord struct {
+	api.Provider
 	History []api.HistoryEntry `json:"history"`
 }
 
@@ -153,7 +160,32 @@ func clearForExport(dir string) error {
 // gather reads the whole record, in the order the tree is written in and by key
 // throughout, so that two exports of the same record are the same bytes.
 func gather(ctx context.Context, c *client.Client) (*record, error) {
-	whole := &record{Machines: []machineRecord{}, Software: []softwareRecord{}, Pages: []pageRecord{}}
+	whole := &record{Machines: []machineRecord{}, Providers: []providerRecord{}, Software: []softwareRecord{}, Pages: []pageRecord{}}
+
+	providers, err := c.ListProvidersWithResponse(ctx)
+	if err != nil {
+		return nil, client.Transport(err)
+	}
+	if err := client.Check(providers.HTTPResponse, providers.Body); err != nil {
+		return nil, err
+	}
+	for _, summary := range sorted(*providers.JSON200, func(p api.ProviderSummary) string { return p.Key }) {
+		read, err := c.ReadProviderWithResponse(ctx, summary.Key)
+		if err != nil {
+			return nil, client.Transport(err)
+		}
+		if err := client.Check(read.HTTPResponse, read.Body); err != nil {
+			return nil, err
+		}
+		history, err := c.ReadProviderHistoryWithResponse(ctx, summary.Key)
+		if err != nil {
+			return nil, client.Transport(err)
+		}
+		if err := client.Check(history.HTTPResponse, history.Body); err != nil {
+			return nil, err
+		}
+		whole.Providers = append(whole.Providers, providerRecord{Provider: *read.JSON200, History: *history.JSON200})
+	}
 
 	retired := true
 	machines, err := c.ListMachinesWithResponse(ctx, &api.ListMachinesParams{Retired: &retired})

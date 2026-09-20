@@ -138,6 +138,7 @@ func Machine(w io.Writer, m api.Machine) {
 		maybe("arch", (*string)(m.Arch)),
 		maybe("host", m.Host))
 	line(w, maybe("provider", m.Provider), maybe("plan", m.Plan), maybe("location", m.Location))
+	line(w, maybe("legacy provider", m.LegacyProvider))
 	line(w, maybe("hostname", m.Hostname), maybe("ssh", m.Ssh))
 	line(w, maybe("ipv4", m.Ipv4), maybe("ipv6", m.Ipv6), maybe("private ip", m.PrivateIp))
 	// The machine's own ports and no installation's: SSH, a Wireguard endpoint.
@@ -189,6 +190,19 @@ func MachineSummaries(w io.Writer, items []api.MachineSummary) {
 		fmt.Fprintf(w, "%-16s %-9s %-8s %-12s %-12s %-6s %-15s %-8s %-10s %s\n",
 			m.Key, m.Kind, m.Status, or(m.Provider), or(m.Location), or((*string)(m.Arch)),
 			seen, restart, m.UpdatedAt.Format("2006-01-02"), m.Name)
+	}
+}
+
+// Provider prints a keyed hoster and its Markdown description.
+func Provider(w io.Writer, p api.Provider) {
+	fmt.Fprintf(w, "%s  %s\n", p.Key, p.Name)
+	touched(w, p.UpdatedAt, p.UpdatedBy, p.CreatedBy)
+	body(w, p.Description)
+}
+
+func ProviderSummaries(w io.Writer, items []api.ProviderSummary) {
+	for _, p := range items {
+		fmt.Fprintf(w, "%-24s %-10s %s\n", p.Key, p.UpdatedAt.Format("2006-01-02"), p.Name)
 	}
 }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Installations;
@@ -20,7 +21,8 @@ namespace Hostingaffe.Application.Acts;
 public sealed record ImportRequest(
     IReadOnlyList<ImportMachine>? Machines,
     IReadOnlyList<ImportSoftware>? Software,
-    IReadOnlyList<ImportPage>? Pages)
+    IReadOnlyList<ImportPage>? Pages,
+    IReadOnlyList<ImportProvider>? Providers = null)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -41,6 +43,7 @@ public sealed record ImportMachine(
     string? Kind,
     string? Host,
     string? Provider,
+    string? LegacyProvider,
     string? Plan,
     string? Location,
     string? Os,
@@ -122,6 +125,11 @@ public sealed record ImportSoftware(
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
+public sealed record ImportProvider(string? Key, string? Name, string? Description)
+{
+    [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
+}
+
 /// <param name="Path">
 /// Where the page came from in the source the document was made of —
 /// <c>docs/setup/README.md</c>. Read only to turn the relative <c>.md</c> links
@@ -147,6 +155,7 @@ public sealed record ImportPage(
 /// </param>
 public sealed record ImportedShape(
     int Machines,
+    int Providers,
     int Software,
     int Installations,
     int Deployments,
@@ -181,6 +190,8 @@ public sealed record ImportedShape(
 public sealed class ImportRecord(
     CreateMachine createMachine,
     ChangeMachine changeMachine,
+    IMachines machineRows,
+    CreateProvider createProvider,
     CreateSoftware createSoftware,
     CreateInstallation createInstallation,
     ChangeInstallation changeInstallation,
@@ -196,10 +207,11 @@ public sealed class ImportRecord(
         Imports.Closed("document", request.UnknownFields);
 
         var machines = request.Machines ?? [];
+        var providers = request.Providers ?? [];
         var software = request.Software ?? [];
         var pages = request.Pages ?? [];
 
-        if (machines.Count == 0 && software.Count == 0 && pages.Count == 0)
+        if (machines.Count == 0 && providers.Count == 0 && software.Count == 0 && pages.Count == 0)
         {
             throw Refusal.Validation("document", "There is nothing in this document to create.");
         }
@@ -209,6 +221,25 @@ public sealed class ImportRecord(
         return await transactions.RunAsync(async () =>
         {
             var made = new Counter();
+
+            // The absent top-level set marks an export from before providers
+            // existed. Its machine values were free text, not provider keys.
+            var legacyKeys = request.Providers is null
+                ? LegacyProviderKeys(machines)
+                : new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var one in providers)
+            {
+                Imports.Closed("provider", one.UnknownFields, "history");
+                await createProvider.ExecuteAsync(
+                    new CreateProviderRequest(one.Key, one.Name, one.Description), note, cancellationToken);
+                made.Providers++;
+            }
+            foreach (var (name, key) in legacyKeys)
+            {
+                await createProvider.ExecuteAsync(
+                    new CreateProviderRequest(key, name, ""), note, cancellationToken);
+                made.Providers++;
+            }
 
             foreach (var one in software)
             {
@@ -226,7 +257,17 @@ public sealed class ImportRecord(
             foreach (var one in machines)
             {
                 Imports.Closed("machine", one.UnknownFields, "history");
-                await createMachine.ExecuteAsync(Machine(one), note, cancellationToken);
+                var legacy = request.Providers is null ? one.Provider : one.LegacyProvider;
+                await createMachine.ExecuteAsync(
+                    Machine(one, request.Providers is null ? legacyKeys.GetValueOrDefault(one.Provider ?? "") : one.Provider),
+                    note, cancellationToken);
+                if (legacy is not null)
+                {
+                    var row = await machineRows.FindAnyAsync(one.Key ?? string.Empty, cancellationToken)
+                        ?? throw new InvalidOperationException("The imported machine is missing.");
+                    row.PreserveLegacyProvider(legacy);
+                    await machineRows.SaveAsync(cancellationToken);
+                }
                 made.Machines++;
             }
 
@@ -389,12 +430,12 @@ public sealed class ImportRecord(
             cancellationToken);
     }
 
-    private static CreateMachineRequest Machine(ImportMachine one) =>
+    private static CreateMachineRequest Machine(ImportMachine one, string? provider) =>
         new(one.Key, one.Name, one.Hostname,
             Validated.Field("kind", () => Spelling.Read<MachineKind>(one.Kind, "kind")),
             // The host is set in the second pass, once every machine is there.
             null,
-            one.Provider, one.Plan, one.Location, one.Os,
+            one.Kind == "vm" ? null : provider, one.Plan, one.Location, one.Os,
             Validated.Field("arch", () => Spelling.Read<Arch>(one.Arch, "arch")),
             one.Cpu, one.Memory, one.Disk, one.Ipv4, one.Ipv6, one.PrivateIp, one.Ssh, one.Ports,
             Validated.Field("status", () => Spelling.Read<Status>(one.Status, "status")),
@@ -420,6 +461,7 @@ public sealed class ImportRecord(
     private sealed class Counter
     {
         public int Machines;
+        public int Providers;
         public int Software;
         public int Installations;
         public int Deployments;
@@ -428,7 +470,28 @@ public sealed class ImportRecord(
         public int Links;
 
         public ImportedShape Counted() =>
-            new(Machines, Software, Installations, Deployments, Files, Pages, Links);
+            new(Machines, Providers, Software, Installations, Deployments, Files, Pages, Links);
+    }
+
+    private static Dictionary<string, string> LegacyProviderKeys(IReadOnlyList<ImportMachine> machines)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in machines.Select(m => m.Provider)
+                     .Where(value => !string.IsNullOrWhiteSpace(value))
+                     .Select(value => value!)
+                     .Distinct(StringComparer.Ordinal)
+                     .OrderBy(value => value, StringComparer.Ordinal))
+        {
+            var stem = Regex.Replace(value.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+            if (stem.Length == 0) stem = "provider";
+            stem = stem[..Math.Min(stem.Length, Key.MaxLength)].Trim('-');
+            var key = stem;
+            for (var suffix = 2; !used.Add(key); suffix++)
+                key = stem[..Math.Min(stem.Length, Key.MaxLength - suffix.ToString().Length - 1)].TrimEnd('-') + "-" + suffix;
+            result[value] = key;
+        }
+        return result;
     }
 }
 

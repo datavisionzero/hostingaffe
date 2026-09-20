@@ -26,6 +26,8 @@ const (
 "repository":"https://github.com/datavisionzero/logaffe","image":"ghcr.io/datavisionzero/logaffe",
 "description":"The log.",` + identities + `}`
 
+	providerJSON = `{"key":"hetzner","name":"Example Host","description":"A provider description.",` + identities + `}`
+
 	installationJSON = `{"key":"logaffe-prod","name":"Logaffe production","machine":"ex44","software":"logaffe",
 "environment":"production","role":"application","status":"active","urls":["https://logs.example.test"],
 "ports":[{"port":443,"protocol":"tcp","scope":"public"},{"port":5432,"protocol":"tcp","scope":"private"}],
@@ -50,6 +52,8 @@ func records() *fake {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/software"):
 			object = softwareJSON
+		case strings.HasPrefix(r.URL.Path, "/api/providers"):
+			object = providerJSON
 		case strings.HasPrefix(r.URL.Path, "/api/installations"):
 			object = installationJSON
 		}
@@ -102,6 +106,15 @@ func TestRecordVerbsReachTheRightAddresses(t *testing.T) {
 		{[]string{"software", "restore", "logaffe"}, "POST", "/api/software/logaffe/restore", "logaffe"},
 		{[]string{"software", "history", "logaffe"}, "GET", "/api/software/logaffe/history", "dist-upgrade"},
 
+		{[]string{"provider", "list"}, "GET", "/api/providers", "hetzner"},
+		{[]string{"provider", "view", "hetzner"}, "GET", "/api/providers/hetzner", "A provider description."},
+		{[]string{"provider", "add", "hetzner", "--name", "Example Host"}, "POST", "/api/providers", "hetzner"},
+		{[]string{"provider", "set", "hetzner", "--description", "Updated"}, "PATCH", "/api/providers/hetzner", "hetzner"},
+		{[]string{"provider", "delete", "hetzner"}, "DELETE", "/api/providers/hetzner", "ha provider restore hetzner"},
+		{[]string{"provider", "restore", "hetzner"}, "POST", "/api/providers/hetzner/restore", "hetzner"},
+		{[]string{"provider", "history", "hetzner"}, "GET", "/api/providers/hetzner/history", "dist-upgrade"},
+		{[]string{"provider", "machines", "hetzner"}, "GET", "/api/machines", "ex44"},
+
 		{[]string{"installation", "list"}, "GET", "/api/installations", "logaffe-prod"},
 		{[]string{"inst", "view", "logaffe-prod"}, "GET", "/api/installations/logaffe-prod", "Logaffe production"},
 		{[]string{"inst", "add", "logaffe-prod", "--machine", "ex44", "--software", "logaffe",
@@ -119,6 +132,12 @@ func TestRecordVerbsReachTheRightAddresses(t *testing.T) {
 		last := f.requests[len(f.requests)-1]
 		if last.Method != tc.method || last.URL.Path != tc.path {
 			t.Errorf("%v: %s %s", tc.args, last.Method, last.URL.Path)
+		}
+		if len(tc.args) >= 2 && tc.args[0] == "provider" && tc.args[1] == "machines" && last.URL.Query().Get("provider") != "hetzner" {
+			t.Errorf("%v: provider filter %q", tc.args, last.URL.RawQuery)
+		}
+		if len(tc.args) >= 2 && tc.args[0] == "provider" && tc.args[1] == "machines" && last.URL.Query().Get("retired") != "true" {
+			t.Errorf("%v: retired machines omitted: %q", tc.args, last.URL.RawQuery)
 		}
 		if strings.HasSuffix(last.URL.Path, "/purge") && last.URL.Query().Get("confirm") != "logaffe-prod" {
 			t.Errorf("%v: confirmation query %q", tc.args, last.URL.RawQuery)

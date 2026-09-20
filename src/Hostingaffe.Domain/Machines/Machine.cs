@@ -86,6 +86,14 @@ public sealed class Machine
     /// <summary>The exact free-text value from before ADR 0020, retained for inspection.</summary>
     public string? LegacyProvider { get; private set; }
 
+    /// <summary>Preserve source text from a pre-provider export without making it an assignment.</summary>
+    public void PreserveLegacyProvider(string? value)
+    {
+        if (value is { Length: > FactMaxLength })
+            throw new ArgumentException("A legacy provider value is too long.", nameof(value));
+        LegacyProvider = value;
+    }
+
     public string? Plan { get; private set; }
 
     public string? Location { get; private set; }

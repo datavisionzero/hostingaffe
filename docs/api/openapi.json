@@ -8620,6 +8620,7 @@
           "kind",
           "host",
           "provider",
+          "legacy_provider",
           "plan",
           "location",
           "os",
@@ -8671,6 +8672,12 @@
             ]
           },
           "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "legacy_provider": {
             "type": [
               "null",
               "string"
@@ -8843,6 +8850,34 @@
           }
         }
       },
+      "ImportProvider": {
+        "required": [
+          "key",
+          "name",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ImportRequest": {
         "required": [
           "machines",
@@ -8876,6 +8911,15 @@
             ],
             "items": {
               "$ref": "#/components/schemas/ImportPage"
+            }
+          },
+          "providers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportProvider"
             }
           }
         }
@@ -8932,6 +8976,7 @@
       "Imported": {
         "required": [
           "machines",
+          "providers",
           "software",
           "installations",
           "deployments",
@@ -8942,6 +8987,10 @@
         "type": "object",
         "properties": {
           "machines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "providers": {
             "type": "integer",
             "format": "int32"
           },

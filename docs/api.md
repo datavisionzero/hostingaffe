@@ -982,13 +982,14 @@ an evaluation has a monitoring tool for it
 | `POST /api/import` | a whole record from one document, in one transaction |
 
 Documenting a host is one act and not thirty calls. The body is the document
-`ha export` writes — machines with their installations, files and deployments,
+`ha export` writes — providers, machines with their installations, files and deployments,
 the software they are of, and pages — and everything in it is created in **one
 transaction**:
 
 ```json
-{"software": [{"key": "caddy", "image": "caddy"}],
- "machines": [{"key": "ex44", "kind": "dedicated",
+{"providers": [{"key": "example-host", "name": "Example Host", "description": "Support notes."}],
+ "software": [{"key": "caddy", "image": "caddy"}],
+ "machines": [{"key": "ex44", "kind": "dedicated", "provider": "example-host",
                "files": [{"path": "sites/app.caddy", "content": "…"}],
                "installations": [{"key": "app-1", "software": "caddy",
                                   "environment": "production", "role": "application",
@@ -1003,6 +1004,23 @@ rule they hold still holds — the keys, the closed sets, the refused paths, the
 history each of them writes — and an installation whose software neither exists
 nor arrives with it fails the whole thing, leaving nothing standing and no key
 spent.
+
+**Providers are created before machines.** Current exports always contain a
+`providers` array, even when empty. Each provider carries its description and
+history; import applies the description and starts new history with the caller.
+Machine `provider` values in current exports are keys. A VM's effective
+`provider` appears in an export but is inherited again on import, never
+assigned directly. Its read-only `legacy_provider` text, when present, is
+preserved exactly.
+
+An older export has no `providers` array and its machine `provider` values are
+free text. Import creates one provider for each distinct nonblank value in
+ordinal order, deriving a lowercase hyphenated key of at most 64 characters.
+Colliding keys receive numeric suffixes (`-2`, `-3`, …). The original text is
+kept in each machine's `legacy_provider` field. A VM inherits its host's
+provider; any old VM value that disagrees remains visible in `legacy_provider`.
+Provider creation, machine creation and everything nested under them share the
+same transaction, so a later refusal rolls all of them back.
 
 **What only the instance writes is read past.** The document is an export, so it
 carries `created_by`, `updated_by`, `created_at`, `updated_at`, the `history`, a
@@ -1019,7 +1037,7 @@ way a machine's `host` is, for the same reason. Within one transaction, so a
 dependency naming nothing at all still fails the whole thing.
 
 **So the circle carries the record and not the account of how it got there.**
-An export read back in is the machines, the software, the installations, the
+An export read back in is the providers, the machines, the software, the installations, the
 files at the content they are at, the deployments and the pages — beginning
 here, written by whoever ran the import, at the moment they ran it. The
 history of the source instance, the revisions its files went through, the
