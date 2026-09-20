@@ -1,4 +1,4 @@
-import { BoxIcon, Building2Icon, ClockIcon, FileTextIcon, LayoutGridIcon, PackageIcon, ServerIcon, type LucideIcon } from "lucide-react";
+import { BoxIcon, Building2Icon, ClockIcon, FileTextIcon, LayoutGridIcon, NetworkIcon, PackageIcon, ServerIcon, type LucideIcon } from "lucide-react";
 
 /**
  * The views of the instance, as ADR 0006 lists them, in the order the
@@ -39,6 +39,14 @@ export const views: View[] = [
     icon: Building2Icon,
     group: "views",
     hint: "Who hosts the team's machines.",
+  },
+  {
+    id: "hosting-map",
+    label: "Hosting map",
+    path: "/hosting-map",
+    icon: NetworkIcon,
+    group: "views",
+    hint: "Providers, their machines and the machines' recorded addresses.",
   },
   {
     id: "installations",

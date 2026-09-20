@@ -27,6 +27,10 @@ export function installationPath(key: string): string {
   return `/installations/${encodeURIComponent(key)}`;
 }
 
+export function installationsOnMachinePath(key: string): string {
+  return `/installations?machine=${encodeURIComponent(key)}`;
+}
+
 /**
  * A file's address, under its owner. The path is escaped segment by segment:
  * it is the author's own, it carries slashes that are part of it, and an

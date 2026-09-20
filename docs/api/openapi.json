@@ -359,6 +359,37 @@
         }
       }
     },
+    "/api/hosting-map": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Providers and live machines with effective provider keys and recorded IP addresses, in one response for the read-only hosting map.",
+        "operationId": "ReadHostingMap",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostingMap"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -8348,6 +8379,93 @@
           }
         },
         "additionalProperties": false
+      },
+      "HostingMap": {
+        "required": [
+          "providers",
+          "machines"
+        ],
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostingMapProvider"
+            }
+          },
+          "machines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostingMapMachine"
+            }
+          }
+        }
+      },
+      "HostingMapMachine": {
+        "required": [
+          "key",
+          "name",
+          "kind",
+          "status",
+          "provider",
+          "ipv4",
+          "ipv6",
+          "private_ip"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MachineKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv4": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ipv6": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "private_ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "HostingMapProvider": {
+        "required": [
+          "key",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
       },
       "IdentityKind": {
         "enum": [

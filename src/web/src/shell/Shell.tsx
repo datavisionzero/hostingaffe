@@ -31,6 +31,7 @@ const MachineView = lazy(() => import("@/record/MachineView").then((module) => (
 const SoftwareView = lazy(() => import("@/record/SoftwareView").then((module) => ({ default: module.SoftwareView })));
 const ProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.ProviderView })));
 const NewProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.NewProviderView })));
+const HostingMapView = lazy(() => import("@/record/HostingMapView").then((module) => ({ default: module.HostingMapView })));
 const InstallationView = lazy(() => import("@/record/InstallationView").then((module) => ({ default: module.InstallationView })));
 const FileView = lazy(() => import("@/record/FileView").then((module) => ({ default: module.FileView })));
 
@@ -124,6 +125,7 @@ export function Shell() {
           <Route path="/providers" element={<ProviderListView />} />
           <Route path="/providers/new" element={<Screen><NewProviderView /></Screen>} />
           <Route path="/providers/:key" element={<Screen><ProviderView /></Screen>} />
+          <Route path="/hosting-map" element={<Screen><HostingMapView /></Screen>} />
           <Route path="/installations" element={<InstallationsView />} />
           <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
           <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />

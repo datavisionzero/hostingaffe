@@ -150,9 +150,14 @@ is escaped the same way everywhere, and `changes.ts` is the one reading of a
 history value — a moment as a date, a birth that does not print its own subject
 back — so that the section and the reading cannot say the same line differently.
 
+`HostingMapView.tsx` reads provider and machine associations in one API call.
+`HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
+with Dagre and renders a read-only React Flow canvas. The grouped list remains
+usable if the diagram cannot load.
+
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/` for the overview, `/machines`, `/providers`, `/software`, `/installations`, `/history`,
+`/` for the overview, `/machines`, `/providers`, `/hosting-map`, `/software`, `/installations`, `/history`,
 `/pages`, `/settings`, `/admin` —
 because the API is out of the way under `/api`; in development Vite forwards
 that one prefix to the API and serves everything else itself. A detail screen

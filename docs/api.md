@@ -438,6 +438,17 @@ including VMs by inherited provider. A provider cannot be deleted while any
 machine still refers to it, even if that machine is deleted but restorable.
 An agent may read and write providers with the same authorization as machines.
 
+### Hosting map
+
+`GET /api/hosting-map` returns a `HostingMap` with providers (`key`, `name`)
+and every live machine (`key`, `name`, `kind`, `status`, effective `provider`,
+`ipv4`, `ipv6`, `private_ip`). Retired machines remain in it; deleted machines
+do not. A VM's provider comes from its host. This one authenticated read feeds
+the read-only `/hosting-map` diagram and its grouped list without a request per
+machine. It records only provider-to-machine relationships; addresses are
+machine fields. The same facts are readable with `ha provider list`,
+`ha machine list` and `ha machine view KEY`.
+
 ### Software
 
 | | |
