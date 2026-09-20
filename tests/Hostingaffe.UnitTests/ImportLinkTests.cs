@@ -121,6 +121,18 @@ public sealed class ImportLinkTests
         Assert.Equal(0, count);
     }
 
+    [Theory]
+    [InlineData("[app](installation:app)", true)]
+    [InlineData("[app](installation:app#backup)", true)]
+    [InlineData("[app][a]\n[a]: installation:app", true)]
+    [InlineData("[other](installation:app-other)", false)]
+    [InlineData("installation:app in prose", false)]
+    [InlineData("```md\n[app](installation:app)\n```", false)]
+    public void A_purge_checks_only_actual_links_to_that_installation(string body, bool expected)
+    {
+        Assert.Equal(expected, ImportLinks.PointsToInstallation(body, "app"));
+    }
+
     private static ImportPage Page(string slug, string? path) =>
         new(slug, slug, null, null, null, path);
 }

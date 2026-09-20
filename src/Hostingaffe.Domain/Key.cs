@@ -21,8 +21,8 @@ namespace Hostingaffe.Domain;
 /// nobody meant.
 /// </para>
 /// <para>
-/// That a key is never reused, not even after the purge, is a rule of deleting
-/// and lives with it.
+/// A deleted key remains reserved unless an installation is explicitly purged
+/// (ADR 0019). That rule lives with deleting, not with the key's shape.
 /// </para>
 /// </remarks>
 public static partial class Key

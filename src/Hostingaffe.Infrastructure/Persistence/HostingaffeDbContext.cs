@@ -74,8 +74,8 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
     public DbSet<HistoryEntry> History => Set<HistoryEntry>();
 
     /// <summary>
-    /// Every key ever given out, so that none is ever given out twice — not
-    /// even after the purge has taken the row that held it (VISION 7).
+    /// Reserved keys, including those whose entity the automatic sweep removed.
+    /// An explicit installation purge may release one (ADR 0019).
     /// </summary>
     public DbSet<AssignedKey> AssignedKeys => Set<AssignedKey>();
 

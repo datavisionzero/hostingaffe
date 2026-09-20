@@ -191,6 +191,7 @@ builder.Services.AddScoped<Cascade>();
 builder.Services.AddScoped<MoveMachine>();
 builder.Services.AddScoped<MoveSoftware>();
 builder.Services.AddScoped<MoveInstallation>();
+builder.Services.AddScoped<PurgeInstallation>();
 builder.Services.AddScoped<MoveFile>();
 builder.Services.AddScoped<MoveDeployment>();
 

@@ -193,7 +193,7 @@ user's own repository.
 |---|---|
 | `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context`, `token` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
-| `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `purge`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
 | `ha report` | `collect` and `send` on the host itself; `show` and `list` from anywhere |
@@ -477,8 +477,10 @@ cron line that uses it, are in `operations.md`.
 of a machine or an installation is `set KEY --status retired`, which keeps
 everything and only leaves the default list; `--retired` on `list` puts them
 back and `--status retired` asks for exactly them. `delete` is for mistakes, is
-undone by `restore` for the grace period, and a key it burns is never given out
-again.
+undone by `restore` for the grace period, and keeps the key reserved. For a
+deleted installation, `ha inst purge KEY --yes-delete KEY` permanently removes
+it and frees its key. Clear pages, dependencies and links that still name it
+first; a refusal lists them. Machine and software keys are never reused.
 
 ## Deployments
 

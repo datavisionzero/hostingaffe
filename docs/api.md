@@ -202,10 +202,10 @@ own the week before stays deleted.
 so that restoring a machine restores the whole picture; only the purge unhooks
 it, and the page becomes a page of the instance.
 
-**The history survives everything, the purge included**, and so does the key. A
-key is written into a register when it is given out and is never given out
-again — creating a machine under the key of one that was purged is `validation`,
-and the message says why.
+**The history survives everything, the purge included.** A key is written into
+a register when it is given out. Machine and software keys stay reserved; an
+installation key stays reserved unless its owner is explicitly purged after
+deletion ([ADR 0019](adr/0019-an-installation-key-can-be-released-explicitly.md)).
 
 ## Endpoints
 
@@ -449,6 +449,16 @@ and that refusal needs the installation.
 | `PATCH /api/installations/{key}` | any field but the key; `If-Match` guards it |
 | `GET /api/installations/{key}/history` | who changed what, oldest first |
 | `DELETE /api/installations/{key}`, `POST /api/installations/{key}/restore` | soft, with its files and deployments |
+| `POST /api/installations/{key}/purge?confirm={key}` | permanently remove a deleted installation and free its key |
+
+The explicit purge requires the key again in `confirm`. It refuses pages
+attached to the installation, dependencies on it, and Markdown links to
+`installation:KEY` in pages or other descriptions; the `transition` problem
+lists the references to clear. If its machine is deleted, restore the machine
+first. It removes the installation's files, revisions
+and deployments. If the automatic sweep already removed the row, the same act
+releases its still-reserved key. Old history remains; a purge event names the
+key, and the machine's history records it while the row is still available.
 
 The list filters by `machine`, `software`, `environment`, `role`, `status`,
 `backup`, `monitoring` and `logging`, each by one value. That is what makes the

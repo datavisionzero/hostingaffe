@@ -71,6 +71,9 @@ public interface IHistory
 {
     void Add(HistoryEntry entry);
 
+    /// <summary>Persist entries when the act has no other store to save with them.</summary>
+    Task SaveAsync(CancellationToken cancellationToken);
+
     /// <summary>Every entry about one subject, oldest first. Not paginated.</summary>
     Task<IReadOnlyList<HistoryEntry>> ListAsync(
         HistorySubject subject, Guid subjectId, CancellationToken cancellationToken);

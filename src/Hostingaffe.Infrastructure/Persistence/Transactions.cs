@@ -34,11 +34,10 @@ namespace Hostingaffe.Infrastructure.Persistence;
 /// from outrunning it.
 /// </para>
 /// <para>
-/// <strong>The history is never purged</strong>, and neither is the register of
-/// keys. That is what VISION 7 asks for: the history of a deleted machine still
-/// says that it existed and when it went, and the key it had is never given out
-/// again. A page is not purged with its anchor either — it loses the anchor and
-/// becomes a page of the instance.
+/// <strong>The history is never purged</strong>, and the automatic sweep leaves
+/// the register of keys alone. A separate installation purge can release its
+/// key (ADR 0019). A page is not purged with its anchor either — it loses the
+/// anchor and becomes a page of the instance.
 /// </para>
 /// </remarks>
 public sealed class Transactions(HostingaffeDbContext context, InstanceSettings settings) : ITransactions

@@ -4,8 +4,8 @@ namespace Hostingaffe.Application.Ports;
 
 /// <summary>
 /// The register of keys that have been given out (<c>docs/storage.md</c>,
-/// Assigned keys). It answers one question and holds one rule: a key is never
-/// reused, not even after the purge.
+/// Assigned keys). It answers whether a key is reserved. The explicit purge
+/// can release an installation key (ADR 0019).
 /// </summary>
 public interface IKeys
 {

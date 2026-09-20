@@ -9,16 +9,16 @@ public enum Keyed
 }
 
 /// <summary>
-/// That a key was given out, once, and that it is therefore spent forever
-/// (<c>CONTEXT.md</c>, Key). One row per kind and key, written when the thing
-/// is created and never touched again.
+/// That a key was given out and remains reserved (<c>CONTEXT.md</c>, Key).
+/// One row per kind and key, written when the thing is created. An explicit
+/// installation purge may remove that installation's row (ADR 0019).
 /// </summary>
 /// <remarks>
 /// <para>
 /// While a deleted row is in its grace period it holds its own key and this
 /// register says nothing new. After the purge the row is gone, and without
-/// something that remembers, the key would be free again — which VISION 7 rules
-/// out.
+/// something that remembers, the key would be free again. The explicit purge
+/// is the only act that can release an installation key.
 /// </para>
 /// <para>
 /// It is a register and not a second history and not a bin: two columns, one
