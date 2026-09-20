@@ -786,7 +786,9 @@ the safety net. Deleting a machine deletes its installations, files and
 deployments with it; deleting a software that still has installations is
 refused. The history is never deleted, not even with the thing it describes:
 the history of a deleted machine still says that it existed and when it was
-deleted. A deleted key is never reused. Identities are deactivated and
+deleted. A deleted key stays reserved unless an installation is explicitly
+purged after deletion ([ADR 0019](docs/adr/0019-an-installation-key-can-be-released-explicitly.md));
+machine and software keys are never reused. Identities are deactivated and
 revoked, never deleted.
 
 ## 8. What an Agent Does Here

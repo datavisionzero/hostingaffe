@@ -55,6 +55,8 @@ func records() *fake {
 		}
 
 		switch {
+		case strings.HasSuffix(r.URL.Path, "/purge"):
+			return 204, ""
 		case strings.HasSuffix(r.URL.Path, "/context"):
 			return 200, contextJSON
 		case r.Method == http.MethodDelete:
@@ -106,6 +108,7 @@ func TestRecordVerbsReachTheRightAddresses(t *testing.T) {
 			"--environment", "production", "--role", "application"}, "POST", "/api/installations", "logaffe-prod"},
 		{[]string{"inst", "set", "logaffe-prod", "--backup", "active"}, "PATCH", "/api/installations/logaffe-prod", "logaffe-prod"},
 		{[]string{"inst", "delete", "logaffe-prod"}, "DELETE", "/api/installations/logaffe-prod", "ha installation restore logaffe-prod"},
+		{[]string{"inst", "purge", "logaffe-prod", "--yes-delete", "logaffe-prod"}, "POST", "/api/installations/logaffe-prod/purge", "its key is free"},
 		{[]string{"inst", "restore", "logaffe-prod"}, "POST", "/api/installations/logaffe-prod/restore", "logaffe-prod"},
 		{[]string{"inst", "history", "logaffe-prod"}, "GET", "/api/installations/logaffe-prod/history", "dist-upgrade"},
 	} {
@@ -117,9 +120,23 @@ func TestRecordVerbsReachTheRightAddresses(t *testing.T) {
 		if last.Method != tc.method || last.URL.Path != tc.path {
 			t.Errorf("%v: %s %s", tc.args, last.Method, last.URL.Path)
 		}
+		if strings.HasSuffix(last.URL.Path, "/purge") && last.URL.Query().Get("confirm") != "logaffe-prod" {
+			t.Errorf("%v: confirmation query %q", tc.args, last.URL.RawQuery)
+		}
 		if !strings.Contains(out, tc.contains) {
 			t.Errorf("%v: stdout %q lacks %q", tc.args, out, tc.contains)
 		}
+	}
+}
+
+func TestInstallationPurgeRequiresTheKeyAgainBeforeCallingTheInstance(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, _, stderr := run(t, server, "inst", "purge", "logaffe-prod", "--yes-delete", "another")
+	if code != exit.Usage || !strings.Contains(stderr, "--yes-delete") || len(f.requests) != 0 {
+		t.Fatalf("code %d, stderr %q, requests %d", code, stderr, len(f.requests))
 	}
 }
 

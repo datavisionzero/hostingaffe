@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -21,7 +22,7 @@ func newInstallation(g *globals) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newInstallationList(g), newInstallationView(g), newInstallationAdd(g), newInstallationSet(g),
-		newInstallationDelete(g), newInstallationRestore(g), newInstallationHistory(g))
+		newInstallationDelete(g), newInstallationRestore(g), newInstallationPurge(g), newInstallationHistory(g))
 	return cmd
 }
 
@@ -296,6 +297,39 @@ func newInstallationRestore(g *globals) *cobra.Command {
 			return printInstallation(g, cmd, *resp.JSON200)
 		},
 	}
+	noteFlag(cmd, &note)
+	return cmd
+}
+
+func newInstallationPurge(g *globals) *cobra.Command {
+	var confirm, note string
+	cmd := &cobra.Command{
+		Use: "purge KEY --yes-delete KEY", Short: "Permanently remove a deleted installation and free its key.", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if confirm != args[0] {
+				return &config.UsageError{Message: "repeat the installation key exactly with --yes-delete KEY to confirm permanent removal."}
+			}
+			_, c, err := g.load()
+			if err != nil {
+				return err
+			}
+			resp, err := c.PurgeInstallationWithResponse(cmd.Context(), args[0], &api.PurgeInstallationParams{
+				Confirm: &confirm, Note: optional(note),
+			})
+			if err != nil {
+				return client.Transport(err)
+			}
+			if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+				return err
+			}
+			if g.json {
+				return render.JSON(cmd.OutOrStdout(), map[string]any{"key": args[0], "purged": true})
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "%s purged; its key is free.\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&confirm, "yes-delete", "", "repeat the key to confirm permanent removal")
 	noteFlag(cmd, &note)
 	return cmd
 }

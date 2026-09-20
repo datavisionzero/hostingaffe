@@ -44,7 +44,9 @@ software `caddy` may coexist, and usually will, because every command names the
 type before the key. Where a key stands alone — a Markdown link, a search
 result, a path in an export — it carries its type.
 
-A deleted key is never reused.
+A deleted key stays reserved. An installation key can be released by the
+separate, irreversible purge after deletion ([ADR 0019](docs/adr/0019-an-installation-key-can-be-released-explicitly.md));
+machine and software keys are never reused.
 
 ## Machine
 
@@ -443,9 +445,9 @@ what it hung on, so that restoring the machine restores the whole picture. Only
 the purge unhooks it, and it becomes a page of the instance.
 
 **The history survives everything, the purge included** — the history of a
-deleted machine still says that it existed and when it went. So does the key:
-it is written into a register when it is given out, and a key is never given out
-a second time, not even after the purge has taken the row that held it.
+deleted machine still says that it existed and when it went. A key is written
+into a register when given out. A normal delete and the automatic purge keep it
+reserved; only the explicit purge of a deleted installation releases its key.
 
 ## Words we do not use
 

@@ -174,6 +174,8 @@ public sealed class History(HostingaffeDbContext context) : IHistory
 
     public void Add(HistoryEntry entry) => context.History.Add(entry);
 
+    public Task SaveAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
+
     public async Task<IReadOnlyList<HistoryEntry>> ListAsync(
         HistorySubject subject, Guid subjectId, CancellationToken cancellationToken) =>
         await context.History

@@ -95,6 +95,17 @@ public static class InstallationEndpoints
             .Produces<InstallationShape>()
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        door.MapPost("/{key}/purge", async (string key, string? confirm, string? note, PurgeInstallation purge, CancellationToken cancellationToken) =>
+            {
+                await purge.ExecuteAsync(key, confirm, note, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("PurgeInstallation")
+            .WithSummary("Permanently remove a deleted installation, its files and deployments, and free its key. Repeat the key in `confirm`. Refuses while its machine is deleted or a page, dependency or Markdown link still points at it. The history remains; `note` accompanies the purge event.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         return endpoints;
     }
 }

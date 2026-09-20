@@ -593,13 +593,13 @@ internal static class InstallationWrites
         if (await installations.FindAnyAsync(key, cancellationToken) is not { } existing)
         {
             // The row is gone, which is not the same as the key being free: a
-            // key is never reused, and the register is what remembers after the
-            // purge has taken the row that held it (VISION 7).
+            // The register remembers after the automatic sweep has taken the
+            // row. Only an explicit purge releases this reservation (ADR 0019).
             if (await keys.AssignedAsync(Keyed.Installation, key, cancellationToken))
             {
                 throw Refusal.Validation(
                     "key",
-                    $"The installation {key} existed and was deleted for good; a key is never given out twice.");
+                    $"The installation {key} existed and was deleted for good; purge it explicitly to release its key.");
             }
 
             return;

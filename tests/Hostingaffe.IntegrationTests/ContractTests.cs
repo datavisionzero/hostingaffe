@@ -55,6 +55,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/installations/{key}/file-restore/{path}",
                 "/api/installations/{key}/file-revisions/{path}", "/api/installations/{key}/files",
                 "/api/installations/{key}/files/{path}", "/api/installations/{key}/history",
+                "/api/installations/{key}/purge",
                 "/api/installations/{key}/restore",
                 "/api/invitations/accept",
                 "/api/machines", "/api/machines/{key}", "/api/machines/{key}/context",

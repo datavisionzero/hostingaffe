@@ -25,6 +25,42 @@ namespace Hostingaffe.Application.Acts;
 /// </remarks>
 public static partial class ImportLinks
 {
+    /// <summary>Whether a Markdown body links this installation outside a code fence.</summary>
+    public static bool PointsToInstallation(string? body, string key)
+    {
+        if (string.IsNullOrEmpty(body) || !body.Contains("installation:" + key, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var fence = (string?)null;
+        foreach (var line in body.Split('\n'))
+        {
+            if (Fence().Match(line) is { Success: true } opened)
+            {
+                var said = opened.Groups["fence"].Value;
+                fence = fence is null ? said : fence[0] == said[0] && said.Length >= fence.Length ? null : fence;
+                continue;
+            }
+
+            if (fence is not null)
+            {
+                continue;
+            }
+
+            foreach (Match match in Inline().Matches(line).Cast<Match>().Concat(Definition().Matches(line).Cast<Match>()))
+            {
+                var target = match.Groups["target"].Value;
+                if (target == "installation:" + key || target.StartsWith("installation:" + key + "#", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// The target of an inline link — what stands between <c>](</c> and the
     /// closing parenthesis, before the optional title. A destination in angle

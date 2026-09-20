@@ -64,7 +64,7 @@ words are the glossary's, and a type named around a collision would be a word
 what it does — `CreatePage`, `CreateUser`, `AuthenticateToken` — plus the
 shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
-`IMachines`, `ISoftware`, `IInstallations`, `IFiles`, `IDeployments`, `IKeys`,
+`IMachines`, `ISoftware`, `IInstallations`, `IInstallationPurge`, `IFiles`, `IDeployments`, `IKeys`,
 `IPages`, `IIdentities`, `ITokens`, `IDeviceLogins`, `IHistory`,
 `ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
 from the environment.
@@ -72,7 +72,7 @@ from the environment.
 **Infrastructure** implements them. `Persistence/` is EF Core: the
 `HostingaffeDbContext`, one `IEntityTypeConfiguration` per table under
 `Configurations/`, one store per port beside it, `Transactions` with the
-opportunistic purge, and `Migrations/` — every schema change arrives
+opportunistic purge and the explicit installation purge, and `Migrations/` — every schema change arrives
 as another one on top, only ever forward (planaffe ADR 0011). `Email/` is
 the SMTP sender, `Identity/` the Argon2id password hasher.
 

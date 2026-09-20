@@ -38,6 +38,7 @@ public static class InfrastructureServices
         services.AddScoped<IMachines, Machines>();
         services.AddScoped<ISoftware, SoftwareRows>();
         services.AddScoped<IInstallations, Installations>();
+        services.AddScoped<IInstallationPurge, InstallationPurge>();
         services.AddScoped<IFiles, Files>();
         services.AddScoped<IDeployments, Deployments>();
         services.AddScoped<IReports, Reports>();

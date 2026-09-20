@@ -9,10 +9,8 @@ namespace Hostingaffe.Infrastructure.Persistence.Configurations;
 /// (<c>docs/storage.md</c>, Assigned keys).
 /// </summary>
 /// <remarks>
-/// Two columns and a primary key over both, which is what enforces the rule
-/// rather than leaving it to a query somebody can forget. Nothing points at
-/// these rows and they point at nothing: the purge does not touch them, and
-/// that is the whole of their job.
+/// Two columns and a primary key over both enforce the reservation. Nothing
+/// points at these rows; only the explicit installation purge releases one.
 /// </remarks>
 public sealed class AssignedKeyConfiguration : IEntityTypeConfiguration<AssignedKey>
 {

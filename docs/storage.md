@@ -230,7 +230,7 @@ create        index machine_host on machine (host_id);
 **The key is the address and never changes.** `machine_key` holds it unique
 across the instance — not per anything, because a machine has no parent
 (`CONTEXT.md`, Key) — and it covers deleted rows, so a key stays spent for the
-grace period. That a key is never reused *after* the purge is a rule of
+grace period. That a machine key is never reused *after* the purge is a rule of
 deleting and is not yet held here.
 
 **Hardware facts are text, `arch` excepted.** Machines are compared by eye and
@@ -769,8 +769,9 @@ reason — see Searching, below.
 
 ## Assigned keys
 
-That a key was given out, once, and that it is therefore spent forever
-(`CONTEXT.md`, Key).
+The reservation of a key given out (`CONTEXT.md`, Key). It normally lasts
+forever; an explicit installation purge removes just that installation's
+reservation ([ADR 0019](adr/0019-an-installation-key-can-be-released-explicitly.md)).
 
 ```sql
 create table assigned_key (
@@ -783,9 +784,10 @@ create table assigned_key (
 
 **Two columns, one question.** While a deleted row is in its grace period it
 holds its own key and this table says nothing new; after the purge the row is
-gone, and without something that remembers, the key would be free again — which
-VISION 7 rules out. The primary key over both columns is what *enforces* the
-rule rather than leaving it to a query somebody can forget.
+gone, and without something that remembers, the key would be free again. The
+primary key over both columns enforces the reservation until the explicit
+installation purge removes its row here. Machine and software reservations
+are never removed.
 
 It is not a bin and not a second history. The history was the other candidate —
 it survives the purge and names the key — but it is there to be read, no index
@@ -793,8 +795,8 @@ could hold a uniqueness rule over it, and the rule would have become a query
 somebody forgets. The migration that created this table filled it from the rows
 that were already there: the rule is not "from now on".
 
-Nothing points at these rows and they point at nothing. The purge does not touch
-them.
+Nothing points at these rows and they point at nothing. The automatic purge
+does not touch them.
 
 ## The history
 
@@ -1056,6 +1058,10 @@ are removed whole for every machine whose grace has passed, before the machine
 row itself is taken. A month of samples is a few thousand narrow rows, and
 leaving half of them behind would only hold the machine back for another write.
 
-**The history is not purged, and neither are the assigned keys.** That is what
-VISION 7 asks for twice over: the history of a deleted machine still says that
-it existed and when it went, and the key it had is never given out again.
+**The history is not purged, and neither are assigned keys by the automatic
+sweep.** The history of a deleted machine still says that it existed and when
+it went, and its key is never given out again. The separate, confirmed
+installation purge removes its row and reservation together, or releases a
+reservation whose row the sweep already removed. It keeps old history and
+writes a key-naming purge event; while the installation row exists, it also
+writes the purge in the machine's history.

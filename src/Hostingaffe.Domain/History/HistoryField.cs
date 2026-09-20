@@ -28,6 +28,12 @@ public static class HistoryField
     /// <summary>Brought back inside the grace period (ADR 0013).</summary>
     public const string Restored = "restored";
 
+    /// <summary>An explicit, irreversible removal; the key is the new value so the audit survives reuse.</summary>
+    public const string Purged = "purged";
+
+    /// <summary>A machine's record that one of its installations was explicitly purged.</summary>
+    public const string InstallationPurged = "installation_purged";
+
     /// <summary>
     /// A machine's token, issued or revoked: the prefix from and the prefix to,
     /// and never a secret. It is the one thing around reports that reaches the
