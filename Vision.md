@@ -132,6 +132,7 @@ permission matrix.
    rumour.
 6. **Text only.** Fields, Markdown, and UTF-8 text files. No binaries, no
    images, no uploads. A configuration that is not text does not belong here.
+   This limits what the record stores, not what the browser can draw from it.
 7. **Easy to host.** Postgres plus the app, two containers, one Compose file.
    No object storage, no queue, no search index beyond Postgres.
 8. **Safe on the open internet.** What this product holds is exactly what an
@@ -139,6 +140,11 @@ permission matrix.
    Every surface is authenticated, nothing is readable anonymously, and
    network-level protection is never the answer to a security question.
 9. **MIT licence.** Fully open source, no open-core split.
+10. **Visual where it helps.** The web interface may use interactive diagrams,
+   maps, charts and SVG views to make recorded relationships and changes easier
+   to understand. A visual is another way to read the same records, with paths
+   back to their details; it does not discover infrastructure or turn a report
+   into monitoring.
 
 ## 5. Non-Goals (Deliberate Boundaries)
 
@@ -173,7 +179,6 @@ permission matrix.
 - **No binary files, no images, no attachments.** Text only.
 - **No DNS management.** The template's Cloudflare script is not carried over;
   DNS stays with the provider and is documented in a page.
-- **No diagrams**, generated or drawn.
 - **No native mobile app.** The web application is responsive; that is all.
 
 ## 6. Product Components
@@ -296,9 +301,16 @@ already know it. Its screens:
   ([ADR 0018](docs/adr/0018-the-front-page-is-a-tile-per-machine.md)).
 - **Machines** as the central list: name, kind, provider, OS, addresses, number
   of installations, when last measured. Sorted and filtered from the URL.
+- **Hosting map** as a graphical view of providers, their machines and the
+  machines' recorded addresses, with paths into each machine's details.
 - **Machine** detail: the fields, the installations on it with their current
   version and ports, the machine-level files, the pages attached to it, the
   history.
+- **Installation map** as a graphical view of what is installed on one machine,
+  with paths into each installation's details. It can bring distinctive or
+  recently changed installations forward while keeping the full record within
+  reach. For web applications, their domains are visible on the installation
+  nodes, derived from the installation's recorded `urls`.
 - **Installation** detail: the fields, the current version and where it came
   from, the deployment history, the description rendered as Markdown, the
   files with their revisions, the pages.
@@ -321,10 +333,32 @@ already know it. Its screens:
   from the navigation. A person types the code `ha` printed and approves, and
   the machine at the other end collects a token of theirs (6.1).
 
-There is no diagram and no chart, and the overview is not a dashboard of
-metrics: every number on it comes out of the record, there is no time series
-behind any of them, and no threshold or colour says which of them is a problem
+Graphical views may be drawn from the record, including its existing
+relationships and deployment history. They do not create or edit relationships
+by moving shapes. The front-page overview remains the machine tiles of ADR
+0018: every number on it comes out of the record, there is no time series
+behind it, and no threshold or colour says which machine is a problem. Other
+views may use diagrams and charts without changing the non-goal of monitoring
 (5, ADR 0018).
+
+`/hosting-map` is the dedicated hosting view, reached from instance navigation.
+It draws provider-to-machine edges only. Unassigned machines have their own
+visible group. Machine nodes show the recorded `ipv4`, `ipv6` and `private_ip`
+fields and lead to machine details and the machine's installation map. Provider
+nodes lead to provider details. An ordinary grouped list beside the diagram
+keeps every record reachable, including at narrow widths or if the graphical
+view cannot render.
+
+`/machines/{key}/installations-map` is reached from a machine detail. It draws
+machine-to-installation edges only, never dependency or VM-host edges.
+Application installations appear directly; platform installations are in a
+collapsed group by default and expand on request. A full adjacent list always
+links to every installation. Installations with a deployment are ordered by
+the latest deployment time, newest first. Those without one follow and say
+"No deployment recorded". Every distinct domain from an installation's
+recorded `urls` appears on its node when that installation is a web
+application; no DNS lookup is implied. Both maps are read-only navigation:
+pan, zoom and focus change only the view, never the record.
 
 ### 6.3 HTTP API
 
@@ -344,17 +378,20 @@ Instance
 │   │   └── File       (what the installation runs with: Compose, Caddy fragment, script)
 │   └── Report         (what the machine said about itself, at a moment)
 ├── Software           (what an installation is an installation of)
+├── Provider           (who supplies a machine's external hosting)
 ├── Page               (Markdown, attached to a machine, an installation, or the instance)
 ├── History            (every change, written by the system)
 └── Identity           (user or agent)
 ```
 
-Three relationships are built in and no others: an installation is on a
-machine, a VM is on a host machine, and an installation depends on another
-installation. The third was held back until the MVP showed whether the first two
-carried the everyday questions; the first host with a shared reverse proxy showed
-that they do not, and it is a field
-([ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md)).
+Four relationships are built in and no others: an installation is on a
+machine, a VM is on a host machine, an installation depends on another
+installation, and a non-VM machine may be assigned to a provider. The model
+originally had only three relationships and no provider entity. The third was
+added for shared installations ([ADR 0014](docs/adr/0014-an-installation-depends-on-an-installation-and-the-reverse-is-derived.md));
+the fourth deliberately replaces free-text `machine.provider` so a hosting
+provider can have its own description and list of machines
+([ADR 0020](docs/adr/0020-a-provider-is-a-record-and-a-vm-inherits-it.md)).
 
 Every entity has a **key**: a short, lowercase, immutable handle the operator
 chooses — `caddy`, `ex44`, `docker-prod-01`, `logaffe-prod`. Keys are what
@@ -378,7 +415,8 @@ the office. It exists whether or not anything is installed on it.
 | `hostname` | text | what `hostnamectl` reports, optional; the key is a handle, this is the machine's own name |
 | `kind` | `vps` · `dedicated` · `vm` · `local` | closed set |
 | `host` | machine key | only for `vm`: the machine it runs on |
-| `provider` | text | `hetzner`, `netcup`, `home` — free text on purpose |
+| `provider` | provider key, optional | assigned on a non-VM machine; derived from the host on a VM |
+| `legacy_provider` | text, read-only, optional | the exact pre-migration `provider` value, retained for inspection |
 | `plan` | text | `EX44`, `CX22` |
 | `location` | text | `fsn1-dc14` |
 | `os` | text | `Ubuntu 26.04 LTS` |
@@ -415,6 +453,47 @@ silenced (16).
 
 **Deliberately left out:** rack, serial number, warranty, purchase date, owner,
 tags, monthly cost (17.), a free-form key/value bag.
+
+An unassigned machine, including a `local` one, has no provider. A local
+machine may be assigned one when an external provider actually supplies it;
+`home` is never invented as a provider. A VM has no independent assignment:
+its effective provider follows its host, through any VM host chain. Changing
+the host immediately changes that effective provider. The historical
+`legacy_provider` is visible on machine reads, in `ha` and in the web detail,
+including when it disagrees with the effective value. It is never an editable
+assignment and is not cleared by a later host change.
+
+### The Provider
+
+A provider is the named source of external hosting for machines. It is a
+record, not a DNS manager or an account integration.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `key` | handle | immutable, unique among providers, and reserved after deletion |
+| `name` | text | display name, defaults to the key |
+| `description` | Markdown | editable notes about the provider |
+
+Provider creation, edits, deletion and restoration carry the same timestamps,
+optimistic writes and history as other records. A provider with any machine
+assignment, including one on a deleted machine that can still be restored,
+cannot be deleted. Retiring or deleting a machine does not remove its
+assignment; restoring it recovers the same one. A VM's derived provider is
+never stored as an assignment. The provider's machine list includes VMs by
+their effective provider. Unassigned machines remain visible in lists and on
+the hosting map.
+
+The forward-only migration creates one provider per distinct nonblank legacy
+provider value. It keeps the exact original text on every machine in
+`legacy_provider`, even for an unassigned VM or a value that cannot become a
+valid key. Provider names retain the original text; keys are deterministic
+lowercase handles made from the value, with a stable digest suffix where
+normalization or truncation would collide. Distinct case or spelling remains
+distinct, and a blank or whitespace-only value becomes no assignment while
+its exact text remains readable. Non-VM machines receive the corresponding
+provider key. VMs inherit from their host, even if their old text disagrees;
+the conflicting value remains readable in `legacy_provider`. The migration
+does not modify machines' installations or their history.
 
 ### The Software
 
@@ -1018,7 +1097,7 @@ is what the host runs, verbatim, so that what is stored is what is true.
 - Import from an existing `hostaffe`-style repository as a feature: the
   agent does that with the bulk call and `files put`, and the first thing we
   do with the MVP is migrate our own repositories that way.
-- Cost, contracts, warranties; diagrams; attachments; page hierarchy; DNS.
+- Cost, contracts, warranties; attachments; page hierarchy; DNS.
 
 ## 15. Roadmap After the MVP
 

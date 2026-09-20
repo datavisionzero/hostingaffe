@@ -1,5 +1,9 @@
 # The Front Page Is a Tile per Machine, and It Is Not Monitoring
 
+[ADR 0020](0020-a-provider-is-a-record-and-a-vm-inherits-it.md) permits
+read-only navigation diagrams on separate routes. The no-graph rule here
+continues to apply to the front-page tiles and to monitoring.
+
 The instance's `/` is an overview: one tile per machine, carrying what has
 lately happened on it, and a click away from that machine's history. The
 sentence in [VISION 6.2](../../Vision.md#62-web-interface-for-humans) that said

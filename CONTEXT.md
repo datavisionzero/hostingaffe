@@ -23,14 +23,17 @@ Instance
 │   │   └── File       what the installation runs with
 │   └── Report         what the machine said about itself, at a moment
 ├── Software           what an installation is an installation of
+├── Provider           who supplies a machine's external hosting
 ├── Page               Markdown, on a machine, an installation or the instance
 ├── History            every change, written by the instance
 └── Identity           user or agent
 ```
 
-Three relationships are built in and no others: an installation is on a
-machine, a virtual machine is on a host machine, and an installation depends on
-another installation.
+Four relationships are built in and no others: an installation is on a
+machine, a virtual machine is on a host machine, an installation depends on
+another installation, and a non-VM machine may be assigned to a provider.
+The fourth replaces the former free-text `machine.provider` deliberately
+([ADR 0020](docs/adr/0020-a-provider-is-a-record-and-a-vm-inherits-it.md)).
 
 ## Key
 
@@ -46,7 +49,7 @@ result, a path in an export — it carries its type.
 
 A deleted key stays reserved. An installation key can be released by the
 separate, irreversible purge after deletion ([ADR 0019](docs/adr/0019-an-installation-key-can-be-released-explicitly.md));
-machine and software keys are never reused.
+machine, software and provider keys are never reused.
 
 ## Machine
 
@@ -66,6 +69,14 @@ and "2×512G NVMe ZFS mirror" is truer than a number. `measured_at` says when
 the facts were last verified — a machine nobody has looked at for a year says
 so.
 
+`provider` is an optional provider key on a non-VM machine. A `vm` has no
+assignment of its own: its effective provider is derived through its `host`
+chain. A host change therefore changes what the VM reports. `local` does not
+imply a provider, and an unassigned machine remains a valid record.
+`legacy_provider` is the exact pre-migration free-text value, read-only and
+visible even when it differs from a VM's inherited provider. It is preserved
+through later edits, deletion and restoration.
+
 `ports` is the machine's own: what it listens on and no installation of it
 answers to — SSH, a Wireguard endpoint, a provider's agent. It is the same field
 an installation has, in the same shape (see Port). **An empty list says nothing
@@ -78,6 +89,16 @@ machine's latest report. It stands beside `measured_at` and answers a different
 question — `measured_at` is when a person last checked the facts, `last_seen`
 is when the machine last spoke for itself. A machine that has never reported
 has none.
+
+## Provider
+
+The record of who supplies external hosting. Its immutable key identifies it;
+`name` is its display name and `description` is editable Markdown. It carries
+identity and change timestamps and history like a machine or software record.
+Its machine list includes directly assigned machines and VMs whose host chain
+leads to it. A provider used by any machine, including a deleted but restorable
+one, cannot be deleted. A provider may be restored; deletion does not make its
+key available again.
 
 ## Software
 
@@ -356,7 +377,7 @@ stored like any other text.
 
 ## History
 
-Every change to a machine, software, installation, file or page: who, when,
+Every change to a machine, provider, software, installation, file or page: who, when,
 which field, from which value to which, and the note that came with it. Written
 by the instance, never edited, never deleted — not even with the thing it
 describes.
@@ -425,6 +446,7 @@ What a deletion takes:
 | deleting a | takes | and |
 |---|---|---|
 | machine | its files, its installations (with theirs), the vms it hosts, its reports and its token | its pages stay |
+| provider | nothing | deletion is refused while any machine still refers to it |
 | installation | its files, its deployments | its pages stay |
 | software | nothing | it is **refused** while installations still hang on it, with a count |
 | file | its revisions | |
