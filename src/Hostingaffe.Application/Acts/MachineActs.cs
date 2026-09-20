@@ -107,6 +107,7 @@ public sealed record MachineShape(
     MachineKind Kind,
     string? Host,
     string? Provider,
+    string? LegacyProvider,
     string? Plan,
     string? Location,
     string? Os,
@@ -225,7 +226,8 @@ public sealed class MachineAssembler(
     DriftFinder drift,
     TimeProvider clock)
 {
-    public static MachineSummaryShape Summary(Machine machine, Report? latest, MachineActivityShape? activity = null)
+    public static MachineSummaryShape Summary(
+        Machine machine, Report? latest, string? provider, MachineActivityShape? activity = null)
     {
         ArgumentNullException.ThrowIfNull(machine);
 
@@ -234,7 +236,7 @@ public sealed class MachineAssembler(
             machine.Name,
             machine.Kind,
             machine.Status,
-            machine.Provider,
+            provider,
             machine.Location,
             machine.Arch,
             machine.MeasuredAt,
@@ -266,10 +268,11 @@ public sealed class MachineAssembler(
         ArgumentNullException.ThrowIfNull(rows);
 
         var latest = await reports.LatestManyAsync(rows.Select(row => row.Id), cancellationToken);
+        var providers = await machines.ProviderKeysAsync(rows.Select(row => row.Id), cancellationToken);
 
         if (window is null)
         {
-            return [.. rows.Select(row => Summary(row, latest.GetValueOrDefault(row.Id)))];
+            return [.. rows.Select(row => Summary(row, latest.GetValueOrDefault(row.Id), providers.GetValueOrDefault(row.Id)))];
         }
 
         var activity = await history.ActivityAsync(clock.GetUtcNow() - window.Span, cancellationToken);
@@ -285,7 +288,7 @@ public sealed class MachineAssembler(
                 ? 0
                 : (await drift.BetweenAsync(row, report, cancellationToken)).Count;
 
-            shapes.Add(Summary(row, report, new MachineActivityShape(
+            shapes.Add(Summary(row, report, providers.GetValueOrDefault(row.Id), new MachineActivityShape(
                 window.Spelled,
                 happened?.Changes ?? 0,
                 happened?.Deployments ?? 0,
@@ -308,6 +311,7 @@ public sealed class MachineAssembler(
             ? (await machines.KeysAsync([id], cancellationToken)).GetValueOrDefault(id)
             : null;
         var latest = await reports.LatestAsync(machine.Id, cancellationToken);
+        var providers = await machines.ProviderKeysAsync([machine.Id], cancellationToken);
 
         return new MachineShape(
             machine.Key,
@@ -315,7 +319,8 @@ public sealed class MachineAssembler(
             machine.Hostname,
             machine.Kind,
             host,
-            machine.Provider,
+            providers.GetValueOrDefault(machine.Id),
+            machine.LegacyProvider,
             machine.Plan,
             machine.Location,
             machine.Os,
@@ -433,6 +438,7 @@ public sealed class ReadMachineHistory(
 public sealed class CreateMachine(
     ICallerIdentity callerIdentity,
     IMachines machines,
+    IProviders providers,
     IKeys keys,
     IHistory history,
     ITransactions transactions,
@@ -455,6 +461,7 @@ public sealed class CreateMachine(
 
         var edit = await MachineWrites.EditAsync(
             machines,
+            providers,
             settings,
             kind,
             request.Host,
@@ -510,6 +517,7 @@ public sealed class CreateMachine(
 public sealed class ChangeMachine(
     ICallerIdentity callerIdentity,
     IMachines machines,
+    IProviders providers,
     IHistory history,
     ITransactions transactions,
     MachineAssembler assembler,
@@ -529,6 +537,7 @@ public sealed class ChangeMachine(
 
         var edit = await MachineWrites.EditAsync(
             machines,
+            providers,
             settings,
             changes.Kind ?? before.Kind,
             changes.Host,
@@ -642,6 +651,7 @@ internal static class MachineWrites
     /// </summary>
     public static async Task<MachineEdit> EditAsync(
         IMachines machines,
+        IProviders providers,
         InstanceSettings settings,
         MachineKind kind,
         string? host,
@@ -651,6 +661,21 @@ internal static class MachineWrites
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(edit);
+
+        if (!string.IsNullOrWhiteSpace(edit.Provider))
+        {
+            if (kind is MachineKind.Vm)
+            {
+                throw Refusal.Validation("provider", "A vm inherits its provider from its host.");
+            }
+
+            var providerKey = Validated.Field("provider", () => Key.Normalize(edit.Provider));
+            var provider = await providers.FindAnyAsync(providerKey, cancellationToken);
+            if (provider is null || provider.Deleted)
+            {
+                throw Refusal.Validation("provider", $"No live provider {providerKey}.");
+            }
+        }
 
         if (!hostGiven)
         {

@@ -36,6 +36,10 @@ public interface IMachines
     Task<IReadOnlyDictionary<Guid, string>> KeysAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken);
 
+    /// <summary>Effective provider keys, following VM host chains in one database read.</summary>
+    Task<IReadOnlyDictionary<Guid, string?>> ProviderKeysAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken);
+
     /// <summary>The row, tracked and locked for the rest of the transaction.</summary>
     Task<Machine?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken);
 

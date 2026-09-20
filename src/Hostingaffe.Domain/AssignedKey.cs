@@ -6,6 +6,7 @@ public enum Keyed
     Machine,
     Software,
     Installation,
+    Provider,
 }
 
 /// <summary>

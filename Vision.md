@@ -487,7 +487,7 @@ The forward-only migration creates one provider per distinct nonblank legacy
 provider value. It keeps the exact original text on every machine in
 `legacy_provider`, even for an unassigned VM or a value that cannot become a
 valid key. Provider names retain the original text; keys are deterministic
-lowercase handles made from the value, with a stable digest suffix where
+lowercase handles made from the value, with a numeric suffix where
 normalization or truncation would collide. Distinct case or spelling remains
 distinct, and a blank or whitespace-only value becomes no assignment while
 its exact text remains readable. Non-VM machines receive the corresponding

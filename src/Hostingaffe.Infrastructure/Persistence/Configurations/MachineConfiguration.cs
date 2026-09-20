@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Machines;
+using Hostingaffe.Domain.Providers;
 using NpgsqlTypes;
 
 namespace Hostingaffe.Infrastructure.Persistence.Configurations;
@@ -33,7 +34,7 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
     /// </summary>
     private const string Letters =
         "key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' "
-        + "|| coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' "
+        + "|| coalesce(provider, '') || ' ' || coalesce(legacy_provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' "
         + "|| coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' "
         + "|| coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' "
         + "|| coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description";
@@ -54,6 +55,7 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             // cannot see it without walking.
             table.HasCheckConstraint("ck_machine_host", "host_id is null and kind <> 'vm' or kind = 'vm'");
             table.HasCheckConstraint("ck_machine_not_its_own_host", "host_id is null or host_id <> id");
+            table.HasCheckConstraint("ck_machine_provider_vm", "kind <> 'vm' or provider is null");
         });
 
         builder.HasKey(m => m.Id).HasName("pk_machine");
@@ -84,7 +86,15 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             .OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(m => m.HostId).HasDatabaseName("machine_host");
 
-        builder.Property(m => m.Provider).HasColumnName("provider").HasMaxLength(Machine.FactMaxLength);
+        builder.Property(m => m.Provider).HasColumnName("provider").HasMaxLength(Key.MaxLength);
+        builder.HasOne<Provider>()
+            .WithMany()
+            .HasForeignKey(m => m.Provider)
+            .HasPrincipalKey(p => p.Key)
+            .HasConstraintName("fk_machine_provider")
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(m => m.Provider).HasDatabaseName("machine_provider");
+        builder.Property(m => m.LegacyProvider).HasColumnName("legacy_provider").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.Plan).HasColumnName("plan").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.Location).HasColumnName("location").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.Os).HasColumnName("os").HasMaxLength(Machine.FactMaxLength);

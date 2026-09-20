@@ -17,7 +17,7 @@ public sealed class AssignedKeyConfiguration : IEntityTypeConfiguration<Assigned
     public void Configure(EntityTypeBuilder<AssignedKey> builder)
     {
         builder.ToTable("assigned_key", table =>
-            table.HasCheckConstraint("ck_assigned_key_kind", "kind in ('machine', 'software', 'installation')"));
+            table.HasCheckConstraint("ck_assigned_key_kind", "kind in ('machine', 'software', 'installation', 'provider')"));
 
         builder.HasKey(a => new { a.Kind, a.Key }).HasName("pk_assigned_key");
 

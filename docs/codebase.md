@@ -50,6 +50,11 @@ history all use; `Link`, how a Markdown body names another thing of the record;
 `RefusalCode`, the one list of every way the product says no, which the CLI
 derives its exit code from.
 
+`Providers` holds keyed provider records; `Machines` keeps direct associations
+on non-VMs and reads the effective provider of VMs through their hosts. A
+forward-only migration retains the original free-text value as
+`legacy_provider` ([ADR 0020](adr/0020-a-provider-is-a-record-and-a-vm-inherits-it.md)).
+
 `Software` is at the root too, and for a different reason: the word is
 uncountable, so there is no plural to name a folder with, and a namespace
 `Software` beside a type `Software` is an ambiguity every reference then has to
@@ -67,7 +72,7 @@ shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
 `IMachines`, `ISoftware`, `IInstallations`, `IInstallationPurge`, `IFiles`, `IDeployments`, `IKeys`,
 `IPages`, `IIdentities`, `ITokens`, `IDeviceLogins`, `IHistory`,
-`ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
+`IProviders`, `ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
 from the environment.
 
 **Infrastructure** implements them. `Persistence/` is EF Core: the

@@ -18,8 +18,8 @@ soft delete with a reserved key, and its edits and lifecycle are history acts.
 The forward-only migration creates provider records from each distinct,
 nonblank legacy value. It saves the original text exactly on each machine as a
 read-only `legacy_provider` field. Provider names use the source text, while
-keys follow the normal lowercase key grammar. A deterministic digest suffix
-disambiguates values that normalize to the same key or need truncation. Thus
+keys follow the normal lowercase key grammar. The migration sorts source
+values and adds numeric suffixes whenever normalized keys collide. Thus
 mixed case, punctuation and invalid key characters lose no information.
 Whitespace-only values have no assignment but remain in `legacy_provider`.
 Non-VM machines receive the new association. VMs inherit the host's provider;

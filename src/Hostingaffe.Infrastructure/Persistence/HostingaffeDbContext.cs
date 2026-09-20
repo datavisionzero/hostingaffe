@@ -7,6 +7,7 @@ using Hostingaffe.Domain.Identities;
 using Hostingaffe.Domain.Installations;
 using Hostingaffe.Domain.Machines;
 using Hostingaffe.Domain.Pages;
+using Hostingaffe.Domain.Providers;
 using Hostingaffe.Domain.Reports;
 
 namespace Hostingaffe.Infrastructure.Persistence;
@@ -45,6 +46,9 @@ public sealed class HostingaffeDbContext(DbContextOptions<HostingaffeDbContext> 
 
     /// <summary>The computers the instance is a record of (VISION 7).</summary>
     public DbSet<Machine> Machines => Set<Machine>();
+
+    /// <summary>The named sources of machines' external hosting (ADR 0020).</summary>
+    public DbSet<Provider> Providers => Set<Provider>();
 
     /// <summary>
     /// What an installation is an installation of (VISION 7). Singular, because
