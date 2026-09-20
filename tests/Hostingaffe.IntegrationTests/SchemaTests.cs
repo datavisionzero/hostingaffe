@@ -94,7 +94,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "identity", "identity_metadata", "installation", "installation_depends_on",
                 "installation_port", "installation_secret",
                 "machine", "machine_port", "machine_report", "machine_token",
-                "one_time_secret", "page", "software", "token",
+                "one_time_secret", "page", "provider", "software", "token",
             ],
             tables);
     }
@@ -116,6 +116,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
 
         Assert.Equal(
             [
+                "AK_provider_key",
                 "PK___EFMigrationsHistory",
                 "browser_session_hash", "browser_session_user",
                 "deployment_letters", "deployment_number", "deployment_search", "deployment_when",
@@ -127,7 +128,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "installation_depends_on_target",
                 "installation_key", "installation_letters", "installation_machine", "installation_search",
                 "installation_secret_letters", "installation_secret_search", "installation_software",
-                "machine_host", "machine_key", "machine_letters",
+                "machine_host", "machine_key", "machine_letters", "machine_provider",
                 "machine_report_number", "machine_report_when",
                 "machine_search", "machine_token_machine", "machine_token_secret_hash",
                 "one_live_secret_per_purpose", "one_time_secret_hash",
@@ -138,7 +139,8 @@ public sealed class SchemaTests(PostgresFixture postgres)
                 "pk_identity", "pk_identity_metadata", "pk_installation",
                 "pk_installation_depends_on", "pk_installation_port", "pk_installation_secret",
                 "pk_machine", "pk_machine_port", "pk_machine_report", "pk_machine_token",
-                "pk_one_time_secret", "pk_page", "pk_software", "pk_token",
+                "pk_one_time_secret", "pk_page", "pk_provider", "pk_software", "pk_token",
+                "provider_key", "provider_letters", "provider_search",
                 "software_key", "software_letters", "software_search", "token_agent", "token_secret_hash",
             ],
             indexes);

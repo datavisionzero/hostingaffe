@@ -53,6 +53,41 @@ public sealed class Machines(HostingaffeDbContext context) : IMachines
                 .ToDictionaryAsync(m => m.Id, m => m.Key, cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string?>> ProviderKeysAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var wanted = ids.Distinct().ToArray();
+        if (wanted.Length == 0) return new Dictionary<Guid, string?>();
+
+        // An instance holds one team's machines. Read the host graph once,
+        // rather than looking up every VM in the list separately.
+        var rows = await context.Machines.AsNoTracking()
+            .Select(machine => new { machine.Id, machine.HostId, machine.Provider })
+            .ToDictionaryAsync(machine => machine.Id, cancellationToken);
+        var result = new Dictionary<Guid, string?>();
+        foreach (var id in wanted)
+        {
+            var seen = new HashSet<Guid>();
+            var at = id;
+            string? provider = null;
+            while (seen.Add(at) && rows.TryGetValue(at, out var row))
+            {
+                if (row.Provider is not null)
+                {
+                    provider = row.Provider;
+                    break;
+                }
+
+                if (row.HostId is not { } host) break;
+                at = host;
+            }
+
+            result[id] = provider;
+        }
+
+        return result;
+    }
+
     public async Task<Machine?> LoadForWriteAsync(Guid id, CancellationToken cancellationToken)
     {
         if (context.Database.CurrentTransaction is null)

@@ -19,8 +19,20 @@ export function softwarePath(key: string): string {
   return `/software/${encodeURIComponent(key)}`;
 }
 
+export function providerPath(key: string): string {
+  return `/providers/${encodeURIComponent(key)}`;
+}
+
 export function installationPath(key: string): string {
   return `/installations/${encodeURIComponent(key)}`;
+}
+
+export function installationsOnMachinePath(key: string): string {
+  return `/installations?machine=${encodeURIComponent(key)}`;
+}
+
+export function installationMapPath(key: string): string {
+  return `${machinePath(key)}/installation-map`;
 }
 
 /**

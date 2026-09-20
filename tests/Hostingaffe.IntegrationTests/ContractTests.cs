@@ -46,6 +46,7 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/device/refusals", "/api/device/tokens",
                 "/api/email-changes/confirm",
                 "/api/history",
+                "/api/hosting-map",
                 "/api/import",
                 "/api/installations", "/api/installations/{key}",
                 "/api/installations/{key}/deployments", "/api/installations/{key}/deployments/{number}",
@@ -62,12 +63,14 @@ public sealed class ContractTests(PostgresFixture postgres)
                 "/api/machines/{key}/file-history/{path}",
                 "/api/machines/{key}/file-restore/{path}", "/api/machines/{key}/file-revisions/{path}",
                 "/api/machines/{key}/files", "/api/machines/{key}/files/{path}",
-                "/api/machines/{key}/history", "/api/machines/{key}/reports",
+                "/api/machines/{key}/history", "/api/machines/{key}/installation-map", "/api/machines/{key}/reports",
                 "/api/machines/{key}/reports/latest", "/api/machines/{key}/reports/{number}",
                 "/api/machines/{key}/restore", "/api/machines/{key}/token",
                 "/api/me", "/api/me/email", "/api/me/metadata", "/api/me/password",
                 "/api/pages", "/api/pages/{slug}", "/api/pages/{slug}/history", "/api/pages/{slug}/restore",
                 "/api/password-recovery", "/api/password-recovery/complete",
+                "/api/providers", "/api/providers/{key}", "/api/providers/{key}/history",
+                "/api/providers/{key}/restore",
                 "/api/search",
                 "/api/session", "/api/session/bootstrap", "/api/sessions", "/api/sessions/{id}",
                 "/api/software", "/api/software/{key}", "/api/software/{key}/history",
@@ -108,6 +111,13 @@ public sealed class ContractTests(PostgresFixture postgres)
         Assert.Contains("Port", schemas);
         Assert.Contains("Software", schemas);
         Assert.Contains("SoftwareSummary", schemas);
+        Assert.Contains("Provider", schemas);
+        Assert.Contains("ProviderSummary", schemas);
+        Assert.Contains("HostingMap", schemas);
+        Assert.Contains("InstallationMap", schemas);
+        Assert.Contains("InstallationMapEntry", schemas);
+        Assert.Contains("HostingMapMachine", schemas);
+        Assert.Contains("HostingMapProvider", schemas);
         Assert.Contains("Page", schemas);
         Assert.Contains("PageSummary", schemas);
         Assert.Contains("HistoryEntry", schemas);

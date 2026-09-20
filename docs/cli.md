@@ -193,6 +193,7 @@ user's own repository.
 |---|---|
 | `ha machine` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `context`, `token` |
 | `ha software` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history` |
+| `ha provider` | `list`, `view`, `add`, `set`, `delete`, `restore`, `history`, `machines` |
 | `ha installation` | `list`, `view`, `add`, `set`, `delete`, `restore`, `purge`, `history` |
 | `ha deployment` | recording is the bare verb; then `list`, `view`, `set`, `delete`, `restore`, `history` |
 | `ha files` | `list`, `get`, `put`, `diff`, `revisions`, `delete`, `restore`, `history`, `sync` |
@@ -210,7 +211,7 @@ keep the glossary's words and the short forms are only short forms, and
 `ha softwares`: the word is uncountable (`CONTEXT.md`, Software).
 
 **`ha machine add --file FILE`** is the bulk write: a whole host — its
-software, its installations, their files and their first deployments — in one
+providers, software, installations, their files and their first deployments — in one
 transaction, because documenting a host is one act and not thirty commands.
 The file is the JSON `ha export` writes — what that carries back and what it
 does not is under Exporting, below — and `-` reads it from stdin. All or
@@ -229,6 +230,12 @@ than as a write that did not happen.
 `--backup`, `--monitoring` and `--logging` on an installation. A value outside
 one is the instance's to refuse and arrives as exit 4 — `ha` keeps no second
 copy of the model.
+
+**A machine's `--provider` is a provider key**, created with
+`ha provider add KEY --name NAME --description-file FILE`. A VM inherits the
+provider of its host and cannot take one directly. `ha provider machines KEY`
+lists machines on that provider, including VMs. The provider's `view` includes
+its Markdown description, and `history` shows changes to it.
 
 **An installation is written with two directories**: `--path`, where it lives on
 the machine, and `--data`, where its persistent data lies — the one a backup has
@@ -537,6 +544,7 @@ hosting-export/
   machines/<key>/installations/<key>/history.md
   machines/<key>/installations/<key>/deployments.md   what ran here, newest by `at` first
   machines/<key>/installations/<key>/files/<path>
+  providers/<key>.md
   software/<key>.md
   pages/<slug>.md
 ```
@@ -548,7 +556,7 @@ shows itself.
 
 **`export.json` is the shape the bulk write reads back**, which is what gives
 migrating an old repository a defined target. What comes back is the record —
-the machines, the software, the installations, the files at the content they
+the machines, the providers and their descriptions, the software, the installations, the files at the content they
 are at, the deployments, the pages — and **not the account of how it got
 there**: the history, a file's earlier revisions, the original timestamps and
 the identities that wrote them stay behind, because the import is the ordinary
@@ -556,6 +564,12 @@ acts run in one transaction and those are the instance's to write
 ([`api.md`](api.md), Importing). An export read into another instance is the
 record as it stands, beginning there. **Moving an instance is `pg_dump`** and
 not export and import ([`operations.md`](operations.md), Backup).
+
+An export from before providers existed has no top-level `providers` array.
+Its free-text machine values are converted to keyed providers in stable order;
+the original text remains in each machine's read-only `legacy_provider` field.
+VMs inherit their host's provider even when their old text differs. Current
+exports always include `providers`, including an empty array.
 
 **It is composed from the ordinary endpoints**, not from an endpoint of its own:
 whoever may read an export may make the single reads it is built from, and one

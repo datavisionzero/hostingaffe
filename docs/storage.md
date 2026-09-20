@@ -197,7 +197,8 @@ create table machine (
     hostname    varchar(200),
     kind        text          not null check (kind in ('vps', 'dedicated', 'vm', 'local')),
     host_id     uuid          references machine (id),
-    provider    varchar(200),
+    provider    varchar(64)   references provider (key),
+    legacy_provider varchar(200),
     plan        varchar(200),
     location    varchar(200),
     os          varchar(200),
@@ -220,11 +221,13 @@ create table machine (
     deleted_by  uuid          references identity (id),
 
     check (host_id is null and kind <> 'vm' or kind = 'vm'),
-    check (host_id is null or host_id <> id)
+    check (host_id is null or host_id <> id),
+    check (kind <> 'vm' or provider is null)
 );
 
 create unique index machine_key  on machine (key);
 create        index machine_host on machine (host_id);
+create        index machine_provider on machine (provider);
 ```
 
 **The key is the address and never changes.** `machine_key` holds it unique
@@ -240,11 +243,18 @@ compares: the image it pulls depends on it. Every free-text fact is one line of
 at most 200 characters — enough for a description, too little for a paragraph,
 which is what `description` and the pages are for.
 
-**`host_id` is the one relationship this table has**, and it points at itself.
+**`host_id` points at another machine; `provider` points at a provider key.**
 Two rules are the column's: only a `vm` names a host, and no machine is its own
 host. That a *longer* chain does not close on itself is the write path's — the
 database cannot see it without walking — and it is walked before every write
-that sets a host.
+that sets a host. A VM cannot store a direct provider. Its effective provider
+is derived by following hosts. `legacy_provider` keeps the exact text the old
+column held before the forward-only migration, even for a VM whose text
+disagrees with its host. The migration derives deterministic, collision-free
+keys by sorting the distinct nonblank values and adding numeric suffixes when
+a normalized key is already used. Whitespace-only values remain as legacy text
+without an assignment. The FK and the `provider` index hold direct assignments;
+soft deleting a machine does not clear one.
 
 **`measured_at` is the answer to the stale document** (VISION 2): a machine
 nobody has looked at for a year says so itself.
@@ -281,6 +291,33 @@ The ports are not in `machine.letters`, for the reason an installation's are
 not: `22` inside the token `22/tcp` is not something anyone would find by typing
 the number. A query that *is* a port number is looked up in this column instead
 — see Searching.
+
+## Providers
+
+The named sources of external hosting (`CONTEXT.md`, Provider):
+
+```sql
+create table provider (
+    id          uuid         not null primary key,
+    key         varchar(64)  not null unique,
+    name        varchar(200) not null,
+    description text         not null default '',
+    created_by  uuid         not null references identity (id),
+    created_at  timestamptz  not null,
+    updated_by  uuid         not null references identity (id),
+    updated_at  timestamptz  not null,
+    deleted_at  timestamptz,
+    deleted_by  uuid         references identity (id)
+);
+
+create unique index provider_key on provider (key);
+```
+
+The machine FK refuses a provider purge while any machine still carries its
+key, even if the machine is deleted. The write path also refuses a provider
+soft delete while it is in use. Provider keys stay in `assigned_key` after
+their rows are purged. Key, name and description have `letters` and `search`
+columns like other searchable records.
 
 ## Software
 
@@ -775,7 +812,7 @@ reservation ([ADR 0019](adr/0019-an-installation-key-can-be-released-explicitly.
 
 ```sql
 create table assigned_key (
-    kind text        not null check (kind in ('machine', 'software', 'installation')),
+    kind text        not null check (kind in ('machine', 'software', 'installation', 'provider')),
     key  varchar(64) not null,
 
     primary key (kind, key)
@@ -786,7 +823,7 @@ create table assigned_key (
 holds its own key and this table says nothing new; after the purge the row is
 gone, and without something that remembers, the key would be free again. The
 primary key over both columns enforces the reservation until the explicit
-installation purge removes its row here. Machine and software reservations
+installation purge removes its row here. Machine, software and provider reservations
 are never removed.
 
 It is not a bin and not a second history. The history was the other candidate —
@@ -892,6 +929,7 @@ index over it, generated from its own row:
 | table | column | what goes into it |
 |---|---|---|
 | `machine` | `search` | the key, the name and every text field, description included |
+| `provider` | `search` | the key, name and description |
 | `software` | `search` | the key, the name, the image, the two URLs, the description |
 | `installation` | `search` | the key, the name, the two directories, the urls, the description |
 | `installation_secret` | `search` | the secret's name and the file it lies in |
@@ -947,6 +985,7 @@ is looked for as a fragment as well, with `ilike` through a `pg_trgm` index:
 | table | column | |
 |---|---|---|
 | `machine` | `letters` | the same text `search` is made of |
+| `provider` | `letters` | " |
 | `software` | `letters` | " |
 | `installation` | `letters` | " |
 | `installation_secret` | `letters` | " |

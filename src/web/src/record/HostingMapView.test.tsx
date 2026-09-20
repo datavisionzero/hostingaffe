@@ -1,0 +1,70 @@
+import { screen, within } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import type { Schemas } from "@/api/client";
+import { installInstance, renderAt } from "@/shared/testing";
+import { HostingMapView } from "./HostingMapView";
+import { mapDiagram } from "./hostingMapData";
+import { layoutDiagram } from "./diagramLayout";
+
+vi.mock("./HostingDiagram", () => ({
+  HostingDiagram: () => { throw new Error("Diagram failed to render"); },
+}));
+
+const map: Schemas["HostingMap"] = {
+  providers: [
+    { key: "example-host", name: "Example Host" },
+    { key: "empty-host", name: "Empty Host" },
+  ],
+  machines: [
+    { key: "guest", name: "Guest VM", kind: "vm", status: "active", provider: "example-host", ipv4: null, ipv6: null, private_ip: "198.51.100.20" },
+    { key: "host", name: "Physical host", kind: "dedicated", status: "active", provider: "example-host", ipv4: "192.0.2.10", ipv6: "2001:db8::10", private_ip: "198.51.100.10" },
+    { key: "local", name: "Local box", kind: "local", status: "retired", provider: null, ipv4: null, ipv6: null, private_ip: null },
+  ],
+};
+
+afterEach(() => vi.unstubAllGlobals());
+
+it("draws only provider-to-machine edges, including inherited VM providers", () => {
+  const graph = mapDiagram(map);
+  expect(graph.items.map((item) => item.id)).toEqual([
+    "provider:example-host", "provider:empty-host", "machine:guest", "machine:host", "machine:local",
+  ]);
+  expect(graph.edges.map((edge) => [edge.source, edge.target])).toEqual([
+    ["provider:example-host", "machine:guest"],
+    ["provider:example-host", "machine:host"],
+  ]);
+  const positioned = new Map(layoutDiagram(graph.items, graph.edges).map((node) => [node.id, node.position]));
+  expect(positioned.get("provider:example-host")!.x).toBeLessThan(positioned.get("machine:guest")!.x);
+  expect(positioned.get("machine:local")).toBeDefined();
+});
+
+it("keeps every address and navigation link in the list when the diagram fails", async () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+
+  const list = await screen.findByRole("region", { name: "Providers and machines" });
+  expect(await screen.findByText("The diagram is unavailable. The grouped list has every provider and machine.")).toBeInTheDocument();
+  expect(within(list).getByRole("link", { name: "Example Host" })).toHaveAttribute("href", "/providers/example-host");
+  expect(within(list).getByRole("link", { name: "guest" })).toHaveAttribute("href", "/machines/guest");
+  expect(within(list).getByRole("link", { name: "host" })).toHaveAttribute("href", "/machines/host");
+  expect(within(list).getByText("192.0.2.10 · 2001:db8::10 · 198.51.100.10")).toBeInTheDocument();
+  expect(within(list).getByText("Unassigned machines")).toBeInTheDocument();
+  expect(within(list).getByText("No machines assigned.")).toBeInTheDocument();
+  expect(within(list).getByRole("link", { name: "local" })).toHaveAttribute("href", "/machines/local");
+  expect(within(list).getAllByRole("link", { name: "Installations" })[0]).toHaveAttribute("href", "/installations?machine=guest");
+  error.mockRestore();
+});
+
+it("answers an empty map", async () => {
+  installInstance({ "GET /api/hosting-map": { providers: [], machines: [] } });
+  renderAt("/hosting-map", <HostingMapView />);
+  expect(await screen.findByText("No providers or machines yet.")).toBeInTheDocument();
+});
+
+it("shows a failed read with a way to the ordinary machine list", async () => {
+  installInstance({ "GET /api/hosting-map": { status: 503, body: { detail: "Map unavailable." } } });
+  renderAt("/hosting-map", <HostingMapView />);
+  expect(await screen.findByText("Map unavailable.")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "All machines" })).toHaveAttribute("href", "/machines");
+});

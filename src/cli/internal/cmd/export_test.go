@@ -35,6 +35,8 @@ func exported() *fake {
 		case path == "/api/software":
 			return 200, `[{"key":"logaffe","name":"logaffe","homepage":null,
 			"image":"ghcr.io/datavisionzero/logaffe","updated_at":"2026-09-05T12:00:00Z"}]`
+		case path == "/api/providers":
+			return 200, `[{"key":"hetzner","name":"Example Host","updated_at":"2026-09-05T12:00:00Z"}]`
 		case path == "/api/pages":
 			return 200, `[{"slug":"architecture","title":"Architecture","kind":"decision","attached_to":null,
 			"updated_by":{"id":"0198e0c0-0000-7000-8000-000000000001","kind":"agent","name":"quiet-otter-42"},
@@ -65,6 +67,8 @@ func exported() *fake {
 			return 200, machineJSON
 		case path == "/api/software/logaffe":
 			return 200, softwareJSON
+		case path == "/api/providers/hetzner":
+			return 200, providerJSON
 		case path == "/api/installations/logaffe-prod":
 			return 200, installationJSON
 		default:
@@ -85,7 +89,7 @@ func TestAnExportIsATreeWithTheFilesInPlace(t *testing.T) {
 	if code != exit.OK || stderr != "" {
 		t.Fatalf("code %d, stderr %q", code, stderr)
 	}
-	if !strings.Contains(out, "1 machines, 1 installations") {
+	if !strings.Contains(out, "1 machines, 1 providers, 1 installations") {
 		t.Errorf("it says what it wrote: %q", out)
 	}
 
@@ -100,6 +104,7 @@ func TestAnExportIsATreeWithTheFilesInPlace(t *testing.T) {
 		"machines/ex44/installations/logaffe-prod/deployments.md",
 		"machines/ex44/installations/logaffe-prod/files/compose.override.yml",
 		"software/logaffe.md",
+		"providers/hetzner.md",
 		"pages/architecture.md",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, want)); err != nil {
@@ -165,6 +170,14 @@ func TestAnExportCarriesTheHistory(t *testing.T) {
 	}
 	if history, _ := machine["history"].([]any); len(history) != 2 {
 		t.Errorf("history = %v", machine["history"])
+	}
+	providers, _ := document["providers"].([]any)
+	if len(providers) != 1 {
+		t.Fatalf("providers = %v", document["providers"])
+	}
+	provider, _ := providers[0].(map[string]any)
+	if provider["description"] != "A provider description." || len(provider["history"].([]any)) != 2 {
+		t.Errorf("provider description or history missing: %v", provider)
 	}
 
 	installations, _ := machine["installations"].([]any)
@@ -286,7 +299,7 @@ func read(t *testing.T, path string) string {
 // record may hold.
 func TestABulkAddHandsTheDocumentToTheInstance(t *testing.T) {
 	f := &fake{version: "0.0.0-dev", answer: func(*http.Request) (int, string) {
-		return 200, `{"machines":1,"software":1,"installations":2,"deployments":2,"files":3,"pages":1}`
+		return 200, `{"machines":1,"providers":1,"software":1,"installations":2,"deployments":2,"files":3,"pages":1}`
 	}}
 	server := httptest.NewServer(f.handler())
 	defer server.Close()
@@ -313,7 +326,7 @@ func TestABulkAddHandsTheDocumentToTheInstance(t *testing.T) {
 	if f.bodies[len(f.bodies)-1] != document {
 		t.Errorf("body = %q", f.bodies[len(f.bodies)-1])
 	}
-	if !strings.Contains(out, "1 machines, 2 installations, 1 software, 2 deployments, 3 files, 1 pages.") {
+	if !strings.Contains(out, "1 machines, 1 providers, 2 installations, 1 software, 2 deployments, 3 files, 1 pages.") {
 		t.Errorf("it says what was made: %q", out)
 	}
 }

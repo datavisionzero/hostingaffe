@@ -21,6 +21,7 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         using var agent = await Agent(instance, admin, "one");
+        await Provider(admin, "hetzner");
 
         using var created = await agent.PostAsJsonAsync(
             "/api/machines",
@@ -316,6 +317,7 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Provider(admin, "hetzner");
 
         await Machine(admin, "ex44", "dedicated");
         await admin.PatchAsJsonAsync(
@@ -351,6 +353,7 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Provider(admin, "hetzner");
 
         using var created = await admin.PostAsJsonAsync(
             "/api/machines?note=replacing%20the%20old%20one",
@@ -391,6 +394,7 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Provider(admin, "hetzner");
 
         await Machine(admin, "ex44", "dedicated");
 
@@ -422,6 +426,8 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
     {
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+        await Provider(admin, "hetzner");
+        await Provider(admin, "netcup");
 
         var created = await Machine(admin, "ex44", "dedicated");
         var read = created.GetProperty("updated_at").GetString();
@@ -460,9 +466,20 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
             body[property.Name] = property.GetValue(rest);
         }
 
+        if (body.GetValueOrDefault("provider") is string provider && provider.Length > 0)
+            await Provider(client, provider);
+
         using var created = await client.PostAsJsonAsync("/api/machines", body, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         return await created.Content.ReadFromJsonAsync<JsonElement>(Ct);
+    }
+
+    private static async Task Provider(HttpClient client, string key)
+    {
+        using var found = await client.GetAsync($"/api/providers/{key}", Ct);
+        if (found.StatusCode == HttpStatusCode.OK) return;
+        using var created = await client.PostAsJsonAsync("/api/providers", new { key }, Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
     }
 
     private static async Task<JsonElement> Problem(HttpResponseMessage response) =>

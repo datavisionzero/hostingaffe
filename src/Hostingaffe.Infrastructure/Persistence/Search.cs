@@ -95,6 +95,15 @@ public sealed class Search(HostingaffeDbContext context) : ISearch
               and (s.search @@ q.words or (q.fragment is not null and s.letters ilike q.fragment))
 
             union all
+            select 2, 'provider', p.key, p.name, null::int, null::text, null::text, null::text,
+                   case when to_tsvector('simple', p.description) @@ q.words
+                          or (q.fragment is not null and p.description ilike q.fragment)
+                        then 'description' else 'fields' end
+            from provider p, q
+            where p.deleted_at is null
+              and (p.search @@ q.words or (q.fragment is not null and p.letters ilike q.fragment))
+
+            union all
             select 3, 'installation', i.key, i.name, null::int, null::text, null::text, null::text,
                    case when to_tsvector('simple', i.description) @@ q.words
                           or (q.fragment is not null and i.description ilike q.fragment)

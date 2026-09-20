@@ -8,7 +8,7 @@ import { Filters, type Filter } from "@/shared/Filters";
 import { word } from "@/shared/narrowing";
 import { dayName, time } from "@/shared/when";
 import { pagePath } from "@/shell/views";
-import { filePath, installationPath, machinePath, softwarePath } from "./addresses";
+import { filePath, installationPath, machinePath, providerPath, softwarePath } from "./addresses";
 import { values } from "./changes";
 
 type HistoryEvent = Schemas["HistoryEvent"];
@@ -19,7 +19,7 @@ const filters: Filter[] = [
   {
     name: "kind",
     label: "Kind",
-    values: ["machine", "software", "installation", "deployment", "file", "page"],
+    values: ["machine", "provider", "software", "installation", "deployment", "file", "page"],
   },
 ];
 
@@ -230,6 +230,7 @@ function address(event: HistoryEvent): string | undefined {
   switch (event.subject_kind) {
     case "machine": return machinePath(subject);
     case "software": return softwarePath(subject);
+    case "provider": return providerPath(subject);
     // A deployment is addressed by the installation it lives under: that is
     // where its version, its ref and its note are read.
     case "installation": case "deployment": return installationPath(subject);

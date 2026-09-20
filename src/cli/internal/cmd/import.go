@@ -43,7 +43,7 @@ func importRecord(g *globals, cmd *cobra.Command, file, note string) error {
 
 	made := *resp.JSON200
 	fmt.Fprintf(cmd.OutOrStdout(),
-		"%d machines, %d installations, %d software, %d deployments, %d files, %d pages.\n",
-		made.Machines, made.Installations, made.Software, made.Deployments, made.Files, made.Pages)
+		"%d machines, %d providers, %d installations, %d software, %d deployments, %d files, %d pages.\n",
+		made.Machines, made.Providers, made.Installations, made.Software, made.Deployments, made.Files, made.Pages)
 	return nil
 }

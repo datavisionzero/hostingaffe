@@ -23,12 +23,12 @@ public static class MachineEndpoints
 
         door.MapGet(
                 string.Empty,
-                (string? status, string? kind, bool? retired, string? activity,
+                (string? status, string? kind, bool? retired, string? activity, string? provider,
                  ListMachines list, CancellationToken cancellationToken) =>
-                    list.ExecuteAsync(status, kind, retired ?? false, activity, cancellationToken))
+                    list.ExecuteAsync(status, kind, retired ?? false, activity, provider, cancellationToken))
             .WithName("ListMachines")
             .WithSummary(
-                "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. "
+                "Every machine as a slim MachineSummary, by key, without the descriptions. `status`, `kind` and effective `provider` filter. "
                 + "Retired machines are left out unless `retired=true` or `status=retired`; not paginated. "
                 + "`activity` — a count of hours or days, `24h` or `7d`, at most `90d` — adds what has been going on "
                 + "per row: how many acts and how many deployments fall inside the window, the newest deployment "
@@ -55,6 +55,12 @@ public static class MachineEndpoints
                 read.ExecuteAsync(key, cancellationToken))
             .WithName("ReadMachine")
             .WithSummary("The complete machine: every field, the host it runs on, and who touched it last.");
+
+        door.MapGet("/{key}/installation-map", (string key, ReadInstallationMap read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, cancellationToken))
+            .WithName("ReadInstallationMap")
+            .WithSummary("Every live installation on the machine, including retired ones, with role, status, URLs and latest deployment time in one read for the read-only installation map.")
+            .Produces<InstallationMapShape>();
 
         door.MapGet("/{key}/context", (string key, ReadMachineContext read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(key, cancellationToken))

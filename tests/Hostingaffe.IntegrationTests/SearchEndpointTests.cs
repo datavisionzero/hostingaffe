@@ -315,6 +315,7 @@ public sealed class SearchEndpointTests(PostgresFixture postgres)
     /// <summary>One of everything, each carrying a word only it has.</summary>
     private static async Task AHostAsync(HttpClient client)
     {
+        await Created(client, "/api/providers", new { key = "hetzner" });
         await Created(client, "/api/machines", new
         {
             key = "ex44",

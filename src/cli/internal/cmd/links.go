@@ -18,7 +18,7 @@ import (
 // validates a body, because the instance stores Markdown and does not parse it,
 // so a reference that points at nothing is written and kept like any other
 // text. This is what says which ones do.
-var schemes = map[string]string{"machine:": "machine", "software:": "software", "installation:": "installation", "page:": "page"}
+var schemes = map[string]string{"machine:": "machine", "software:": "software", "provider:": "provider", "installation:": "installation", "page:": "page"}
 
 var (
 	// The two spellings of a link: inline, and the reference definition an
@@ -214,6 +214,17 @@ func everyKeyOf(ctx context.Context, c *client.Client, kind string) (map[string]
 		}
 	case "software":
 		resp, err := c.ListSoftwareWithResponse(ctx)
+		if err != nil {
+			return nil, client.Transport(err)
+		}
+		if err := client.Check(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, err
+		}
+		for _, one := range *resp.JSON200 {
+			keys[one.Key] = true
+		}
+	case "provider":
+		resp, err := c.ListProvidersWithResponse(ctx)
 		if err != nil {
 			return nil, client.Transport(err)
 		}

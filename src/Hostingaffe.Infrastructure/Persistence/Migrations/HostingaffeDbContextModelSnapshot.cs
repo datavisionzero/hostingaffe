@@ -40,7 +40,7 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
 
                     b.ToTable("assigned_key", null, t =>
                         {
-                            t.HasCheckConstraint("ck_assigned_key_kind", "kind in ('machine', 'software', 'installation')");
+                            t.HasCheckConstraint("ck_assigned_key_kind", "kind in ('machine', 'software', 'installation', 'provider')");
                         });
                 });
 
@@ -291,7 +291,7 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
 
                     b.ToTable("history", null, t =>
                         {
-                            t.HasCheckConstraint("ck_history_subject", "subject in ('page', 'machine', 'software', 'installation', 'file', 'deployment')");
+                            t.HasCheckConstraint("ck_history_subject", "subject in ('page', 'machine', 'software', 'installation', 'file', 'deployment', 'provider')");
                         });
                 });
 
@@ -814,11 +814,16 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("kind");
 
+                    b.Property<string>("LegacyProvider")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("legacy_provider");
+
                     b.Property<string>("Letters")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("text")
                         .HasColumnName("letters")
-                        .HasComputedColumnSql("key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' || coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' || coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' || coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' || coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description", true);
+                        .HasComputedColumnSql("key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' || coalesce(provider, '') || ' ' || coalesce(legacy_provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' || coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' || coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' || coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description", true);
 
                     b.Property<string>("Location")
                         .HasMaxLength(200)
@@ -856,15 +861,15 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .HasColumnName("private_ip");
 
                     b.Property<string>("Provider")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("provider");
 
                     b.Property<NpgsqlTsVector>("Search")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("tsvector")
                         .HasColumnName("search")
-                        .HasComputedColumnSql("to_tsvector('simple', key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' || coalesce(provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' || coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' || coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' || coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description)", true);
+                        .HasComputedColumnSql("to_tsvector('simple', key || ' ' || name || ' ' || coalesce(hostname, '') || ' ' || coalesce(provider, '') || ' ' || coalesce(legacy_provider, '') || ' ' || coalesce(plan, '') || ' ' || coalesce(location, '') || ' ' || coalesce(os, '') || ' ' || coalesce(cpu, '') || ' ' || coalesce(memory, '') || ' ' || coalesce(disk, '') || ' ' || coalesce(ipv4, '') || ' ' || coalesce(ipv6, '') || ' ' || coalesce(private_ip, '') || ' ' || coalesce(ssh, '') || ' ' || description)", true);
 
                     b.Property<string>("Ssh")
                         .HasMaxLength(200)
@@ -900,6 +905,9 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Letters"), "GIN");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Letters"), new[] { "gin_trgm_ops" });
 
+                    b.HasIndex("Provider")
+                        .HasDatabaseName("machine_provider");
+
                     b.HasIndex("Search")
                         .HasDatabaseName("machine_search");
 
@@ -914,6 +922,8 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_machine_kind", "kind in ('vps', 'dedicated', 'vm', 'local')");
 
                             t.HasCheckConstraint("ck_machine_not_its_own_host", "host_id is null or host_id <> id");
+
+                            t.HasCheckConstraint("ck_machine_provider_vm", "kind <> 'vm' or provider is null");
 
                             t.HasCheckConstraint("ck_machine_status", "status in ('planned', 'active', 'retired')");
                         });
@@ -1080,6 +1090,89 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_page_kind", "kind in ('runbook', 'decision', 'note')");
                         });
+                });
+
+            modelBuilder.Entity("Hostingaffe.Domain.Providers.Provider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Letters")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("letters")
+                        .HasComputedColumnSql("key || ' ' || name || ' ' || description", true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<NpgsqlTsVector>("Search")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasColumnName("search")
+                        .HasComputedColumnSql("to_tsvector('simple', key || ' ' || name || ' ' || description)", true);
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_provider");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("provider_key");
+
+                    b.HasIndex("Letters")
+                        .HasDatabaseName("provider_letters");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Letters"), "GIN");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Letters"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("Search")
+                        .HasDatabaseName("provider_search");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Search"), "GIN");
+
+                    b.ToTable("provider", (string)null);
                 });
 
             modelBuilder.Entity("Hostingaffe.Domain.Reports.Report", b =>
@@ -1726,6 +1819,13 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("fk_machine_host");
 
+                    b.HasOne("Hostingaffe.Domain.Providers.Provider", null)
+                        .WithMany()
+                        .HasForeignKey("Provider")
+                        .HasPrincipalKey("Key")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_machine_provider");
+
                     b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
@@ -1827,6 +1927,29 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("fk_page_updated_by");
+                });
+
+            modelBuilder.Entity("Hostingaffe.Domain.Providers.Provider", b =>
+                {
+                    b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_provider_created_by");
+
+                    b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("fk_provider_deleted_by");
+
+                    b.HasOne("Hostingaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_provider_updated_by");
                 });
 
             modelBuilder.Entity("Hostingaffe.Domain.Reports.Report", b =>

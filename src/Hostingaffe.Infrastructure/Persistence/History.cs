@@ -85,6 +85,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
                case e.kind
                    when 'machine'      then m.key
                    when 'software'     then s.key
+                   when 'provider'     then pr.key
                    when 'installation' then i.key
                    when 'file'         then f.path
                    when 'page'         then p.slug
@@ -103,6 +104,7 @@ public sealed class History(HostingaffeDbContext context) : IHistory
         from events e
         left join machine      m   on e.kind = 'machine'      and m.id  = e.subject_id
         left join software     s   on e.kind = 'software'     and s.id  = e.subject_id
+        left join provider     pr  on e.kind = 'provider'     and pr.id = e.subject_id
         left join installation i   on e.kind = 'installation' and i.id  = e.subject_id
         left join machine      im  on im.id  = i.machine_id
         left join file         f   on e.kind = 'file'         and f.id  = e.subject_id

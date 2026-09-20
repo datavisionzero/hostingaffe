@@ -22,8 +22,8 @@ import { admitUrl, recordPath } from "./links";
  * `https` and `mailto`, and a URL with any other scheme, or a relative one,
  * loses its `href` here and stays text (planaffe ADR 0017).
  *
- * The exception is the record's own four schemes — `page:`, `machine:`,
- * `software:` and `installation:` (ADR 0007). Those are this instance's own
+ * The exception is the record's own schemes — `page:`, `machine:`,
+ * `software:`, `provider:` and `installation:` (ADR 0007). Those are this instance's own
  * addresses, so they are followed rather than opened: no new tab, no
  * `noopener`, and the frame is never remounted (planaffe ADR 0006).
  */

@@ -72,6 +72,12 @@ func write(dir string, whole *record) error {
 		}
 	}
 
+	for _, provider := range whole.Providers {
+		if err := put(filepath.Join(dir, "providers", provider.Key+".md"), providerMarkdown(provider)); err != nil {
+			return err
+		}
+	}
+
 	for _, page := range whole.Pages {
 		if err := put(filepath.Join(dir, "pages", page.Slug+".md"), pageMarkdown(page)); err != nil {
 			return err
@@ -136,12 +142,13 @@ func readme(whole *record) string {
 	out.WriteString("- `machines/<key>/` is one machine: what it is, its history, its own files at\n")
 	out.WriteString("  their paths, and a directory per installation on it.\n")
 	out.WriteString("- `software/<key>.md` is what the installations are installations of.\n")
+	out.WriteString("- `providers/<key>.md` describes who hosts the machines.\n")
 	out.WriteString("- `pages/<slug>.md` is the wiki, flat, as it is stored.\n\n")
 	out.WriteString("Nothing here says when it was written: two exports of the same record are the\n")
 	out.WriteString("same bytes, so this directory can be kept in a repository and diffed.\n\n")
 
-	fmt.Fprintf(&out, "%d machines, %d installations, %d software, %d files, %d pages.\n",
-		len(whole.Machines), whole.installations(), len(whole.Software), whole.files(), len(whole.Pages))
+	fmt.Fprintf(&out, "%d machines, %d providers, %d installations, %d software, %d files, %d pages.\n",
+		len(whole.Machines), len(whole.Providers), whole.installations(), len(whole.Software), whole.files(), len(whole.Pages))
 
 	if len(whole.Machines) > 0 {
 		out.WriteString("\n| machine | kind | status | installations |\n|---|---|---|---|\n")
@@ -163,6 +170,7 @@ func machineMarkdown(machine machineRecord) string {
 		{"hostname", value(machine.Hostname)},
 		{"host", value(machine.Host)},
 		{"provider", value(machine.Provider)},
+		{"legacy provider", value(machine.LegacyProvider)},
 		{"plan", value(machine.Plan)},
 		{"location", value(machine.Location)},
 		{"os", value(machine.Os)},
@@ -241,6 +249,14 @@ func softwareMarkdown(software softwareRecord) string {
 
 	body(&out, software.Description)
 	history(&out, software.History)
+	return out.String()
+}
+
+func providerMarkdown(provider providerRecord) string {
+	var out strings.Builder
+	fmt.Fprintf(&out, "# %s — %s\n\n", provider.Key, provider.Name)
+	body(&out, provider.Description)
+	history(&out, provider.History)
 	return out.String()
 }
 

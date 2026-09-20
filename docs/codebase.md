@@ -19,6 +19,7 @@ tests/Hostingaffe.IntegrationTests  the real thing against a real Postgres
 deploy/                         Dockerfile, Compose, `.env.example`
 docs/api/openapi.json           the contract, captured and checked in
 docs/agents-md.md               the AGENTS.md block a user copies into their own repository
+docs/research/                  primary-source reading behind product decisions
 skills/                         the two agent skills shipped for agents working on a user's hosts
 ```
 
@@ -49,6 +50,11 @@ history all use; `Link`, how a Markdown body names another thing of the record;
 `RefusalCode`, the one list of every way the product says no, which the CLI
 derives its exit code from.
 
+`Providers` holds keyed provider records; `Machines` keeps direct associations
+on non-VMs and reads the effective provider of VMs through their hosts. A
+forward-only migration retains the original free-text value as
+`legacy_provider` ([ADR 0020](adr/0020-a-provider-is-a-record-and-a-vm-inherits-it.md)).
+
 `Software` is at the root too, and for a different reason: the word is
 uncountable, so there is no plural to name a folder with, and a namespace
 `Software` beside a type `Software` is an ambiguity every reference then has to
@@ -66,7 +72,7 @@ shapes the contract serves (`…Shape`, the suffix the OpenAPI document drops).
 `Ports/` holds the interfaces the acts need and the Infrastructure implements:
 `IMachines`, `ISoftware`, `IInstallations`, `IInstallationPurge`, `IFiles`, `IDeployments`, `IKeys`,
 `IPages`, `IIdentities`, `ITokens`, `IDeviceLogins`, `IHistory`,
-`ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
+`IProviders`, `ITransactions`, `IIdempotency`, `IEmailSender`, and the settings records read
 from the environment.
 
 **Infrastructure** implements them. `Persistence/` is EF Core: the
@@ -119,7 +125,7 @@ ADRs 0004, 0007, 0017). Its API layer is generated from the same
 
 ```
 src/shell       the frame: sidebar, palette, shortcuts, routing
-src/record      the machines, the software, the installations and the files
+src/record      the providers, machines, software, installations and files
 src/pages       the wiki
 src/session     sign-in, activation, recovery, and approving a `ha login`
 src/settings    personal settings and instance administration
@@ -129,7 +135,7 @@ src/api         the generated client and its wrapper
 ```
 
 `src/record` is the product's own screens (VISION 6.2): a list and a detail for
-each of the machines, the software and the installations, and one file screen
+each of the providers, machines, software and installations, and one file screen
 serving both of the things a file can hang on. `OverviewView.tsx` and
 `HistoryView.tsx` are the two that are about all of them at once: the front
 page, one tile per machine with what lately happened on it (ADR 0018), and the
@@ -144,9 +150,18 @@ is escaped the same way everywhere, and `changes.ts` is the one reading of a
 history value — a moment as a date, a birth that does not print its own subject
 back — so that the section and the reading cannot say the same line differently.
 
+`HostingMapView.tsx` reads provider and machine associations in one API call.
+`HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
+with Dagre and renders a read-only React Flow canvas. The grouped list remains
+usable if the diagram cannot load.
+`InstallationMapView.tsx` reads one machine's installation and latest deployment
+facts in one API call. `InstallationDiagram.tsx` uses the same canvas for
+machine-to-installation links. Platform entries start collapsed in the diagram;
+the adjacent list keeps every installation available.
+
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/` for the overview, `/machines`, `/software`, `/installations`, `/history`,
+`/` for the overview, `/machines`, `/machines/:key/installation-map`, `/providers`, `/hosting-map`, `/software`, `/installations`, `/history`,
 `/pages`, `/settings`, `/admin` —
 because the API is out of the way under `/api`; in development Vite forwards
 that one prefix to the API and serves everything else itself. A detail screen

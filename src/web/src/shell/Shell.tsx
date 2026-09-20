@@ -8,6 +8,7 @@ import { PagesView } from "@/pages/PagesView";
 import { MachinesView } from "@/record/MachinesView";
 import { InstallationsView } from "@/record/InstallationsView";
 import { SoftwareListView } from "@/record/SoftwareListView";
+import { ProviderListView } from "@/record/ProviderListView";
 import { OverviewView } from "@/record/OverviewView";
 import { HistoryView } from "@/record/HistoryView";
 import { SettingsView } from "@/settings/SettingsView";
@@ -28,6 +29,10 @@ const NewPageView = lazy(() => import("@/pages/PageView").then((module) => ({ de
 // and stay with it.
 const MachineView = lazy(() => import("@/record/MachineView").then((module) => ({ default: module.MachineView })));
 const SoftwareView = lazy(() => import("@/record/SoftwareView").then((module) => ({ default: module.SoftwareView })));
+const ProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.ProviderView })));
+const NewProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.NewProviderView })));
+const HostingMapView = lazy(() => import("@/record/HostingMapView").then((module) => ({ default: module.HostingMapView })));
+const InstallationMapView = lazy(() => import("@/record/InstallationMapView").then((module) => ({ default: module.InstallationMapView })));
 const InstallationView = lazy(() => import("@/record/InstallationView").then((module) => ({ default: module.InstallationView })));
 const FileView = lazy(() => import("@/record/FileView").then((module) => ({ default: module.FileView })));
 
@@ -113,11 +118,16 @@ export function Shell() {
           <Route path="/admin/*" element={<AdminView />} />
           <Route path="/machines" element={<MachinesView />} />
           <Route path="/machines/:key" element={<Screen><MachineView /></Screen>} />
+          <Route path="/machines/:key/installation-map" element={<Screen><InstallationMapView /></Screen>} />
           {/* The path of a file carries slashes, so it is the rest of the
               address and not one segment of it. */}
           <Route path="/machines/:key/files/*" element={<Screen><FileView owner="machine" /></Screen>} />
           <Route path="/software" element={<SoftwareListView />} />
           <Route path="/software/:key" element={<Screen><SoftwareView /></Screen>} />
+          <Route path="/providers" element={<ProviderListView />} />
+          <Route path="/providers/new" element={<Screen><NewProviderView /></Screen>} />
+          <Route path="/providers/:key" element={<Screen><ProviderView /></Screen>} />
+          <Route path="/hosting-map" element={<Screen><HostingMapView /></Screen>} />
           <Route path="/installations" element={<InstallationsView />} />
           <Route path="/installations/:key" element={<Screen><InstallationView /></Screen>} />
           <Route path="/installations/:key/files/*" element={<Screen><FileView owner="installation" /></Screen>} />

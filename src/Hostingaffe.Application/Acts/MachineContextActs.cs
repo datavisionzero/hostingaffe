@@ -108,6 +108,8 @@ public sealed class ReadMachineContext(
         var hostKey = machine.HostId is { } on
             ? (await machines.KeysAsync([on], cancellationToken)).GetValueOrDefault(on)
             : null;
+        var provider = (await machines.ProviderKeysAsync([machine.Id], cancellationToken))
+            .GetValueOrDefault(machine.Id);
 
         var edge = await EdgeAsync(installed, cancellationToken);
 
@@ -123,7 +125,7 @@ public sealed class ReadMachineContext(
             : await drift.BetweenAsync(machine, latest, cancellationToken);
 
         var document = new StringBuilder();
-        Head(document, machine, hostKey);
+        Head(document, machine, hostKey, provider);
         Reported(document, latest, disagreements, clock.GetUtcNow());
         Installations(document, installed, programs, recorded, underInstallations, edge);
         Software(document, programs);
@@ -223,7 +225,7 @@ public sealed class ReadMachineContext(
         }
     }
 
-    private static void Head(StringBuilder document, Machine machine, string? host)
+    private static void Head(StringBuilder document, Machine machine, string? host, string? provider)
     {
         document.Append("# ").Append(machine.Key).Append(" — ").Append(machine.Name).Append("\n\n");
         document
@@ -235,7 +237,8 @@ public sealed class ReadMachineContext(
         {
             ("hostname", machine.Hostname),
             ("host", host),
-            ("provider", machine.Provider),
+            ("provider", provider),
+            ("legacy provider", machine.LegacyProvider),
             ("plan", machine.Plan),
             ("location", machine.Location),
             ("os", machine.Os),

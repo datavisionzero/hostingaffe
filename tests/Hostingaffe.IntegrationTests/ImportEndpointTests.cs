@@ -29,6 +29,7 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
 
         var made = await imported.Content.ReadFromJsonAsync<JsonElement>(Ct);
         Assert.Equal(1, made.GetProperty("machines").GetInt32());
+        Assert.Equal(1, made.GetProperty("providers").GetInt32());
         Assert.Equal(1, made.GetProperty("software").GetInt32());
         Assert.Equal(2, made.GetProperty("installations").GetInt32());
         Assert.Equal(2, made.GetProperty("deployments").GetInt32());
@@ -38,6 +39,8 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         var machine = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
         Assert.Equal("The big one", machine.GetProperty("name").GetString());
         Assert.Equal("fsn1-dc14", machine.GetProperty("location").GetString());
+        Assert.Equal("hetzner", machine.GetProperty("provider").GetString());
+        Assert.Equal("hetzner", machine.GetProperty("legacy_provider").GetString());
 
         var installation = await admin.GetFromJsonAsync<JsonElement>("/api/installations/app-1", Ct);
         Assert.Equal("ex44", installation.GetProperty("machine").GetString());
@@ -112,7 +115,7 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         foreach (var address in new[]
         {
             "/api/machines/ex44", "/api/software/logaffe", "/api/installations/app-1",
-            "/api/installations/app-1/files/compose.yml", "/api/pages/backup-restore",
+            "/api/installations/app-1/files/compose.yml", "/api/pages/backup-restore", "/api/providers/hetzner",
         })
         {
             using var missing = await admin.GetAsync(address, Ct);
@@ -212,6 +215,68 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         var entry = Assert.Single(history.EnumerateArray());
         Assert.Equal("created", entry.GetProperty("field").GetString());
         Assert.Equal("maintainer", entry.GetProperty("actor").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Current_export_keeps_provider_description_machine_relationships_and_legacy_text()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var imported = await admin.PostAsJsonAsync("/api/import", new
+        {
+            providers = new[] { new
+            {
+                key = "example-host", name = "Example Host", description = "**Support** every day.",
+                history = new[] { new { field = "description", note = "source history" } },
+            } },
+            software = new[] { new { key = "web-app", name = "Web App" } },
+            machines = new object[]
+            {
+                new
+                {
+                    key = "host", kind = "dedicated", provider = "example-host", legacy_provider = "Original Host",
+                    installations = new[] { new { key = "web-prod", software = "web-app", environment = "production", role = "application" } },
+                },
+                new { key = "guest", kind = "vm", host = "host", provider = "example-host", legacy_provider = "Different VM Host" },
+            },
+        }, Ct);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.Equal(1, (await imported.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("providers").GetInt32());
+
+        var provider = await admin.GetFromJsonAsync<JsonElement>("/api/providers/example-host", Ct);
+        Assert.Equal("**Support** every day.", provider.GetProperty("description").GetString());
+        var supplied = await admin.GetFromJsonAsync<JsonElement>("/api/machines?provider=example-host", Ct);
+        Assert.Equal(new[] { "guest", "host" }, supplied.EnumerateArray().Select(m => m.GetProperty("key").GetString()));
+        var guest = await admin.GetFromJsonAsync<JsonElement>("/api/machines/guest", Ct);
+        Assert.Equal("example-host", guest.GetProperty("provider").GetString());
+        Assert.Equal("Different VM Host", guest.GetProperty("legacy_provider").GetString());
+        var installation = await admin.GetFromJsonAsync<JsonElement>("/api/installations/web-prod", Ct);
+        Assert.Equal("host", installation.GetProperty("machine").GetString());
+    }
+
+    [Fact]
+    public async Task Legacy_export_converts_distinct_provider_text_deterministically_and_keeps_vm_disagreement()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var imported = await admin.PostAsJsonAsync("/api/import", new
+        {
+            machines = new object[]
+            {
+                new { key = "host", kind = "dedicated", provider = "Example Host" },
+                new { key = "other", kind = "dedicated", provider = "example-host" },
+                new { key = "guest", kind = "vm", host = "host", provider = "Different VM Host" },
+            },
+        }, Ct);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        var providers = await admin.GetFromJsonAsync<JsonElement>("/api/providers", Ct);
+        Assert.Equal(new[] { "different-vm-host", "example-host", "example-host-2" },
+            providers.EnumerateArray().Select(p => p.GetProperty("key").GetString()));
+        var guest = await admin.GetFromJsonAsync<JsonElement>("/api/machines/guest", Ct);
+        Assert.Equal("example-host", guest.GetProperty("provider").GetString());
+        Assert.Equal("Different VM Host", guest.GetProperty("legacy_provider").GetString());
     }
 
     /// <summary>A field neither writable nor an export's is `unknown-field`, as everywhere.</summary>

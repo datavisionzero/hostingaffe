@@ -22,7 +22,7 @@ namespace Hostingaffe.Domain.Machines;
 /// machine nobody has looked at for a year says so itself.
 /// </para>
 /// <para>
-/// <see cref="HostId"/> is one of the three relationships the model has, and it
+/// <see cref="HostId"/> is one of the model's relationships, and it
 /// is only a <see cref="MachineKind.Vm"/>'s. Whether the host exists, and
 /// whether a chain of hosts closes on itself, needs the other rows and is the
 /// act's; what is here is that no other kind carries one.
@@ -80,7 +80,19 @@ public sealed class Machine
     /// <summary>Only on a <see cref="MachineKind.Vm"/>: the machine it runs on.</summary>
     public Guid? HostId { get; private set; }
 
+    /// <summary>The directly assigned provider key, only on a non-VM machine.</summary>
     public string? Provider { get; private set; }
+
+    /// <summary>The exact free-text value from before ADR 0020, retained for inspection.</summary>
+    public string? LegacyProvider { get; private set; }
+
+    /// <summary>Preserve source text from a pre-provider export without making it an assignment.</summary>
+    public void PreserveLegacyProvider(string? value)
+    {
+        if (value is { Length: > FactMaxLength })
+            throw new ArgumentException("A legacy provider value is too long.", nameof(value));
+        LegacyProvider = value;
+    }
 
     public string? Plan { get; private set; }
 
@@ -175,7 +187,12 @@ public sealed class Machine
 
         Fields.Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
         Fields.Text("hostname", edit.Hostname, Hostname, value => Hostname = value, Fact, changes);
-        Fields.Text("provider", edit.Provider, Provider, value => Provider = value, Fact, changes);
+        if ((edit.Kind ?? Kind) is MachineKind.Vm && !string.IsNullOrWhiteSpace(edit.Provider))
+        {
+            throw new ArgumentException("A vm inherits its provider from its host.", "provider");
+        }
+
+        Fields.Text("provider", edit.Provider, Provider, value => Provider = value, value => Domain.Key.Normalize(value), changes);
         Fields.Text("plan", edit.Plan, Plan, value => Plan = value, Fact, changes);
         Fields.Text("location", edit.Location, Location, value => Location = value, Fact, changes);
         Fields.Text("os", edit.Os, Os, value => Os = value, Fact, changes);
@@ -238,6 +255,12 @@ public sealed class Machine
         {
             changes.Add(new FieldChange("host", null, null));
             HostId = null;
+        }
+
+        if (Kind is MachineKind.Vm && Provider is not null)
+        {
+            changes.Add(new FieldChange("provider", Provider, null));
+            Provider = null;
         }
 
         if (changes.Count > 0)
