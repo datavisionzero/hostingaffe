@@ -139,6 +139,7 @@ builder.Services.AddScoped<MachineAssembler>();
 builder.Services.AddScoped<ProviderAssembler>();
 builder.Services.AddScoped<ListProviders>();
 builder.Services.AddScoped<ReadHostingMap>();
+builder.Services.AddScoped<ReadInstallationMap>();
 builder.Services.AddScoped<ReadProvider>();
 builder.Services.AddScoped<ReadProviderHistory>();
 builder.Services.AddScoped<CreateProvider>();

@@ -8,6 +8,7 @@ import { ago, moment } from "@/shared/when";
 import { About, Attached, Description, Files, History, Installations, StatusBadge } from "./Parts";
 import { DriftList, LastReport, ReportHistory, ReportingToken } from "./Reports";
 import { ProviderAssignment } from "./ProviderAssignment";
+import { installationMapPath } from "./addresses";
 
 type Machine = Schemas["Machine"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -131,6 +132,9 @@ export function MachineView() {
           </Section>
         )}
 
+        <div className="mb-3">
+          <Link className="text-sm font-medium text-brand hover:underline" to={installationMapPath(machine.key)}>View installation map</Link>
+        </div>
         <Installations of={{ machine: machine.key }} />
 
         {/* What the machine says about itself, beside what the record says

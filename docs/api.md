@@ -449,6 +449,27 @@ machine. It records only provider-to-machine relationships; addresses are
 machine fields. The same facts are readable with `ha provider list`,
 `ha machine list` and `ha machine view KEY`.
 
+### Installation map
+
+`GET /api/machines/{key}/installation-map` returns one `InstallationMap` for a
+live machine, including a retired one. It contains the machine's key, name and
+status, plus every non-deleted installation on it, including retired
+installations. Each entry has `key`, `name`, `software`, `role`, `status`, all
+recorded `urls`, and `latest_deployment_at` (null where no deployment is
+recorded). The latest time is derived from deployment `at`, including backfilled
+and corrected records. Entries with deployments are sorted newest first; entries
+without one follow in key order. A missing or deleted machine follows the same
+read refusal as `GET /api/machines/{key}`.
+
+This authenticated read feeds `/machines/KEY/installation-map` without a
+request per installation. The read-only diagram draws only
+machine-to-installation edges. Application installations are shown directly;
+platform installations can be expanded, and the adjacent list always shows
+all entries. Domains displayed on nodes come from distinct hostnames in the
+recorded URLs. The same facts remain available through `ha machine view KEY`,
+`ha installation list --machine KEY --retired`, `ha installation view KEY`, and
+`ha deployment list --installation KEY`.
+
 ### Software
 
 | | |

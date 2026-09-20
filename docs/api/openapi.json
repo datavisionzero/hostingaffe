@@ -2044,6 +2044,57 @@
         }
       }
     },
+    "/api/machines/{key}/installation-map": {
+      "get": {
+        "tags": [
+          "hostingaffe"
+        ],
+        "summary": "Every live installation on the machine, including retired ones, with role, status, URLs and latest deployment time in one read for the read-only installation map.",
+        "operationId": "ReadInstallationMap",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationMap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/machines/{key}/context": {
       "get": {
         "tags": [
@@ -9259,6 +9310,74 @@
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InstallationMap": {
+        "required": [
+          "machine",
+          "name",
+          "status",
+          "installations"
+        ],
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "installations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstallationMapEntry"
+            }
+          }
+        }
+      },
+      "InstallationMapEntry": {
+        "required": [
+          "key",
+          "name",
+          "software",
+          "role",
+          "status",
+          "urls",
+          "latest_deployment_at"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "software": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "latest_deployment_at": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           }
         }

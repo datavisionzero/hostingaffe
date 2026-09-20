@@ -32,6 +32,7 @@ const SoftwareView = lazy(() => import("@/record/SoftwareView").then((module) =>
 const ProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.ProviderView })));
 const NewProviderView = lazy(() => import("@/record/ProviderView").then((module) => ({ default: module.NewProviderView })));
 const HostingMapView = lazy(() => import("@/record/HostingMapView").then((module) => ({ default: module.HostingMapView })));
+const InstallationMapView = lazy(() => import("@/record/InstallationMapView").then((module) => ({ default: module.InstallationMapView })));
 const InstallationView = lazy(() => import("@/record/InstallationView").then((module) => ({ default: module.InstallationView })));
 const FileView = lazy(() => import("@/record/FileView").then((module) => ({ default: module.FileView })));
 
@@ -117,6 +118,7 @@ export function Shell() {
           <Route path="/admin/*" element={<AdminView />} />
           <Route path="/machines" element={<MachinesView />} />
           <Route path="/machines/:key" element={<Screen><MachineView /></Screen>} />
+          <Route path="/machines/:key/installation-map" element={<Screen><InstallationMapView /></Screen>} />
           {/* The path of a file carries slashes, so it is the rest of the
               address and not one segment of it. */}
           <Route path="/machines/:key/files/*" element={<Screen><FileView owner="machine" /></Screen>} />

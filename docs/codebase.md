@@ -154,10 +154,14 @@ back — so that the section and the reading cannot say the same line differentl
 `HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
 with Dagre and renders a read-only React Flow canvas. The grouped list remains
 usable if the diagram cannot load.
+`InstallationMapView.tsx` reads one machine's installation and latest deployment
+facts in one API call. `InstallationDiagram.tsx` uses the same canvas for
+machine-to-installation links. Platform entries start collapsed in the diagram;
+the adjacent list keeps every installation available.
 
 The frame is rendered before any data arrives and is never remounted by
 navigation (planaffe ADR 0006). Its routes are the instance's own addresses —
-`/` for the overview, `/machines`, `/providers`, `/hosting-map`, `/software`, `/installations`, `/history`,
+`/` for the overview, `/machines`, `/machines/:key/installation-map`, `/providers`, `/hosting-map`, `/software`, `/installations`, `/history`,
 `/pages`, `/settings`, `/admin` —
 because the API is out of the way under `/api`; in development Vite forwards
 that one prefix to the API and serves everything else itself. A detail screen

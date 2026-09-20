@@ -56,6 +56,12 @@ public static class MachineEndpoints
             .WithName("ReadMachine")
             .WithSummary("The complete machine: every field, the host it runs on, and who touched it last.");
 
+        door.MapGet("/{key}/installation-map", (string key, ReadInstallationMap read, CancellationToken cancellationToken) =>
+                read.ExecuteAsync(key, cancellationToken))
+            .WithName("ReadInstallationMap")
+            .WithSummary("Every live installation on the machine, including retired ones, with role, status, URLs and latest deployment time in one read for the read-only installation map.")
+            .Produces<InstallationMapShape>();
+
         door.MapGet("/{key}/context", (string key, ReadMachineContext read, CancellationToken cancellationToken) =>
                 read.ExecuteAsync(key, cancellationToken))
             .WithName("ReadMachineContext")
