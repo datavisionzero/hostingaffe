@@ -26,6 +26,7 @@ public static class Link
     public const string PageScheme = "page";
     public const string MachineScheme = "machine";
     public const string SoftwareScheme = "software";
+    public const string ProviderScheme = "provider";
     public const string InstallationScheme = "installation";
 
     /// <summary>What a link to the page <paramref name="slug"/> has as its target.</summary>

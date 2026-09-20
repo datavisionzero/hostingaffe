@@ -369,7 +369,7 @@ follow its anchor into deletion.
 
 A body names another thing of the record as a Markdown link whose target is a
 scheme and an address — `[the runbook](page:backup-restore)`, and likewise
-`machine:ex44`, `software:caddy` and `installation:app-1`
+`machine:ex44`, `software:caddy`, `provider:example-host` and `installation:app-1`
 ([ADR 0007](docs/adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)).
 That is the Key rule above written down: where a key stands alone it carries
 its type. Nothing validates a body, so a reference that points at nothing is

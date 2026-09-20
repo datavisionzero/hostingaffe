@@ -392,7 +392,13 @@ public sealed class ListMachines(IMachines machines, MachineAssembler assembler)
 {
     public async Task<IReadOnlyList<MachineSummaryShape>> ExecuteAsync(
         string? status, string? kind, bool retired, string? activity, CancellationToken cancellationToken) =>
-        await assembler.SummariesAsync(
+        await ExecuteAsync(status, kind, retired, activity, null, cancellationToken);
+
+    public async Task<IReadOnlyList<MachineSummaryShape>> ExecuteAsync(
+        string? status, string? kind, bool retired, string? activity, string? provider,
+        CancellationToken cancellationToken)
+    {
+        var summaries = await assembler.SummariesAsync(
             await machines.ListAsync(
                 Validated.Field("status", () => Spelling.Read<Status>(status, "status")),
                 Validated.Field("kind", () => Spelling.Read<MachineKind>(kind, "kind")),
@@ -400,6 +406,11 @@ public sealed class ListMachines(IMachines machines, MachineAssembler assembler)
                 cancellationToken),
             ActivityWindow.Read(activity),
             cancellationToken);
+
+        if (provider is null) return summaries;
+        var key = Validated.Field("provider", () => Key.Normalize(provider));
+        return [.. summaries.Where(machine => machine.Provider == key)];
+    }
 }
 
 public sealed class ReadMachine(IMachines machines, MachineAssembler assembler, InstanceSettings settings)
@@ -492,6 +503,7 @@ public sealed class CreateMachine(
 
         var machine = await transactions.RunAsync(async () =>
         {
+            await MachineWrites.GuardProviderAsync(providers, edit.Provider, cancellationToken);
             var now = clock.GetUtcNow();
             var created = Validated.Field("name", () => Machine.Create(key, request.Name, kind, caller.Id, now));
 
@@ -569,6 +581,7 @@ public sealed class ChangeMachine(
 
         var machine = await transactions.RunAsync(async () =>
         {
+            await MachineWrites.GuardProviderAsync(providers, edit.Provider, cancellationToken);
             var row = await machines.LoadForWriteAsync(before.Id, cancellationToken)
                 ?? throw new Refusal(RefusalCode.NotFound, $"No machine {key}.");
 
@@ -598,6 +611,16 @@ public sealed class ChangeMachine(
 
 internal static class MachineWrites
 {
+    public static async Task GuardProviderAsync(
+        IProviders providers, string? key, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(key)
+            && !await providers.AssignableForWriteAsync(key, cancellationToken))
+        {
+            throw Refusal.Validation("provider", $"No live provider {key}.");
+        }
+    }
+
     /// <summary>
     /// A field the object does not define is <c>unknown-field</c>, never
     /// silently ignored (<c>docs/api.md</c>, Conventions).

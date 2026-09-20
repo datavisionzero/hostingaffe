@@ -54,13 +54,13 @@ describe("the Markdown pipeline (planaffe ADR 0007)", () => {
     expect(admitUrl("http://example.org", "href", { type: "element", tagName: "a", properties: {}, children: [] })).toBe("http://example.org");
   });
 
-  // ADR 0007: the record's own four schemes are this instance's addresses, so
+  // ADR 0007: the record's own schemes are this instance's addresses, so
   // they are followed rather than opened.
   it("follows a link of the record instead of opening it", () => {
     renderAt(
       "/pages/architecture",
       <Markdown>
-        {"[the runbook](page:backup-restore) [ex44](machine:ex44) [caddy](software:caddy) [app-1](installation:app-1)"}
+        {"[the runbook](page:backup-restore) [ex44](machine:ex44) [caddy](software:caddy) [hoster](provider:example-host) [app-1](installation:app-1)"}
       </Markdown>,
     );
 
@@ -71,6 +71,7 @@ describe("the Markdown pipeline (planaffe ADR 0007)", () => {
 
     expect(screen.getByRole("link", { name: "ex44" })).toHaveAttribute("href", "/machines/ex44");
     expect(screen.getByRole("link", { name: "caddy" })).toHaveAttribute("href", "/software/caddy");
+    expect(screen.getByRole("link", { name: "hoster" })).toHaveAttribute("href", "/providers/example-host");
     expect(screen.getByRole("link", { name: "app-1" })).toHaveAttribute("href", "/installations/app-1");
   });
 

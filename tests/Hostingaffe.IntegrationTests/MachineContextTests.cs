@@ -227,6 +227,7 @@ public sealed class MachineContextTests(PostgresFixture postgres)
     /// </summary>
     private static async Task AHostAsync(HttpClient client, int installations)
     {
+        await Created(client, "/api/providers", new { key = "hetzner" });
         await Created(client, "/api/machines", new
         {
             key = "ex44",

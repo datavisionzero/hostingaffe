@@ -203,7 +203,7 @@ so that restoring a machine restores the whole picture; only the purge unhooks
 it, and the page becomes a page of the instance.
 
 **The history survives everything, the purge included.** A key is written into
-a register when it is given out. Machine and software keys stay reserved; an
+a register when it is given out. Machine, software and provider keys stay reserved; an
 installation key stays reserved unless its owner is explicitly purged after
 deletion ([ADR 0019](adr/0019-an-installation-key-can-be-released-explicitly.md)).
 
@@ -289,7 +289,7 @@ collected in time is expired rather than approved.
 
 | | |
 |---|---|
-| `GET /api/machines` | every machine as a slim `MachineSummary`, by key; `status`, `kind` and `activity` |
+| `GET /api/machines` | every machine as a slim `MachineSummary`, by key; `status`, `kind`, effective `provider` and `activity` |
 | `POST /api/machines` | `key` and `kind` are required, everything else may arrive later |
 | `GET /api/machines/{key}` | the complete machine |
 | `PATCH /api/machines/{key}` | any field but the key; `If-Match` guards it |
@@ -342,6 +342,16 @@ measuring again.
 is refused. A machine is not its own host, and a chain of hosts that would close
 on itself is refused. A machine that stops being a `vm` loses its host, and the
 history says so.
+
+`provider` names a live provider key on a non-VM machine. An empty string
+clears the assignment; a missing or deleted key is `validation`. A VM cannot
+receive a direct assignment. Its `provider` in complete and summary reads is
+derived through its host chain, so changing the host or its provider changes
+the VM's effective value. `GET /api/machines?provider=KEY` filters on that
+effective value and therefore includes VMs. `legacy_provider` on a complete
+machine is the exact read-only value carried over from the former free-text
+field, including any VM value that disagrees with its host. It is visible in
+the machine context document too. Writes cannot set it.
 
 `status` is `planned`, `active` or `retired` and defaults to `active`: a record
 is usually made for a machine that already exists, and `planned` is the case a
@@ -408,6 +418,25 @@ deliberate exception to what this document otherwise avoids — describing
 presentation. A client that built it would ask about thirty times for a host of
 that size, and the web application's machine screen is the same assembly; one of
 them is what keeps the two saying the same thing.
+
+### Providers
+
+| | |
+|---|---|
+| `GET /api/providers` | live providers as slim `ProviderSummary` rows, by key |
+| `POST /api/providers` | create a provider; `key` is required |
+| `GET /api/providers/{key}` | name, Markdown description, authors and timestamps |
+| `PATCH /api/providers/{key}` | change name or description; `If-Match` guards it |
+| `GET /api/providers/{key}/history` | its changes, oldest first |
+| `DELETE /api/providers/{key}`, `POST /api/providers/{key}/restore` | soft delete and restore |
+
+A provider key is immutable and remains reserved after deletion. Unknown
+fields are refused, as on other records. Changes and lifecycle acts write
+history, and description changes record that the text changed without copying
+its content into history. `GET /api/machines?provider=KEY` lists its machines,
+including VMs by inherited provider. A provider cannot be deleted while any
+machine still refers to it, even if that machine is deleted but restorable.
+An agent may read and write providers with the same authorization as machines.
 
 ### Software
 
@@ -1047,7 +1076,7 @@ what was found and where:
  "number": null, "directory": null, "owner": null, "where": "ports"}
 ```
 
-`kind` is `machine`, `software`, `installation`, `deployment`, `file` or `page`,
+`kind` is `machine`, `provider`, `software`, `installation`, `deployment`, `file` or `page`,
 and the hits come in that order. `key` is the address — a key, a page's slug, a
 file's path, or the installation a deployment lives under; `number` is the
 deployment's number and nothing else has one; `directory` is where a machine's
@@ -1200,13 +1229,14 @@ one thing.
 
 **A body names another thing of the record with a scheme and an address**:
 `[Restoring a backup](page:backup-restore)`, `[ex44](machine:ex44)`,
-`[caddy](software:caddy)`, `[app-1](installation:app-1)`
+`[caddy](software:caddy)`, `[Example Host](provider:example-host)`,
+`[app-1](installation:app-1)`
 ([ADR 0007](adr/0007-a-record-is-linked-from-markdown-as-a-scheme-and-a-key.md)).
 The scheme carries the type because the address does not — a key is unique per
 entity type, so the machine `caddy` and the software `caddy` coexist.
 
 Nothing validates it. The instance stores Markdown and does not parse it, so a
 link to a page that does not exist is stored like any other text; the web
-application resolves the four schemes to its own addresses and `ha page check`
+application resolves these schemes to its own addresses and `ha page check`
 says which references point at nothing. Renaming a page therefore breaks its
 inbound links, as it always did — the check is how that shows itself.

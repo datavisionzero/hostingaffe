@@ -23,12 +23,12 @@ public static class MachineEndpoints
 
         door.MapGet(
                 string.Empty,
-                (string? status, string? kind, bool? retired, string? activity,
+                (string? status, string? kind, bool? retired, string? activity, string? provider,
                  ListMachines list, CancellationToken cancellationToken) =>
-                    list.ExecuteAsync(status, kind, retired ?? false, activity, cancellationToken))
+                    list.ExecuteAsync(status, kind, retired ?? false, activity, provider, cancellationToken))
             .WithName("ListMachines")
             .WithSummary(
-                "Every machine as a slim MachineSummary, by key, without the descriptions. `status` and `kind` filter. "
+                "Every machine as a slim MachineSummary, by key, without the descriptions. `status`, `kind` and effective `provider` filter. "
                 + "Retired machines are left out unless `retired=true` or `status=retired`; not paginated. "
                 + "`activity` — a count of hours or days, `24h` or `7d`, at most `90d` — adds what has been going on "
                 + "per row: how many acts and how many deployments fall inside the window, the newest deployment "

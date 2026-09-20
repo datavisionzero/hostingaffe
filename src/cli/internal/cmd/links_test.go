@@ -15,7 +15,7 @@ import (
 func TestReferencesInABodyAreTheRecordsOwnSchemes(t *testing.T) {
 	body := strings.Join([]string{
 		"Read [the runbook](page:backup-restore) on [ex44](machine:ex44).",
-		"[caddy](software:caddy) runs as [app-1](installation:app-1#ports).",
+		"[caddy](software:caddy) runs as [app-1](installation:app-1#ports) at [hoster](provider:example-host).",
 		"Not this: [a](https://example.org), [b](../decisions/x.md), [c](#heading), [d](page:Not-A-Slug).",
 		"",
 		"```sh",
@@ -32,6 +32,7 @@ func TestReferencesInABodyAreTheRecordsOwnSchemes(t *testing.T) {
 		{Page: "setup", Text: "ex44", Target: "machine:ex44", kind: "machine", address: "ex44"},
 		{Page: "setup", Text: "caddy", Target: "software:caddy", kind: "software", address: "caddy"},
 		{Page: "setup", Text: "app-1", Target: "installation:app-1#ports", kind: "installation", address: "app-1"},
+		{Page: "setup", Text: "hoster", Target: "provider:example-host", kind: "provider", address: "example-host"},
 		{Page: "setup", Text: "f", Target: "page:by-reference", kind: "page", address: "by-reference"},
 	}
 

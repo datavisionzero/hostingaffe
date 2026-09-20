@@ -26,13 +26,15 @@ public sealed class HistoryReadTests(PostgresFixture postgres)
         await using var instance = await AnInstance.BootstrappedAsync(postgres);
         using var admin = instance.ClientWith(AnInstance.BootstrapToken);
         await Ground(admin);
+        using var provider = await admin.PostAsJsonAsync("/api/providers", new { key = "hetzner" }, Ct);
+        Assert.Equal(HttpStatusCode.Created, provider.StatusCode);
 
         var machine = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44", Ct);
         using var changed = await Patch(
             admin,
             "/api/machines/ex44?note=the%20new%20box",
             machine.GetProperty("updated_at").GetString()!,
-            new { provider = "Hetzner", os = "Debian 12", arch = "arm64" });
+            new { provider = "hetzner", os = "Debian 12", arch = "arm64" });
         Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
 
         using var deployed = await admin.PostAsJsonAsync(
@@ -68,7 +70,7 @@ public sealed class HistoryReadTests(PostgresFixture postgres)
         // a deployment is in this reading once, as the record it is, never
         // again as the history row its recording wrote beside it.
         Assert.Equal(
-            ["deployment", "machine", "installation", "deployment", "software", "machine"],
+            ["deployment", "machine", "provider", "installation", "deployment", "software", "machine"],
             events.Select(one => Field(one, "subject_kind")));
     }
 

@@ -82,7 +82,7 @@ func newHistory(g *globals) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&machine, "machine", "", "only what hangs on this machine: its own changes, its installations', their deployments, the files of both, the pages attached to either")
-	cmd.Flags().StringVar(&kind, "kind", "", "only one kind of subject: machine, software, installation, deployment, file or page")
+	cmd.Flags().StringVar(&kind, "kind", "", "only one kind of subject: machine, provider, software, installation, deployment, file or page")
 	cmd.Flags().StringVar(&since, "since", "", "how far back to read: 24h, 7d, 2w, a Go duration, or an RFC 3339 moment. Without it, one page")
 	cmd.Flags().Int32Var(&limit, "limit", 0, "how many events per call; the instance caps it at 200 whatever is asked")
 	return cmd

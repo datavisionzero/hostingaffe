@@ -8,7 +8,7 @@ import { useSession } from "@/session/useSession";
 import { cn } from "@/lib/utils";
 import { Keys } from "./ShortcutsDialog";
 import { is } from "./shortcuts";
-import { anchorPath, installationPath, machinePath, softwarePath } from "@/record/addresses";
+import { anchorPath, installationPath, machinePath, providerPath, softwarePath } from "@/record/addresses";
 import { pagePath, viewPath, views } from "./views";
 
 type SearchHit = Schemas["SearchHit"];
@@ -308,6 +308,7 @@ function where(hit: SearchHit): string | undefined {
   switch (hit.kind) {
     case "machine": return machinePath(hit.key);
     case "software": return softwarePath(hit.key);
+    case "provider": return providerPath(hit.key);
     case "installation": return installationPath(hit.key);
     case "page": return pagePath(hit.key);
     case "file": return hit.owner === null || hit.owner === undefined

@@ -19,6 +19,10 @@ export function softwarePath(key: string): string {
   return `/software/${encodeURIComponent(key)}`;
 }
 
+export function providerPath(key: string): string {
+  return `/providers/${encodeURIComponent(key)}`;
+}
+
 export function installationPath(key: string): string {
   return `/installations/${encodeURIComponent(key)}`;
 }

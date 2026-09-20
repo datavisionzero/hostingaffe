@@ -136,6 +136,13 @@ builder.Services.AddSingleton(InstanceSettings.FromVariables(
 
 // The record itself (VISION 7): the computers the instance knows about.
 builder.Services.AddScoped<MachineAssembler>();
+builder.Services.AddScoped<ProviderAssembler>();
+builder.Services.AddScoped<ListProviders>();
+builder.Services.AddScoped<ReadProvider>();
+builder.Services.AddScoped<ReadProviderHistory>();
+builder.Services.AddScoped<CreateProvider>();
+builder.Services.AddScoped<ChangeProvider>();
+builder.Services.AddScoped<MoveProvider>();
 builder.Services.AddScoped<ListMachines>();
 builder.Services.AddScoped<ReadMachine>();
 builder.Services.AddScoped<ReadMachineHistory>();
@@ -292,6 +299,7 @@ api.MapIdentities();
 api.MapBrowserIdentity();
 api.MapDeviceLogin();
 api.MapMachines();
+api.MapProviders();
 api.MapSoftware();
 api.MapInstallations();
 api.MapFiles();

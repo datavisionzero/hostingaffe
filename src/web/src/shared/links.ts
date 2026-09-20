@@ -1,5 +1,5 @@
 import type { UrlTransform } from "react-markdown";
-import { installationPath, machinePath, softwarePath } from "@/record/addresses";
+import { installationPath, machinePath, providerPath, softwarePath } from "@/record/addresses";
 import { pagePath } from "@/shell/views";
 
 /**
@@ -11,7 +11,7 @@ import { pagePath } from "@/shell/views";
 const admitted = new Set(["http:", "https:", "mailto:"]);
 
 /**
- * The four schemes a body names another thing of the record with
+ * The schemes a body names another thing of the record with
  * (ADR 0007): `[Restoring a backup](page:backup-restore)`,
  * `[ex44](machine:ex44)`, `[caddy](software:caddy)`,
  * `[app-1](installation:app-1)`.
@@ -23,6 +23,7 @@ const admitted = new Set(["http:", "https:", "mailto:"]);
 const record: Record<string, (address: string) => string> = {
   "machine:": machinePath,
   "software:": softwarePath,
+  "provider:": providerPath,
   "installation:": installationPath,
   "page:": pagePath,
 };
