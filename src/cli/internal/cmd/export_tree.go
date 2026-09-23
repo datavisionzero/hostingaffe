@@ -184,6 +184,8 @@ func machineMarkdown(machine machineRecord) string {
 		{"ssh", value(machine.Ssh)},
 		{"ports", render.Ports(machine.Ports)},
 		{"measured", stamp(machine.MeasuredAt)},
+		{"avatar", value((*string)(machine.Avatar))},
+		{"avatar color", value((*string)(machine.AvatarColor))},
 	})
 
 	body(&out, machine.Description)

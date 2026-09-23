@@ -292,6 +292,32 @@ func TestPortsAreWrittenAsPeopleWriteThem(t *testing.T) {
 	}
 }
 
+// A machine's picture is chosen in the words of its two closed sets, and the
+// empty value clears it like a text field (ADR 0021).
+func TestAMachinesPictureIsChosenInWordsAndClearedByEmptiness(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	if code, _, stderr := run(t, server, "machine", "set", "ex44", "--avatar", "monkey", "--avatar-color", "teal"); code != exit.OK {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	body := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	if len(body) != 2 || body["avatar"] != "monkey" || body["avatar_color"] != "teal" {
+		t.Errorf("body = %v", body)
+	}
+
+	if code, _, _ := run(t, server, "machine", "set", "ex44", "--avatar", ""); code != exit.OK {
+		t.Fatal("code")
+	}
+	body = map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	if len(body) != 1 || body["avatar"] != "" {
+		t.Errorf("cleared body = %v", body)
+	}
+}
+
 // A machine keeps the ports no installation of it answers to — SSH, a Wireguard
 // endpoint — in the same field and the same spelling (CONTEXT.md, Port).
 func TestAMachineKeepsItsOwnPorts(t *testing.T) {
