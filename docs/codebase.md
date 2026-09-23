@@ -156,7 +156,10 @@ with Dagre and renders a read-only React Flow canvas. The grouped list can be
 hidden while the diagram renders; if the diagram cannot load, the list is
 shown and stays shown. Its find control only moves the canvas's view onto a
 node, through the `focus` that `Diagram.tsx` accepts; the cards carry their
-fixed size, so React Flow can frame one without measuring it first.
+fixed size, so React Flow can frame one without measuring it first. The focus
+view is a Base UI dialog filling the window, which brings Escape, focus return
+and an inert page behind it; it keeps its own list visibility, and the
+diagram's `frame` makes the canvas fit again once it has taken its new size.
 `InstallationMapView.tsx` reads one machine's installation and latest deployment
 facts in one API call. `InstallationDiagram.tsx` uses the same canvas for
 machine-to-installation links. Platform entries start collapsed in the diagram;
