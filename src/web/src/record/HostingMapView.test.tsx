@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Schemas } from "@/api/client";
 import { installInstance, renderAt } from "@/shared/testing";
@@ -6,8 +7,13 @@ import { HostingMapView } from "./HostingMapView";
 import { mapDiagram } from "./hostingMapData";
 import { layoutDiagram } from "./diagramLayout";
 
+const diagram = vi.hoisted(() => ({ fails: true }));
+
 vi.mock("./HostingDiagram", () => ({
-  HostingDiagram: () => { throw new Error("Diagram failed to render"); },
+  HostingDiagram: () => {
+    if (diagram.fails) throw new Error("Diagram failed to render");
+    return <div role="region" aria-label="Provider to machine diagram" />;
+  },
 }));
 
 const map: Schemas["HostingMap"] = {
@@ -22,7 +28,10 @@ const map: Schemas["HostingMap"] = {
   ],
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  diagram.fails = true;
+});
 
 it("draws only provider-to-machine edges, including inherited VM providers", () => {
   const graph = mapDiagram(map);
@@ -67,4 +76,49 @@ it("shows a failed read with a way to the ordinary machine list", async () => {
   renderAt("/hosting-map", <HostingMapView />);
   expect(await screen.findByText("Map unavailable.")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "All machines" })).toHaveAttribute("href", "/machines");
+});
+
+it("hides the grouped list on request and gives the diagram the whole width", async () => {
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByRole("region", { name: "Provider to machine diagram" });
+
+  const toggle = screen.getByRole("button", { name: "Hide list" });
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(toggle).toHaveAttribute("aria-controls", "hosting-map-list");
+  const list = screen.getByRole("region", { name: "Providers and machines" });
+  const layout = list.parentElement!;
+  expect(layout).toHaveAttribute("data-list", "shown");
+  expect(layout.className).toContain("xl:grid-cols-");
+
+  await userEvent.click(toggle);
+  expect(screen.queryByRole("region", { name: "Providers and machines" })).toBeNull();
+  expect(list).not.toBeVisible();
+  expect(layout).toHaveAttribute("data-list", "hidden");
+  expect(layout.className).not.toContain("xl:grid-cols-");
+  expect(screen.getByRole("button", { name: "Show list" })).toHaveAttribute("aria-expanded", "false");
+
+  screen.getByRole("button", { name: "Show list" }).focus();
+  await userEvent.keyboard("{Enter}");
+  expect(screen.getByRole("region", { name: "Providers and machines" })).toBeVisible();
+  expect(within(list).getByRole("link", { name: "Example Host" })).toHaveAttribute("href", "/providers/example-host");
+  expect(layout).toHaveAttribute("data-list", "shown");
+});
+
+it("offers no way to hide the list when the diagram cannot render", async () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByText("The diagram is unavailable. The grouped list has every provider and machine.");
+  expect(screen.getByRole("region", { name: "Providers and machines" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /list/ })).toBeNull();
+  error.mockRestore();
+});
+
+it("has no list control on an empty map", async () => {
+  installInstance({ "GET /api/hosting-map": { providers: [], machines: [] } });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByText("No providers or machines yet.");
+  expect(screen.queryByRole("button", { name: /list/ })).toBeNull();
 });
