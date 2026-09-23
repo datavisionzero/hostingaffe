@@ -436,6 +436,8 @@ the office. It exists whether or not anything is installed on it.
 | `status` | `planned` · `active` · `retired` | closed set |
 | `measured_at` | date | when the facts above were last verified against the machine |
 | `description` | Markdown | what the machine is for, and anything that fits nowhere else |
+| `avatar` | closed set, optional | the picture the machine is recognised by — see below |
+| `avatar_color` | closed set, optional | the colour that picture is drawn in |
 
 Hardware fields are text, not numbers, with `arch` as the one exception. We
 want to compare machines by eye, not sum their memory, and "2×512G NVMe ZFS
@@ -458,6 +460,23 @@ silenced (16).
 
 **Deliberately left out:** rack, serial number, warranty, purchase date, owner,
 tags, monthly cost (17.), a free-form key/value bag.
+
+**A machine has a face.** `avatar` names one of the pictures the product ships
+with — animals and devices, drawn for it and published under the same licence
+as everything else — and `avatar_color` one of ten colours it is drawn in. Both
+are closed sets, and nothing is uploaded: the record keeps two words, not an
+image, and no picture is fetched from anywhere but the instance itself. Neither
+is required. A machine that has none is shown with one the web interface
+derives from its key, the same one every time, and that derived picture is
+never written back — the record says what someone chose, not what the screen
+guessed. Whether a device is drawn with a face or as a plain symbol is each
+person's own setting in the web interface, not a fact about the machine
+([ADR 0021](docs/adr/0021-a-machine-has-a-picture-from-a-closed-set.md)).
+
+| closed set | values |
+| --- | --- |
+| `avatar` | `monkey` · `gorilla` · `sloth` · `raccoon` · `fox` · `owl` · `penguin` · `octopus` · `cat` · `frog` · `bear` · `wolf` · `lion` · `puma` · `robot` · `rack` · `turbo` · `tower` · `minipc` · `minimac` · `desktop` · `laptop` · `devbook` · `aibox` · `monitor` · `router` · `proxy` · `signpost` · `firewall` · `cloud` · `container` · `database` · `harddrive` · `bucket` · `floppy` · `tape` · `logbook` · `gauge` |
+| `avatar_color` | `brown` · `slate` · `teal` · `orange` · `berry` · `sage` · `blue` · `red` · `mustard` · `lavender` |
 
 An unassigned machine, including a `local` one, has no provider. A local
 machine may be assigned one when an external provider actually supplies it;

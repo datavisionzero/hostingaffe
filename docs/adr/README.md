@@ -50,6 +50,7 @@ material value to understanding the decision.
 - [0018 – The front page is a tile per machine, and it is not monitoring](./0018-the-front-page-is-a-tile-per-machine.md)
 - [0019 – An installation key can be released explicitly](./0019-an-installation-key-can-be-released-explicitly.md)
 - [0020 – A provider is a record, and a VM inherits it](./0020-a-provider-is-a-record-and-a-vm-inherits-it.md)
+- [0021 – A machine has a picture from a closed set](./0021-a-machine-has-a-picture-from-a-closed-set.md)
 
 ## Adopted from planaffe
 

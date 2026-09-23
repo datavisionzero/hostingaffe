@@ -62,6 +62,8 @@ not anything is installed on it.
 | `arch` | `amd64` · `arm64` |
 | `status` | `planned` · `active` · `retired` |
 | `protocol`, `scope` (of a port) | see Port |
+| `avatar` | `monkey` · `gorilla` · `sloth` · `raccoon` · `fox` · `owl` · `penguin` · `octopus` · `cat` · `frog` · `bear` · `wolf` · `lion` · `puma` · `robot` · `rack` · `turbo` · `tower` · `minipc` · `minimac` · `desktop` · `laptop` · `devbook` · `aibox` · `monitor` · `router` · `proxy` · `signpost` · `firewall` · `cloud` · `container` · `database` · `harddrive` · `bucket` · `floppy` · `tape` · `logbook` · `gauge` |
+| `avatar_color` | `brown` · `slate` · `teal` · `orange` · `berry` · `sage` · `blue` · `red` · `mustard` · `lavender` |
 
 `host` is set only on a `vm`, and names the machine it runs on. Hardware facts
 are text rather than numbers, `arch` excepted: machines are compared by eye,
@@ -83,6 +85,15 @@ an installation has, in the same shape (see Port). **An empty list says nothing
 rather than "none":** the record holds no ports for this machine, and the drift
 that reads it is simply not computed. Whoever writes one down switches that
 comparison on and can clear every finding it makes.
+
+`avatar` and `avatar_color` are the machine's picture: one of the drawings the
+product ships with, in one of its colours. Both are optional, and a machine
+without them is shown with a picture derived from its key — derived on every
+read, never stored. **A picture is not a kind:** a `rack` avatar on a `local`
+machine says nothing about the machine, it only makes it recognisable. The
+avatar of a rack-mounted computer is called `rack` because "server" is a word
+this product does not use (below). Whether a device is drawn with a face is a
+person's setting in the web interface, not a field.
 
 `last_seen` is derived and never written: the moment the instance received the
 machine's latest report. It stands beside `measured_at` and answers a different
