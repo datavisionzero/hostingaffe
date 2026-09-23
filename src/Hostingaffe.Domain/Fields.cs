@@ -114,6 +114,41 @@ public static class Fields
     }
 
     /// <summary>
+    /// A closed set that may also be empty: <c>null</c> leaves it alone, a
+    /// blank word clears it, and any other word has to be one of the set —
+    /// the rule of a text field, for a value that is a word of a closed set.
+    /// </summary>
+    /// <exception cref="ArgumentException">The word is not one of the set; the message lists them.</exception>
+    public static void Optional<T>(
+        string field,
+        string? given,
+        T? current,
+        Action<T?> set,
+        List<FieldChange> changes)
+        where T : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        ArgumentNullException.ThrowIfNull(changes);
+
+        if (given is null)
+        {
+            return;
+        }
+
+        var value = Spelling.Read<T>(given, field);
+        if (Nullable.Equals(value, current))
+        {
+            return;
+        }
+
+        set(value);
+        changes.Add(new FieldChange(
+            field,
+            current is { } was ? Spelling.Of(was) : null,
+            value is { } now ? Spelling.Of(now) : null));
+    }
+
+    /// <summary>
     /// A whole list at once: absent leaves it alone, an empty list clears it,
     /// and anything else replaces it. A list is not patched entry by entry —
     /// there is no address for an entry, and a caller who sends two of them

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/session/useSession";
 import { TextActionDialog } from "@/shared/ActionDialog";
+import { AvatarDrawing } from "@/record/avatars/MachineAvatar";
+import { useFaces } from "@/record/avatars/avatars";
 import { reporting } from "@/shared/report";
 import { date, submitting } from "./forms";
 import { Row, Rows, Said, Secret, Section, SettingsShell } from "./SettingsShell";
@@ -19,6 +21,7 @@ export function SettingsView() {
       title="Personal settings"
       areas={[
         { to: "profile", label: "Profile", element: <Profile /> },
+        { to: "appearance", label: "Appearance", element: <Appearance /> },
         { to: "security", label: "Security", element: <Security /> },
         { to: "tokens", label: "User tokens", element: <Tokens /> },
         { to: "agents", label: "Agents", element: <Agents /> },
@@ -42,6 +45,27 @@ function Profile() {
         <Button type="submit" variant="outline">Change email</Button>
       </form>
       <Said notice={notice} />
+    </Section>
+  );
+}
+
+/**
+ * How this browser draws the record. Kept in the browser, like the theme: it is
+ * one person's taste, and nobody else's screen changes with it (ADR 0021).
+ */
+function Appearance() {
+  const [faces, setFaces] = useFaces();
+  return (
+    <Section title="Machine avatars" description="Devices can be drawn with a face or as a plain symbol. Animals always keep their face. This setting applies to this browser only.">
+      <label className="flex items-center gap-3 text-sm">
+        <input type="checkbox" name="avatar-faces" checked={faces} onChange={(e) => setFaces(e.target.checked)} className="size-4 accent-brand" />
+        Draw machine avatars with faces
+        <span aria-hidden className="ml-auto flex gap-1">
+          <AvatarDrawing avatar="rack" color="teal" size={28} />
+          <AvatarDrawing avatar="laptop" color="berry" size={28} />
+          <AvatarDrawing avatar="monkey" color="brown" size={28} />
+        </span>
+      </label>
     </Section>
   );
 }

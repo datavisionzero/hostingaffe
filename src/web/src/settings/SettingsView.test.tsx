@@ -125,3 +125,20 @@ it("moves between areas from an area, without growing the address", async () => 
   expect(screen.getByTestId("at")).toHaveTextContent("/settings/profile");
   expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
 });
+
+// Whether devices have a face is this browser's, like the theme, and every
+// avatar on the page follows the switch at once (ADR 0021).
+it("keeps whether avatars have faces in this browser", async () => {
+  localStorage.removeItem("avatar-faces");
+  settings({}, "/settings/appearance");
+  const user = userEvent.setup();
+
+  const faces = await screen.findByRole("checkbox", { name: /with faces/ });
+  expect(faces).toBeChecked();
+
+  await user.click(faces);
+
+  expect(faces).not.toBeChecked();
+  expect(localStorage.getItem("avatar-faces")).toBe("off");
+  localStorage.removeItem("avatar-faces");
+});

@@ -145,6 +145,9 @@ func Machine(w io.Writer, m api.Machine) {
 	// An empty list says nothing about the machine rather than "none".
 	line(w, said("ports", Ports(m.Ports)))
 	line(w, maybe("os", m.Os), maybe("cpu", m.Cpu), maybe("memory", m.Memory), maybe("disk", m.Disk))
+	// The picture the web interface draws, in the words it is chosen by; `ha`
+	// draws nothing (ADR 0021).
+	line(w, maybe("avatar", (*string)(m.Avatar)), maybe("avatar color", (*string)(m.AvatarColor)))
 	// `measured` is when a person last checked the facts; `last seen` is when
 	// the machine last spoke for itself. The two mean different things, and
 	// standing beside each other is what makes that readable (CONTEXT.md).

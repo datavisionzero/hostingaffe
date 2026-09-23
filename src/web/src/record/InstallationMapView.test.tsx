@@ -17,7 +17,7 @@ vi.mock("./InstallationDiagram", () => ({
 }));
 
 const map: Schemas["InstallationMap"] = {
-  machine: "host", name: "Example host", status: "active",
+  machine: "host", name: "Example host", status: "active", avatar: null, avatar_color: null,
   installations: [
     { key: "new", name: "New site", software: "site", role: "application", status: "active",
       urls: ["https://one.example.test/a", "https://two.example.test", "https://one.example.test/b"],

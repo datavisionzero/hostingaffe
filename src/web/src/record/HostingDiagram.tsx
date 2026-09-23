@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Diagram, type DiagramFocus } from "./Diagram";
 import type { DiagramItem } from "./diagramLayout";
 import { StatusBadge } from "./Parts";
+import { MachineAvatar } from "./avatars/MachineAvatar";
 
 type Provider = Schemas["HostingMapProvider"];
 type Machine = Schemas["HostingMapMachine"];
@@ -32,8 +33,9 @@ export function MachineCard({ data, selected }: NodeProps) {
   ].filter(([, value]) => value !== null);
   return <div className={cn("flex h-full flex-col rounded-xl border bg-card px-4 py-3 shadow-sm", selected && found)}>
     <Handle type="target" position={Position.Left} isConnectable={false} className="!size-2 !border-0 !bg-brand" />
-    <div className="flex items-center justify-between gap-2">
-      <span className="truncate text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">{machine.kind}</span>
+    <div className="flex items-center gap-2">
+      <MachineAvatar machine={machine} size={24} />
+      <span className="mr-auto truncate text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">{machine.kind}</span>
       <StatusBadge status={machine.status} />
     </div>
     <Link className="nodrag nopan mt-1 truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"

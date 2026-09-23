@@ -9,6 +9,7 @@ import { About, Attached, Description, Files, History, Installations, StatusBadg
 import { DriftList, LastReport, ReportHistory, ReportingToken } from "./Reports";
 import { ProviderAssignment } from "./ProviderAssignment";
 import { installationMapPath } from "./addresses";
+import { AvatarChooser } from "./avatars/AvatarChooser";
 
 type Machine = Schemas["Machine"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -51,6 +52,7 @@ export function MachineView() {
       <PageHeader
         title={
           <span className="flex items-center gap-2">
+            <AvatarChooser machine={machine} onWritten={() => { again(); history.again(); }} />
             <span className="font-mono text-xs font-normal text-muted-foreground">{machine.key}</span>
             {machine.name}
           </span>

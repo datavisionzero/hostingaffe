@@ -52,6 +52,13 @@ describe("the machines (VISION 6.2)", () => {
     expect(screen.getByText("never measured")).toBeInTheDocument();
   });
 
+  it("draws each machine's avatar before its key", async () => {
+    installInstance({ "GET /api/machines": [{ ...aMachine("web-01"), avatar: "owl", avatar_color: "red" }] });
+    renderAt("/machines", <MachinesView />);
+
+    expect(await screen.findByRole("img", { name: "red owl" })).toBeInTheDocument();
+  });
+
   // The list somebody works off on a Friday afternoon: which of them are
   // waiting for a restart. A word, no colour and no threshold — and nothing at
   // all where the machine never said (VISION 5).

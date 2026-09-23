@@ -140,6 +140,15 @@ public sealed class Machine
     /// <summary>When the facts above were last verified against the machine.</summary>
     public DateTimeOffset? MeasuredAt { get; private set; }
 
+    /// <summary>
+    /// The picture the machine is recognised by, and the colour it is drawn in
+    /// (ADR 0021). Both optional: a machine without them is shown with a
+    /// picture derived from its key, and that one is never stored.
+    /// </summary>
+    public Avatar? Avatar { get; private set; }
+
+    public AvatarColor? AvatarColor { get; private set; }
+
     /// <summary>Markdown: what the machine is for, and what fits nowhere else.</summary>
     public string Description { get; private set; } = null!;
 
@@ -225,6 +234,8 @@ public sealed class Machine
         Fields.Closed("kind", edit.Kind, Kind, value => Kind = value, changes);
         Fields.Closed("arch", edit.Arch, Arch, value => Arch = value, changes);
         Fields.Closed("status", edit.Status, Status, value => Status = value, changes);
+        Fields.Optional("avatar", edit.Avatar, Avatar, value => Avatar = value, changes);
+        Fields.Optional("avatar_color", edit.AvatarColor, AvatarColor, value => AvatarColor = value, changes);
 
         if (edit.MeasuredAt is { } measured && measured != MeasuredAt)
         {

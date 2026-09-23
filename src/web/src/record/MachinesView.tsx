@@ -7,6 +7,7 @@ import { machinePath } from "./addresses";
 import { Filters, type Filter } from "@/shared/Filters";
 import { found, word } from "@/shared/narrowing";
 import { StatusBadge } from "./Parts";
+import { MachineAvatar } from "./avatars/MachineAvatar";
 
 type MachineSummary = Schemas["MachineSummary"];
 
@@ -90,6 +91,7 @@ export function MachinesView() {
           {rows.map((machine) => (
             <li key={machine.key}>
               <Link to={machinePath(machine.key)} className="flex min-h-10 items-center gap-3 px-4 py-1 hover:bg-accent">
+                <MachineAvatar machine={machine} size={24} />
                 <span className="w-48 shrink-0 truncate font-mono text-xs text-muted-foreground">{machine.key}</span>
                 <span className="min-w-0 flex-1 truncate">{machine.name}</span>
                 <span className="hidden w-28 shrink-0 truncate text-xs text-muted-foreground sm:block">

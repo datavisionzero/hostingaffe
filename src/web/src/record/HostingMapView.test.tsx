@@ -22,9 +22,9 @@ const map: Schemas["HostingMap"] = {
     { key: "empty-host", name: "Empty Host" },
   ],
   machines: [
-    { key: "guest", name: "Guest VM", kind: "vm", status: "active", provider: "example-host", ipv4: null, ipv6: null, private_ip: "198.51.100.20" },
-    { key: "host", name: "Physical host", kind: "dedicated", status: "active", provider: "example-host", ipv4: "192.0.2.10", ipv6: "2001:db8::10", private_ip: "198.51.100.10" },
-    { key: "local", name: "Local box", kind: "local", status: "retired", provider: null, ipv4: null, ipv6: null, private_ip: null },
+    { key: "guest", name: "Guest VM", kind: "vm", status: "active", provider: "example-host", ipv4: null, ipv6: null, private_ip: "198.51.100.20", avatar: null, avatar_color: null },
+    { key: "host", name: "Physical host", kind: "dedicated", status: "active", provider: "example-host", ipv4: "192.0.2.10", ipv6: "2001:db8::10", private_ip: "198.51.100.10", avatar: null, avatar_color: null },
+    { key: "local", name: "Local box", kind: "local", status: "retired", provider: null, ipv4: null, ipv6: null, private_ip: null, avatar: null, avatar_color: null },
   ],
 };
 
@@ -63,6 +63,14 @@ it("keeps every address and navigation link in the list when the diagram fails",
   expect(within(list).getByRole("link", { name: "local" })).toHaveAttribute("href", "/machines/local");
   expect(within(list).getAllByRole("link", { name: "Installations" })[0]).toHaveAttribute("href", "/installations?machine=guest");
   error.mockRestore();
+});
+
+it("draws each machine's avatar in the grouped list", async () => {
+  installInstance({ "GET /api/hosting-map": { ...map, machines: [{ ...map.machines[1], avatar: "minimac", avatar_color: "sage" }] } });
+  renderAt("/hosting-map", <HostingMapView />);
+
+  const list = await screen.findByRole("region", { name: "Providers and machines" });
+  expect(within(list).getByRole("img", { name: "sage minimac" })).toBeInTheDocument();
 });
 
 it("answers an empty map", async () => {
@@ -126,7 +134,7 @@ it("has no list control on an empty map", async () => {
 
 const twins: Schemas["HostingMap"] = {
   ...map,
-  machines: [...map.machines, { key: "guest-2", name: "Guest VM", kind: "vm", status: "active", provider: "empty-host", ipv4: null, ipv6: null, private_ip: null }],
+  machines: [...map.machines, { key: "guest-2", name: "Guest VM", kind: "vm", status: "active", provider: "empty-host", ipv4: null, ipv6: null, private_ip: null, avatar: null, avatar_color: null }],
 };
 
 it("finds providers and machines by name or key and tells equal names apart by key", () => {

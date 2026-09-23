@@ -26,6 +26,8 @@ public sealed record MachineSummaryShape(
     DateTimeOffset? LastSeen,
     bool? RebootRequired,
     DateTimeOffset UpdatedAt,
+    Avatar? Avatar,
+    AvatarColor? AvatarColor,
     MachineActivityShape? Activity = null);
 
 /// <summary>
@@ -125,6 +127,8 @@ public sealed record MachineShape(
     DateTimeOffset? LastSeen,
     bool? RebootRequired,
     IReadOnlyList<DriftShape> Drift,
+    Avatar? Avatar,
+    AvatarColor? AvatarColor,
     string Description,
     IdentityRef CreatedBy,
     IdentityRef UpdatedBy,
@@ -156,7 +160,9 @@ public sealed record CreateMachineRequest(
     IReadOnlyList<PortShape>? Ports,
     Status? Status,
     DateTimeOffset? MeasuredAt,
-    string? Description)
+    string? Description,
+    string? Avatar = null,
+    string? AvatarColor = null)
 {
     /// <inheritdoc cref="ChangeMachineRequest.UnknownFields"/>
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
@@ -187,7 +193,9 @@ public sealed record ChangeMachineRequest(
     IReadOnlyList<PortShape>? Ports,
     Status? Status,
     DateTimeOffset? MeasuredAt,
-    string? Description)
+    string? Description,
+    string? Avatar = null,
+    string? AvatarColor = null)
 {
     /// <summary>
     /// Whatever the caller sent that this object does not define. A closed
@@ -243,6 +251,8 @@ public sealed class MachineAssembler(
             latest?.ReceivedAt,
             latest?.Body.Updates?.RebootRequired,
             machine.UpdatedAt,
+            machine.Avatar,
+            machine.AvatarColor,
             activity);
     }
 
@@ -341,6 +351,8 @@ public sealed class MachineAssembler(
             // about, computed here so that no client builds it twice
             // (ADR 0015).
             latest is null ? [] : await drift.BetweenAsync(machine, latest, cancellationToken),
+            machine.Avatar,
+            machine.AvatarColor,
             machine.Description,
             IdentityRef.Of(people[machine.CreatedBy]),
             IdentityRef.Of(people[machine.UpdatedBy]),
@@ -497,6 +509,8 @@ public sealed class CreateMachine(
                 Status = request.Status,
                 MeasuredAt = request.MeasuredAt,
                 Description = request.Description,
+                Avatar = request.Avatar,
+                AvatarColor = request.AvatarColor,
             },
             subject: null,
             cancellationToken);
@@ -575,6 +589,8 @@ public sealed class ChangeMachine(
                 Status = changes.Status,
                 MeasuredAt = changes.MeasuredAt,
                 Description = changes.Description,
+                Avatar = changes.Avatar,
+                AvatarColor = changes.AvatarColor,
             },
             subject: before,
             cancellationToken);

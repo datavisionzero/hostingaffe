@@ -751,6 +751,14 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("arch");
 
+                    b.Property<string>("Avatar")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar");
+
+                    b.Property<string>("AvatarColor")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar_color");
+
                     b.Property<string>("Cpu")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -916,6 +924,10 @@ namespace Hostingaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("machine", null, t =>
                         {
                             t.HasCheckConstraint("ck_machine_arch", "arch is null or arch in ('amd64', 'arm64')");
+
+                            t.HasCheckConstraint("ck_machine_avatar", "avatar is null or avatar in ('monkey', 'gorilla', 'sloth', 'raccoon', 'fox', 'owl', 'penguin', 'octopus', 'cat', 'frog', 'bear', 'wolf', 'lion', 'puma', 'robot', 'rack', 'turbo', 'tower', 'minipc', 'minimac', 'desktop', 'laptop', 'devbook', 'aibox', 'monitor', 'router', 'proxy', 'signpost', 'firewall', 'cloud', 'container', 'database', 'harddrive', 'bucket', 'floppy', 'tape', 'logbook', 'gauge')");
+
+                            t.HasCheckConstraint("ck_machine_avatar_color", "avatar_color is null or avatar_color in ('brown', 'slate', 'teal', 'orange', 'berry', 'sage', 'blue', 'red', 'mustard', 'lavender')");
 
                             t.HasCheckConstraint("ck_machine_host", "host_id is null and kind <> 'vm' or kind = 'vm'");
 

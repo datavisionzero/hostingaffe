@@ -60,7 +60,9 @@ public sealed record ImportMachine(
     DateTimeOffset? MeasuredAt,
     string? Description,
     IReadOnlyList<ImportInstallation>? Installations,
-    IReadOnlyList<ImportFile>? Files)
+    IReadOnlyList<ImportFile>? Files,
+    string? Avatar = null,
+    string? AvatarColor = null)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -439,7 +441,7 @@ public sealed class ImportRecord(
             Validated.Field("arch", () => Spelling.Read<Arch>(one.Arch, "arch")),
             one.Cpu, one.Memory, one.Disk, one.Ipv4, one.Ipv6, one.PrivateIp, one.Ssh, one.Ports,
             Validated.Field("status", () => Spelling.Read<Status>(one.Status, "status")),
-            one.MeasuredAt, one.Description);
+            one.MeasuredAt, one.Description, one.Avatar, one.AvatarColor);
 
     // `version` is not passed on: it is derived from the deployments, and the
     // deployments are in the document. Taking both would record the first one

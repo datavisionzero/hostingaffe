@@ -7,6 +7,7 @@ import { word } from "@/shared/narrowing";
 import { ago } from "@/shared/when";
 import { historyPath, installationPath, machinePath } from "./addresses";
 import { StatusBadge } from "./Parts";
+import { MachineAvatar } from "./avatars/MachineAvatar";
 
 type MachineSummary = Schemas["MachineSummary"];
 
@@ -92,7 +93,8 @@ function Tile({ machine, window }: { machine: MachineSummary; window: string }) 
       />
 
       <div className="relative flex flex-col gap-2 p-4">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-center gap-2">
+          <MachineAvatar machine={machine} size={28} />
           <Link
             to={machinePath(machine.key)}
             className="relative font-mono text-sm font-medium hover:underline"

@@ -30,6 +30,8 @@ const machine = {
   measured_at: null,
   last_seen: null,
   drift: [],
+  avatar: null,
+  avatar_color: null,
   description: "The one that answers the website.",
   created_by: identity,
   updated_by: identity,
@@ -182,6 +184,61 @@ describe("a machine (VISION 6.2)", () => {
       const write = instance.calls.find((call) => call.method === "PATCH");
       expect(write?.headers.get("If-Match")).toBe("2026-09-02T10:00:00Z");
     });
+  });
+
+  it("writes a chosen picture at once and reads the machine again", async () => {
+    const instance = view({
+      "PATCH /api/machines/web-01": { ...machine, avatar: "owl" },
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Change the avatar of web-01" }));
+    const pictures = await screen.findByRole("group", { name: "Picture" });
+    expect(within(pictures).getAllByRole("button")).toHaveLength(38);
+    expect(screen.getByText("Derived from the key until one is chosen.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Automatic" })).toBeDisabled();
+
+    await user.click(within(pictures).getByRole("button", { name: "owl" }));
+
+    await waitFor(() => {
+      const write = instance.calls.find((call) => call.method === "PATCH");
+      expect(write).toBeDefined();
+    });
+    const write = instance.calls.find((call) => call.method === "PATCH")!;
+    expect(await write.clone().json()).toEqual({ avatar: "owl" });
+    await waitFor(() =>
+      expect(instance.calls.filter((call) => call.method === "GET" && new URL(call.url).pathname === "/api/machines/web-01")).toHaveLength(2));
+  });
+
+  it("clears both words when the picture goes back to automatic", async () => {
+    const instance = view({
+      "GET /api/machines/web-01": { ...machine, avatar: "rack", avatar_color: "teal" },
+      "PATCH /api/machines/web-01": machine,
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Change the avatar of web-01" }));
+    const colours = await screen.findByRole("group", { name: "Colour" });
+    expect(within(colours).getByRole("button", { name: "teal" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Automatic" }));
+
+    await waitFor(() => expect(instance.calls.find((call) => call.method === "PATCH")).toBeDefined());
+    expect(await instance.calls.find((call) => call.method === "PATCH")!.clone().json()).toEqual({ avatar: "", avatar_color: "" });
+  });
+
+  it("walks the pictures with the arrow keys", async () => {
+    view({ "GET /api/machines/web-01": { ...machine, avatar: "monkey", avatar_color: "teal" } });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Change the avatar of web-01" }));
+    const pictures = await screen.findByRole("group", { name: "Picture" });
+    within(pictures).getByRole("button", { name: "monkey" }).focus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(within(pictures).getByRole("button", { name: "gorilla" })).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(within(pictures).getByRole("button", { name: "frog" })).toHaveFocus();
   });
 
   it("says what the instance said when the machine is not there", async () => {

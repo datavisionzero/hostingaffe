@@ -124,6 +124,7 @@ type machineFields struct {
 	os, arch, cpu, memory, disk                          string
 	ipv4, ipv6, privateIP, ssh, status, measuredAt       string
 	description, descriptionFile                         string
+	avatar, avatarColor                                  string
 	ports                                                []string
 }
 
@@ -150,6 +151,12 @@ func (m *machineFields) flags(cmd *cobra.Command) {
 	f.StringVar(&m.status, "status", "", "planned, active or retired")
 	f.StringVar(&m.measuredAt, "measured-at", "", "when the hardware facts were last verified: 2026-09-05, or an RFC 3339 timestamp")
 	f.StringVar(&m.description, "description", "", "what does not fit in a field, in Markdown")
+	f.StringVar(&m.avatar, "avatar", "",
+		"the picture it is recognised by: monkey, gorilla, sloth, raccoon, fox, owl, penguin, octopus, cat, frog, bear, wolf, lion, puma, "+
+			"robot, rack, turbo, tower, minipc, minimac, desktop, laptop, devbook, aibox, monitor, router, proxy, signpost, firewall, "+
+			"cloud, container, database, harddrive, bucket, floppy, tape, logbook or gauge; empty clears it")
+	f.StringVar(&m.avatarColor, "avatar-color", "",
+		"the colour of that picture: brown, slate, teal, orange, berry, sage, blue, red, mustard or lavender; empty clears it")
 	f.StringVar(&m.descriptionFile, "description-file", "", "the description, from a file or `-` for stdin")
 }
 
@@ -163,6 +170,7 @@ func (m *machineFields) body(cmd *cobra.Command) (*fields, error) {
 		"arch": &m.arch, "cpu": &m.cpu, "memory": &m.memory, "disk": &m.disk,
 		"ipv4": &m.ipv4, "ipv6": &m.ipv6, "private-ip": &m.privateIP, "ssh": &m.ssh,
 		"status": &m.status, "description": &m.description,
+		"avatar": &m.avatar, "avatar-color": &m.avatarColor,
 	} {
 		f.take(flag, value)
 	}

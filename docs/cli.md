@@ -231,6 +231,18 @@ than as a write that did not happen.
 one is the instance's to refuse and arrives as exit 4 — `ha` keeps no second
 copy of the model.
 
+**A machine's picture is two closed sets that can be cleared**: `--avatar`
+names one of the drawings the web interface ships with and `--avatar-color` one
+of its ten colours, both listed in the help. Unlike `--kind` they take the empty
+value, which clears them — a machine without a picture is drawn with one the
+web interface derives from its key (ADR 0021). `view` and the export tree print
+the two words; `ha` draws nothing.
+
+```sh
+ha machine set ex44 --avatar rack --avatar-color teal
+ha machine set ex44 --avatar ""        # back to the derived picture
+```
+
 **A machine's `--provider` is a provider key**, created with
 `ha provider add KEY --name NAME --description-file FILE`. A VM inherits the
 provider of its host and cannot take one directly. `ha provider machines KEY`
