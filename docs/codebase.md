@@ -159,7 +159,9 @@ page inline, because their colour arrives as the CSS variable
 repository's own files and nothing else ever takes that path. `avatars.ts`
 holds the ten colours, the picture a key derives where none was chosen — a
 stable hash, never written back — and whether this browser draws faces, kept
-in local storage like the theme.
+in local storage like the theme. `AvatarChooser.tsx` is the chooser in the
+machine screen's header, a popover over `components/ui/popover.tsx`; a choice
+is written the moment it is made.
 
 `HostingMapView.tsx` reads provider and machine associations in one API call.
 `HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
