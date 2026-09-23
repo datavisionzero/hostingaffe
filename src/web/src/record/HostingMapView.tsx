@@ -13,6 +13,7 @@ import { installationsOnMachinePath, machinePath, providerPath } from "./address
 import { StatusBadge } from "./Parts";
 import type { DiagramFocus } from "./Diagram";
 import { findOnMap, mapDiagram, type MapMatch } from "./hostingMapData";
+import { MachineAvatar } from "./avatars/MachineAvatar";
 
 type HostingMap = Schemas["HostingMap"];
 type Machine = Schemas["HostingMapMachine"];
@@ -34,6 +35,7 @@ class DiagramBoundary extends Component<{ children: ReactNode; onFail: () => voi
 function MachineList({ machine }: { machine: Machine }) {
   const addresses = [machine.ipv4, machine.ipv6, machine.private_ip].filter((address) => address !== null);
   return <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2 text-sm">
+    <MachineAvatar machine={machine} size={20} />
     <Link className="min-w-0 font-mono text-xs text-brand hover:underline" to={machinePath(machine.key)}>{machine.key}</Link>
     <span className="min-w-0 flex-1 truncate">{machine.name}</span>
     <StatusBadge status={machine.status} />

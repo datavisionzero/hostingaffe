@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installInstance, renderAt } from "@/shared/testing";
 import { OverviewView } from "./OverviewView";
+import { pictureOf } from "./avatars/avatars";
 
 function aMachine(over: Record<string, unknown> = {}) {
   return {
@@ -54,6 +55,15 @@ describe("the overview (ADR 0018)", () => {
       .toHaveAttribute("href", "/history?machine=ex44");
     // And the key itself leads to the machine.
     expect(within(tile).getByRole("link", { name: "ex44" })).toHaveAttribute("href", "/machines/ex44");
+  });
+
+  it("draws the machine's avatar in its tile, derived from the key where none was chosen", async () => {
+    overview([aMachine(), aMachine({ key: "cx22", name: "cx22", avatar: "rack", avatar_color: "slate" })]);
+
+    const [derived, chosen] = await screen.findAllByRole("listitem");
+    const { avatar, color } = pictureOf({ key: "ex44" });
+    expect(within(derived).getByRole("img", { name: `${color} ${avatar}` })).toBeInTheDocument();
+    expect(within(chosen).getByRole("img", { name: "slate rack" })).toBeInTheDocument();
   });
 
   it("says what lately happened: the version that moved, the count, the report, the drift", async () => {

@@ -65,6 +65,14 @@ it("keeps every address and navigation link in the list when the diagram fails",
   error.mockRestore();
 });
 
+it("draws each machine's avatar in the grouped list", async () => {
+  installInstance({ "GET /api/hosting-map": { ...map, machines: [{ ...map.machines[1], avatar: "minimac", avatar_color: "sage" }] } });
+  renderAt("/hosting-map", <HostingMapView />);
+
+  const list = await screen.findByRole("region", { name: "Providers and machines" });
+  expect(within(list).getByRole("img", { name: "sage minimac" })).toBeInTheDocument();
+});
+
 it("answers an empty map", async () => {
   installInstance({ "GET /api/hosting-map": { providers: [], machines: [] } });
   renderAt("/hosting-map", <HostingMapView />);

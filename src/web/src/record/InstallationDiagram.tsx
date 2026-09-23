@@ -6,17 +6,21 @@ import { installationPath, machinePath } from "./addresses";
 import { Diagram } from "./Diagram";
 import type { DiagramItem } from "./diagramLayout";
 import { StatusBadge } from "./Parts";
+import { MachineAvatar } from "./avatars/MachineAvatar";
 
 type InstallationMap = Schemas["InstallationMap"];
 type Entry = Schemas["InstallationMapEntry"];
 
 function MachineCard({ data }: NodeProps) {
   const map = data.map as InstallationMap;
-  return <div className="flex h-full flex-col justify-center rounded-xl border border-brand/40 bg-card px-4 py-3 shadow-sm">
-    <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">Machine</span>
-    <Link className="nodrag nopan truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
-      to={machinePath(map.machine)}>{map.name}</Link>
-    <span className="truncate font-mono text-xs text-muted-foreground">{map.machine}</span>
+  return <div className="flex h-full items-center gap-3 rounded-xl border border-brand/40 bg-card px-4 py-3 shadow-sm">
+    <MachineAvatar machine={{ key: map.machine, avatar: map.avatar, avatar_color: map.avatar_color }} size={40} />
+    <div className="flex min-w-0 flex-col">
+      <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">Machine</span>
+      <Link className="nodrag nopan truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+        to={machinePath(map.machine)}>{map.name}</Link>
+      <span className="truncate font-mono text-xs text-muted-foreground">{map.machine}</span>
+    </div>
     <Handle type="source" position={Position.Right} isConnectable={false} className="!size-2 !border-0 !bg-brand" />
   </div>;
 }
