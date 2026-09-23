@@ -27,3 +27,18 @@ export function mapDiagram(map: HostingMap): { items: DiagramItem[]; edges: Edge
     }));
   return { items, edges };
 }
+
+export type MapMatch = { id: string; kind: "Provider" | "Machine"; name: string; key: string };
+
+/** Providers and machines whose name or key contains the query; the map itself is left whole. */
+export function findOnMap(map: HostingMap, query: string): MapMatch[] {
+  const wanted = query.trim().toLowerCase();
+  if (wanted === "") return [];
+  const hits = (name: string, key: string) => name.toLowerCase().includes(wanted) || key.toLowerCase().includes(wanted);
+  return [
+    ...map.providers.filter((provider) => hits(provider.name, provider.key))
+      .map((provider): MapMatch => ({ id: `provider:${provider.key}`, kind: "Provider", name: provider.name, key: provider.key })),
+    ...map.machines.filter((machine) => hits(machine.name, machine.key))
+      .map((machine): MapMatch => ({ id: `machine:${machine.key}`, kind: "Machine", name: machine.name, key: machine.key })),
+  ];
+}

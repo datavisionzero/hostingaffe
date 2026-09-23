@@ -346,8 +346,11 @@ It draws provider-to-machine edges only. Unassigned machines have their own
 visible group. Machine nodes show the recorded `ipv4`, `ipv6` and `private_ip`
 fields and lead to machine details and the machine's installation map. Provider
 nodes lead to provider details. An ordinary grouped list beside the diagram
-keeps every record reachable, including at narrow widths or if the graphical
-view cannot render.
+keeps every record reachable, including at narrow widths. It is shown at
+first and can be hidden to give the diagram the whole width; if the graphical
+view cannot render, the list is shown and cannot be hidden. A find control
+matches provider and machine names and keys and brings the chosen node into
+view, marked, without narrowing the map or the list.
 
 `/machines/{key}/installations-map` is reached from a machine detail. It draws
 machine-to-installation edges only, never dependency or VM-host edges.
