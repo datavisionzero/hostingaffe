@@ -154,7 +154,9 @@ back — so that the section and the reading cannot say the same line differentl
 `HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
 with Dagre and renders a read-only React Flow canvas. The grouped list can be
 hidden while the diagram renders; if the diagram cannot load, the list is
-shown and stays shown.
+shown and stays shown. Its find control only moves the canvas's view onto a
+node, through the `focus` that `Diagram.tsx` accepts; the cards carry their
+fixed size, so React Flow can frame one without measuring it first.
 `InstallationMapView.tsx` reads one machine's installation and latest deployment
 facts in one API call. `InstallationDiagram.tsx` uses the same canvas for
 machine-to-installation links. Platform entries start collapsed in the diagram;

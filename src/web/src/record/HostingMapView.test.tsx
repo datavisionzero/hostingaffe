@@ -4,15 +4,15 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { Schemas } from "@/api/client";
 import { installInstance, renderAt } from "@/shared/testing";
 import { HostingMapView } from "./HostingMapView";
-import { mapDiagram } from "./hostingMapData";
+import { findOnMap, mapDiagram } from "./hostingMapData";
 import { layoutDiagram } from "./diagramLayout";
 
 const diagram = vi.hoisted(() => ({ fails: true }));
 
 vi.mock("./HostingDiagram", () => ({
-  HostingDiagram: () => {
+  HostingDiagram: ({ focus }: { focus: { id: string; at: number } | null }) => {
     if (diagram.fails) throw new Error("Diagram failed to render");
-    return <div role="region" aria-label="Provider to machine diagram" />;
+    return <div role="region" aria-label="Provider to machine diagram" data-focus={focus?.id} data-at={focus?.at} />;
   },
 }));
 
@@ -121,4 +121,80 @@ it("has no list control on an empty map", async () => {
   renderAt("/hosting-map", <HostingMapView />);
   await screen.findByText("No providers or machines yet.");
   expect(screen.queryByRole("button", { name: /list/ })).toBeNull();
+});
+
+const twins: Schemas["HostingMap"] = {
+  ...map,
+  machines: [...map.machines, { key: "guest-2", name: "Guest VM", kind: "vm", status: "active", provider: "empty-host", ipv4: null, ipv6: null, private_ip: null }],
+};
+
+it("finds providers and machines by name or key and tells equal names apart by key", () => {
+  expect(findOnMap(twins, "  ")).toEqual([]);
+  expect(findOnMap(twins, "EXAMPLE").map((match) => [match.kind, match.key])).toEqual([["Provider", "example-host"]]);
+  expect(findOnMap(twins, "host").map((match) => match.id)).toEqual([
+    "provider:example-host", "provider:empty-host", "machine:host",
+  ]);
+  expect(findOnMap(twins, "guest vm").map((match) => [match.name, match.key])).toEqual([
+    ["Guest VM", "guest"], ["Guest VM", "guest-2"],
+  ]);
+});
+
+it("brings a found node into view without narrowing the map or the list", async () => {
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": twins });
+  renderAt("/hosting-map", <HostingMapView />);
+  const canvas = await screen.findByRole("region", { name: "Provider to machine diagram" });
+  const find = screen.getByRole("searchbox", { name: "Find a provider or machine" });
+
+  await userEvent.type(find, "guest vm");
+  const matches = screen.getByRole("list", { name: "Matches" });
+  const buttons = within(matches).getAllByRole("button");
+  expect(buttons.map((button) => button.textContent)).toEqual(["MachineGuest VMguest", "MachineGuest VMguest-2"]);
+
+  await userEvent.click(buttons[1]);
+  expect(canvas).toHaveAttribute("data-focus", "machine:guest-2");
+  expect(screen.queryByRole("list", { name: "Matches" })).toBeNull();
+  const list = screen.getByRole("region", { name: "Providers and machines" });
+  expect(within(list).getByRole("link", { name: "guest" })).toBeInTheDocument();
+  expect(within(list).getByRole("link", { name: "local" })).toBeInTheDocument();
+
+  await userEvent.clear(find);
+  await userEvent.type(find, "empty");
+  await userEvent.keyboard("{ArrowDown}");
+  expect(screen.getByRole("button", { name: /Empty Host/ })).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(canvas).toHaveAttribute("data-focus", "provider:empty-host");
+
+  await userEvent.clear(find);
+  await userEvent.type(find, "physical{Enter}");
+  expect(canvas).toHaveAttribute("data-focus", "machine:host");
+  const at = canvas.getAttribute("data-at");
+  await userEvent.keyboard("{Enter}");
+  expect(canvas.getAttribute("data-at")).not.toBe(at);
+});
+
+it("says when nothing matches and closes the matches on Escape", async () => {
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  const canvas = await screen.findByRole("region", { name: "Provider to machine diagram" });
+  const find = screen.getByRole("searchbox", { name: "Find a provider or machine" });
+
+  await userEvent.type(find, "nowhere{Enter}");
+  expect(screen.getByRole("status")).toHaveTextContent("No provider or machine matches “nowhere”.");
+  expect(canvas).not.toHaveAttribute("data-focus");
+
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(find).toHaveFocus();
+  expect(find).toHaveAttribute("aria-expanded", "false");
+});
+
+it("offers no find action when the diagram cannot render", async () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByText("The diagram is unavailable. The grouped list has every provider and machine.");
+  expect(screen.queryByRole("searchbox")).toBeNull();
+  error.mockRestore();
 });

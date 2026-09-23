@@ -29,7 +29,8 @@ export function layoutDiagram(items: DiagramItem[], edges: Edge[]): Node[] {
       position: { x: at.x - item.width / 2, y: at.y - item.height / 2 },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      style: { width: item.width, height: item.height },
+      width: item.width,
+      height: item.height,
       draggable: false,
       deletable: false,
     };
