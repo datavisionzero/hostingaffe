@@ -1,6 +1,7 @@
 import { lazy, Suspense, Component, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link } from "react-router";
-import { PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { Maximize2Icon, Minimize2Icon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
 import { api, type Schemas } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,51 +106,98 @@ export function HostingMapView() {
   return <HostingMapContent map={asked.value} />;
 }
 
+function ListToggle({ shown, controls, onToggle }: { shown: boolean; controls: string; onToggle: () => void }) {
+  return <Button variant="outline" size="sm" aria-expanded={shown} aria-controls={controls} onClick={onToggle}>
+    {shown ? <PanelRightCloseIcon aria-hidden /> : <PanelRightOpenIcon aria-hidden />}
+    {shown ? "Hide list" : "Show list"}
+  </Button>;
+}
+
+function GroupedList({ map, id, shown, className }: { map: HostingMap; id: string; shown: boolean; className?: string }) {
+  const under = new Map(map.providers.map((provider) => [provider.key, map.machines.filter((machine) => machine.provider === provider.key)]));
+  const unassigned = map.machines.filter((machine) => machine.provider === null);
+  return <section id={id} aria-label="Providers and machines" hidden={!shown} className={cn("min-w-0 space-y-4", className)}>
+    <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Providers and machines</h2>
+    {map.providers.map((provider) => <div key={provider.key} className="rounded-lg border p-3">
+      <h3 className="font-semibold"><Link className="text-brand hover:underline" to={providerPath(provider.key)}>{provider.name}</Link></h3>
+      <p className="font-mono text-xs text-muted-foreground">{provider.key}</p>
+      {(under.get(provider.key) ?? []).length === 0
+        ? <p className="mt-2 text-sm text-muted-foreground">No machines assigned.</p>
+        : <ul className="mt-2">{under.get(provider.key)!.map((machine) => <MachineList key={machine.key} machine={machine} />)}</ul>}
+    </div>)}
+    {unassigned.length > 0 && <div className="rounded-lg border p-3">
+      <h3 className="font-semibold">Unassigned machines</h3>
+      <ul className="mt-2">{unassigned.map((machine) => <MachineList key={machine.key} machine={machine} />)}</ul>
+    </div>}
+  </section>;
+}
+
 function HostingMapContent({ map }: { map: HostingMap }) {
   const [listHidden, setListHidden] = useState(false);
+  // The focus view is there for the diagram, so it starts without the list and keeps the ordinary layout's choice apart.
+  const [focused, setFocused] = useState(false);
+  const [focusListHidden, setFocusListHidden] = useState(true);
   const [diagramFailed, setDiagramFailed] = useState(false);
   const [focus, setFocus] = useState<DiagramFocus | null>(null);
   const { items, edges } = mapDiagram(map);
-  const under = new Map(map.providers.map((provider) => [provider.key, map.machines.filter((machine) => machine.provider === provider.key)]));
-  const unassigned = map.machines.filter((machine) => machine.provider === null);
-  // Without the diagram the list is the only way to the records, so it cannot stay hidden.
-  const listShown = !listHidden || diagramFailed;
+  const meta = `${map.providers.length} providers · ${map.machines.length} machines`;
 
-  return <>
-    <PageHeader title="Hosting map" meta={`${map.providers.length} providers · ${map.machines.length} machines`}>
-      {items.length > 0 && !diagramFailed && <Button variant="outline" size="sm" aria-expanded={listShown} aria-controls="hosting-map-list"
-        onClick={() => setListHidden((hidden) => !hidden)}>
-        {listShown ? <PanelRightCloseIcon aria-hidden /> : <PanelRightOpenIcon aria-hidden />}
-        {listShown ? "Hide list" : "Show list"}
-      </Button>}
-    </PageHeader>
-    {items.length === 0 ? <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+  if (items.length === 0) return <>
+    <PageHeader title="Hosting map" meta={meta} />
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
       <p className="font-medium">No providers or machines yet.</p>
       <Link className="text-sm text-brand hover:underline" to="/providers">Browse providers</Link>
-    </div> : <div data-list={listShown ? "shown" : "hidden"}
+    </div>
+  </>;
+
+  // Without the diagram the list is the only way to the records, so it cannot stay hidden.
+  const listShown = !listHidden || diagramFailed;
+  const focusListShown = !focusListHidden || diagramFailed;
+  const find = !diagramFailed && <FindOnMap map={map} onFind={(match) => setFocus((current) => ({ id: match.id, at: (current?.at ?? 0) + 1 }))} />;
+  const diagram = (shown: boolean, className?: string) => <DiagramBoundary onFail={() => setDiagramFailed(true)}>
+    <Suspense fallback={<p aria-busy className="rounded-lg border p-4 text-sm text-muted-foreground">Loading the diagram…</p>}>
+      <HostingDiagram items={items} edges={edges} focus={focus} frame={shown ? "with list" : "without list"} className={className} />
+    </Suspense>
+  </DiagramBoundary>;
+
+  return <DialogPrimitive.Root open={focused} onOpenChange={setFocused}>
+    <PageHeader title="Hosting map" meta={meta}>
+      {!diagramFailed && <>
+        <ListToggle shown={listShown} controls="hosting-map-list" onToggle={() => setListHidden((hidden) => !hidden)} />
+        <DialogPrimitive.Trigger render={<Button variant="outline" size="sm" />}>
+          <Maximize2Icon aria-hidden />Focus map
+        </DialogPrimitive.Trigger>
+      </>}
+    </PageHeader>
+    {!focused && <div data-list={listShown ? "shown" : "hidden"}
       className={cn("grid min-w-0 gap-5 p-4 md:p-6", listShown && "xl:grid-cols-[minmax(0,2fr)_minmax(19rem,1fr)]")}>
       <div className="min-w-0 space-y-3">
-        {!diagramFailed && <FindOnMap map={map} onFind={(match) => setFocus((current) => ({ id: match.id, at: (current?.at ?? 0) + 1 }))} />}
-        <DiagramBoundary onFail={() => setDiagramFailed(true)}>
-          <Suspense fallback={<p aria-busy className="rounded-lg border p-4 text-sm text-muted-foreground">Loading the diagram…</p>}>
-            <HostingDiagram items={items} edges={edges} focus={focus} />
-          </Suspense>
-        </DiagramBoundary>
+        {find}
+        {diagram(listShown)}
       </div>
-      <section id="hosting-map-list" aria-label="Providers and machines" hidden={!listShown} className="min-w-0 space-y-4">
-        <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Providers and machines</h2>
-        {map.providers.map((provider) => <div key={provider.key} className="rounded-lg border p-3">
-          <h3 className="font-semibold"><Link className="text-brand hover:underline" to={providerPath(provider.key)}>{provider.name}</Link></h3>
-          <p className="font-mono text-xs text-muted-foreground">{provider.key}</p>
-          {(under.get(provider.key) ?? []).length === 0
-            ? <p className="mt-2 text-sm text-muted-foreground">No machines assigned.</p>
-            : <ul className="mt-2">{under.get(provider.key)!.map((machine) => <MachineList key={machine.key} machine={machine} />)}</ul>}
-        </div>)}
-        {unassigned.length > 0 && <div className="rounded-lg border p-3">
-          <h3 className="font-semibold">Unassigned machines</h3>
-          <ul className="mt-2">{unassigned.map((machine) => <MachineList key={machine.key} machine={machine} />)}</ul>
-        </div>}
-      </section>
+      <GroupedList map={map} id="hosting-map-list" shown={listShown} />
     </div>}
-  </>;
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Popup className="fixed inset-0 z-50 flex flex-col overflow-auto bg-background text-sm outline-none">
+        <div className="sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2">
+          <DialogPrimitive.Title className="text-sm font-semibold">Hosting map</DialogPrimitive.Title>
+          <span className="text-xs text-muted-foreground">{meta}</span>
+          <div className="ml-auto flex items-center gap-2">
+            {!diagramFailed && <ListToggle shown={focusListShown} controls="hosting-map-focus-list" onToggle={() => setFocusListHidden((hidden) => !hidden)} />}
+            <DialogPrimitive.Close render={<Button variant="outline" size="sm" />}>
+              <Minimize2Icon aria-hidden />Exit focus
+            </DialogPrimitive.Close>
+          </div>
+        </div>
+        <div data-list={focusListShown ? "shown" : "hidden"} className={cn("grid flex-1 gap-4 p-3 md:p-4 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]",
+          focusListShown && "lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]")}>
+          <div className="flex min-h-[max(20rem,calc(100dvh-8rem))] min-w-0 flex-col gap-3 lg:min-h-0">
+            {find}
+            {diagram(focusListShown, "h-auto min-h-80 flex-1")}
+          </div>
+          <GroupedList map={map} id="hosting-map-focus-list" shown={focusListShown} className="lg:min-h-0 lg:overflow-auto" />
+        </div>
+      </DialogPrimitive.Popup>
+    </DialogPrimitive.Portal>
+  </DialogPrimitive.Root>;
 }

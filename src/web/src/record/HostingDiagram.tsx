@@ -53,6 +53,13 @@ export function MachineCard({ data, selected }: NodeProps) {
 
 const nodeTypes: NodeTypes = { provider: ProviderCard, machine: MachineCard };
 
-export function HostingDiagram({ items, edges, focus }: { items: DiagramItem[]; edges: Edge[]; focus: DiagramFocus | null }) {
-  return <Diagram label="Provider to machine diagram" items={items} edges={edges} nodeTypes={nodeTypes} focus={focus} />;
+export function HostingDiagram({ items, edges, focus, frame, className }: {
+  items: DiagramItem[];
+  edges: Edge[];
+  focus: DiagramFocus | null;
+  frame: string;
+  className?: string;
+}) {
+  return <Diagram label="Provider to machine diagram" items={items} edges={edges} nodeTypes={nodeTypes}
+    focus={focus} frame={frame} className={className} />;
 }

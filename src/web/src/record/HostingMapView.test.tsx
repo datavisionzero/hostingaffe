@@ -113,6 +113,7 @@ it("offers no way to hide the list when the diagram cannot render", async () => 
   await screen.findByText("The diagram is unavailable. The grouped list has every provider and machine.");
   expect(screen.getByRole("region", { name: "Providers and machines" })).toBeVisible();
   expect(screen.queryByRole("button", { name: /list/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Focus map" })).toBeNull();
   error.mockRestore();
 });
 
@@ -196,5 +197,66 @@ it("offers no find action when the diagram cannot render", async () => {
   renderAt("/hosting-map", <HostingMapView />);
   await screen.findByText("The diagram is unavailable. The grouped list has every provider and machine.");
   expect(screen.queryByRole("searchbox")).toBeNull();
+  error.mockRestore();
+});
+
+it("gives the diagram a focus view and restores the ordinary layout on leaving it", async () => {
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByRole("region", { name: "Provider to machine diagram" });
+  await userEvent.click(screen.getByRole("button", { name: "Hide list" }));
+
+  await userEvent.click(screen.getByRole("button", { name: "Focus map" }));
+  const view = await screen.findByRole("dialog", { name: "Hosting map" });
+  expect(within(view).getByRole("region", { name: "Provider to machine diagram" })).toBeInTheDocument();
+  expect(within(view).getByRole("searchbox", { name: "Find a provider or machine" })).toBeInTheDocument();
+  const toggle = within(view).getByRole("button", { name: "Show list" });
+  expect(toggle).toHaveAttribute("aria-controls", "hosting-map-focus-list");
+  await userEvent.click(toggle);
+  const list = within(view).getByRole("region", { name: "Providers and machines" });
+  expect(within(list).getByRole("link", { name: "local" })).toHaveAttribute("href", "/machines/local");
+
+  await userEvent.click(within(view).getByRole("button", { name: "Exit focus" }));
+  await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByRole("button", { name: "Show list" })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("region", { name: "Provider to machine diagram" })).toBeInTheDocument();
+});
+
+it("leaves the focus view on Escape, after closing any open matches first", async () => {
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByRole("region", { name: "Provider to machine diagram" });
+  const enter = screen.getByRole("button", { name: "Focus map" });
+
+  await userEvent.click(enter);
+  const view = await screen.findByRole("dialog", { name: "Hosting map" });
+  await userEvent.type(within(view).getByRole("searchbox"), "guest");
+  await userEvent.keyboard("{Escape}");
+  expect(within(view).queryByRole("list", { name: "Matches" })).toBeNull();
+  expect(screen.getByRole("dialog", { name: "Hosting map" })).toBeInTheDocument();
+
+  await userEvent.keyboard("{Escape}");
+  await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await vi.waitFor(() => expect(screen.getByRole("button", { name: "Focus map" })).toHaveFocus());
+  expect(screen.getByRole("region", { name: "Providers and machines" })).toBeVisible();
+});
+
+it("shows the whole list in the focus view when the diagram fails there", async () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  diagram.fails = false;
+  installInstance({ "GET /api/hosting-map": map });
+  renderAt("/hosting-map", <HostingMapView />);
+  await screen.findByRole("region", { name: "Provider to machine diagram" });
+
+  diagram.fails = true;
+  await userEvent.click(screen.getByRole("button", { name: "Focus map" }));
+  const view = await screen.findByRole("dialog", { name: "Hosting map" });
+  expect(await within(view).findByText("The diagram is unavailable. The grouped list has every provider and machine.")).toBeInTheDocument();
+  expect(within(view).getByRole("region", { name: "Providers and machines" })).toBeVisible();
+  expect(within(view).queryByRole("button", { name: /list/ })).toBeNull();
+  expect(within(view).queryByRole("searchbox")).toBeNull();
+  expect(within(view).getByRole("button", { name: "Exit focus" })).toBeInTheDocument();
   error.mockRestore();
 });
