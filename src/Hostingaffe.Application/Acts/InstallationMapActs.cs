@@ -2,6 +2,7 @@ using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Deployments;
 using Hostingaffe.Domain.Installations;
+using Hostingaffe.Domain.Machines;
 
 namespace Hostingaffe.Application.Acts;
 
@@ -10,7 +11,8 @@ public sealed record InstallationMapEntryShape(
     IReadOnlyList<string> Urls, DateTimeOffset? LatestDeploymentAt);
 
 public sealed record InstallationMapShape(
-    string Machine, string Name, Status Status, IReadOnlyList<InstallationMapEntryShape> Installations);
+    string Machine, string Name, Status Status, IReadOnlyList<InstallationMapEntryShape> Installations,
+    Avatar? Avatar, AvatarColor? AvatarColor);
 
 /// <summary>One read of a machine and its recorded installation map facts.</summary>
 public sealed class ReadInstallationMap(
@@ -35,6 +37,6 @@ public sealed class ReadInstallationMap(
             .ThenBy(entry => entry.Key, StringComparer.Ordinal)
             .ToArray();
 
-        return new InstallationMapShape(machine.Key, machine.Name, machine.Status, entries);
+        return new InstallationMapShape(machine.Key, machine.Name, machine.Status, entries, machine.Avatar, machine.AvatarColor);
     }
 }

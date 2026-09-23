@@ -361,6 +361,15 @@ Retiring, and deleting.
 Hardware facts are text, `arch` excepted, and each is one line of at most 200
 characters. What is longer than that is the `description`, or a page.
 
+**`avatar` and `avatar_color` are the machine's picture** (ADR 0021): a word of
+each closed set, listed in `CONTEXT.md` and in the contract's `Avatar` and
+`AvatarColor` schemas. Unlike `kind` and `arch` they can be cleared, so a write
+sends them as words and the empty string clears them, like a text field; a word
+outside the set is `validation` on the field it was sent in. Both are optional,
+and a machine without them reads `null` — the picture a screen shows instead is
+derived from the key there and never written back. Every machine read carries
+them: the complete machine, the list, the hosting map and the installation map.
+
 **`ports` is what the machine itself listens on** and no installation of it
 answers to: SSH, a Wireguard endpoint, a provider's agent. It is the same
 `Port` an installation carries — `{ "port": 22, "protocol": "tcp", "scope":
@@ -442,7 +451,7 @@ An agent may read and write providers with the same authorization as machines.
 
 `GET /api/hosting-map` returns a `HostingMap` with providers (`key`, `name`)
 and every live machine (`key`, `name`, `kind`, `status`, effective `provider`,
-`ipv4`, `ipv6`, `private_ip`). Retired machines remain in it; deleted machines
+`ipv4`, `ipv6`, `private_ip`, `avatar`, `avatar_color`). Retired machines remain in it; deleted machines
 do not. A VM's provider comes from its host. This one authenticated read feeds
 the read-only `/hosting-map` diagram and its grouped list without a request per
 machine. It records only provider-to-machine relationships; addresses are
@@ -452,8 +461,8 @@ machine fields. The same facts are readable with `ha provider list`,
 ### Installation map
 
 `GET /api/machines/{key}/installation-map` returns one `InstallationMap` for a
-live machine, including a retired one. It contains the machine's key, name and
-status, plus every non-deleted installation on it, including retired
+live machine, including a retired one. It contains the machine's key, name, status,
+`avatar` and `avatar_color`, plus every non-deleted installation on it, including retired
 installations. Each entry has `key`, `name`, `software`, `role`, `status`, all
 recorded `urls`, and `latest_deployment_at` (null where no deployment is
 recorded). The latest time is derived from deployment `at`, including backfilled

@@ -6464,6 +6464,72 @@
           "string"
         ]
       },
+      "Avatar": {
+        "enum": [
+          "monkey",
+          "gorilla",
+          "sloth",
+          "raccoon",
+          "fox",
+          "owl",
+          "penguin",
+          "octopus",
+          "cat",
+          "frog",
+          "bear",
+          "wolf",
+          "lion",
+          "puma",
+          "robot",
+          "rack",
+          "turbo",
+          "tower",
+          "minipc",
+          "minimac",
+          "desktop",
+          "laptop",
+          "devbook",
+          "aibox",
+          "monitor",
+          "router",
+          "proxy",
+          "signpost",
+          "firewall",
+          "cloud",
+          "container",
+          "database",
+          "harddrive",
+          "bucket",
+          "floppy",
+          "tape",
+          "logbook",
+          "gauge",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "AvatarColor": {
+        "enum": [
+          "brown",
+          "slate",
+          "teal",
+          "orange",
+          "berry",
+          "sage",
+          "blue",
+          "red",
+          "mustard",
+          "lavender",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
+      },
       "Backup": {
         "enum": [
           "none",
@@ -6854,6 +6920,18 @@
             "format": "date-time"
           },
           "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatar": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatar_color": {
             "type": [
               "null",
               "string"
@@ -7420,6 +7498,18 @@
             "format": "date-time"
           },
           "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatar": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatar_color": {
             "type": [
               "null",
               "string"
@@ -8461,7 +8551,9 @@
           "provider",
           "ipv4",
           "ipv6",
-          "private_ip"
+          "private_ip",
+          "avatar",
+          "avatar_color"
         ],
         "type": "object",
         "properties": {
@@ -8499,6 +8591,26 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Avatar"
+              }
+            ]
+          },
+          "avatar_color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AvatarColor"
+              }
             ]
           }
         }
@@ -8963,6 +9075,18 @@
             "items": {
               "$ref": "#/components/schemas/ImportFile"
             }
+          },
+          "avatar": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "avatar_color": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -9319,7 +9443,9 @@
           "machine",
           "name",
           "status",
-          "installations"
+          "installations",
+          "avatar",
+          "avatar_color"
         ],
         "type": "object",
         "properties": {
@@ -9337,6 +9463,26 @@
             "items": {
               "$ref": "#/components/schemas/InstallationMapEntry"
             }
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Avatar"
+              }
+            ]
+          },
+          "avatar_color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AvatarColor"
+              }
+            ]
           }
         }
       },
@@ -9575,6 +9721,8 @@
           "last_seen",
           "reboot_required",
           "drift",
+          "avatar",
+          "avatar_color",
           "description",
           "created_by",
           "updated_by",
@@ -9721,6 +9869,26 @@
               "$ref": "#/components/schemas/Drift"
             }
           },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Avatar"
+              }
+            ]
+          },
+          "avatar_color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AvatarColor"
+              }
+            ]
+          },
           "description": {
             "type": "string"
           },
@@ -9818,7 +9986,9 @@
           "measured_at",
           "last_seen",
           "reboot_required",
-          "updated_at"
+          "updated_at",
+          "avatar",
+          "avatar_color"
         ],
         "type": "object",
         "properties": {
@@ -9879,6 +10049,26 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "avatar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Avatar"
+              }
+            ]
+          },
+          "avatar_color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AvatarColor"
+              }
+            ]
           },
           "activity": {
             "oneOf": [

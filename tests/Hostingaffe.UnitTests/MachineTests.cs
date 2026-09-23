@@ -192,5 +192,57 @@ public sealed class MachineTests
         Assert.Equal(["vps", "dedicated", "vm", "local"], Enum.GetValues<MachineKind>().Select(Spelling.Of));
         Assert.Equal(["amd64", "arm64"], Enum.GetValues<Arch>().Select(Spelling.Of));
         Assert.Equal(["planned", "active", "retired"], Enum.GetValues<Status>().Select(Spelling.Of));
+        Assert.Equal(
+            ["brown", "slate", "teal", "orange", "berry", "sage", "blue", "red", "mustard", "lavender"],
+            Enum.GetValues<AvatarColor>().Select(Spelling.Of));
+        Assert.Equal(38, Enum.GetValues<Avatar>().Length);
+        Assert.Contains("rack", Enum.GetValues<Avatar>().Select(Spelling.Of));
+    }
+
+    /// <summary>
+    /// The picture is chosen in words, and the history names the word it was
+    /// and the word it became (ADR 0021).
+    /// </summary>
+    [Fact]
+    public void A_picture_is_chosen_by_its_word_and_the_history_says_which()
+    {
+        var machine = A();
+
+        var changes = machine.Apply(
+            new MachineEdit { Avatar = "monkey", AvatarColor = "teal" }, Actor, Now.AddMinutes(1));
+
+        Assert.Equal(Avatar.Monkey, machine.Avatar);
+        Assert.Equal(AvatarColor.Teal, machine.AvatarColor);
+        Assert.Equal(
+            [("avatar", null, "monkey"), ("avatar_color", null, "teal")],
+            changes.Select(c => (c.Field, c.OldValue, c.NewValue)));
+    }
+
+    [Fact]
+    public void A_picture_is_left_alone_when_absent_and_cleared_by_the_empty_string()
+    {
+        var machine = A();
+        machine.Apply(new MachineEdit { Avatar = "rack", AvatarColor = "red" }, Actor, Now);
+
+        Assert.Empty(machine.Apply(new MachineEdit { Plan = null }, Actor, Now.AddMinutes(1)));
+        var changes = machine.Apply(new MachineEdit { Avatar = string.Empty }, Actor, Now.AddMinutes(2));
+
+        Assert.Null(machine.Avatar);
+        Assert.Equal(AvatarColor.Red, machine.AvatarColor);
+        Assert.Equal([("avatar", "rack", null)], changes.Select(c => (c.Field, c.OldValue, c.NewValue)));
+    }
+
+    [Theory]
+    [InlineData("avatar", "server")]
+    [InlineData("avatar", "Monkey")]
+    [InlineData("avatar_color", "#9a6b45")]
+    public void A_picture_takes_no_word_outside_its_set(string field, string word)
+    {
+        var refused = Assert.Throws<ArgumentException>(() => A().Apply(
+            field == "avatar" ? new MachineEdit { Avatar = word } : new MachineEdit { AvatarColor = word },
+            Actor,
+            Now));
+
+        Assert.Equal(field, refused.ParamName);
     }
 }

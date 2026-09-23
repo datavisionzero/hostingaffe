@@ -17,7 +17,7 @@ vi.mock("./Diagram", () => ({
 
 it("links installation nodes and prints every distinct domain and missing deployment", () => {
   const graph = installationDiagram({
-    machine: "host", name: "Example host", status: "active",
+    machine: "host", name: "Example host", status: "active", avatar: null, avatar_color: null,
     installations: [
       { key: "site", name: "Example site", software: "site", role: "application", status: "active",
         urls: ["https://one.example.test/a", "https://two.example.test", "https://one.example.test/b"],

@@ -161,6 +161,61 @@ public sealed class MachineEndpointTests(PostgresFixture postgres)
     }
 
     /// <summary>
+    /// A machine's picture is two words of closed sets: they are written,
+    /// read back on the machine, its list and both maps, named in the history,
+    /// and cleared by the empty string (ADR 0021).
+    /// </summary>
+    [Fact]
+    public async Task A_machine_is_given_a_picture_and_can_lose_it_again()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await Machine(admin, "ex44", "dedicated", new { avatar = "rack" });
+
+        using var written = await admin.PatchAsJsonAsync(
+            "/api/machines/ex44", new { avatar = "monkey", avatar_color = "teal" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+
+        var machine = await written.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal("monkey", machine.GetProperty("avatar").GetString());
+        Assert.Equal("teal", machine.GetProperty("avatar_color").GetString());
+
+        var list = await admin.GetFromJsonAsync<JsonElement>("/api/machines", Ct);
+        Assert.Equal("monkey", list[0].GetProperty("avatar").GetString());
+
+        var map = await admin.GetFromJsonAsync<JsonElement>("/api/hosting-map", Ct);
+        Assert.Equal("teal", map.GetProperty("machines")[0].GetProperty("avatar_color").GetString());
+
+        var installations = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/installation-map", Ct);
+        Assert.Equal("monkey", installations.GetProperty("avatar").GetString());
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/machines/ex44/history", Ct);
+        var change = history.EnumerateArray().Last(one => one.GetProperty("field").GetString() == "avatar");
+        Assert.Equal("rack", change.GetProperty("old_value").GetString());
+        Assert.Equal("monkey", change.GetProperty("new_value").GetString());
+
+        using var cleared = await admin.PatchAsJsonAsync("/api/machines/ex44", new { avatar = "", avatar_color = "" }, Ct);
+        var bare = await cleared.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal(JsonValueKind.Null, bare.GetProperty("avatar").ValueKind);
+        Assert.Equal(JsonValueKind.Null, bare.GetProperty("avatar_color").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_picture_outside_the_set_is_refused_and_names_its_field()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        await Machine(admin, "ex44", "dedicated");
+
+        using var refused = await admin.PatchAsJsonAsync("/api/machines/ex44", new { avatar_color = "#ff0000" }, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("avatar_color", (await Problem(refused)).GetProperty("errors").EnumerateObject().Single().Name);
+    }
+
+    /// <summary>
     /// The machine's own ports: what it listens on and no installation of it
     /// answers to. The same shape an installation's ports have, because it is
     /// the same field — and an empty list says the record holds none, never

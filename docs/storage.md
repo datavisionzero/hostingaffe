@@ -212,6 +212,8 @@ create table machine (
     ssh         varchar(200),
     status      text          not null check (status in ('planned', 'active', 'retired')),
     measured_at timestamptz,
+    avatar      text          check (avatar is null or avatar in ('monkey', …, 'gauge')),
+    avatar_color text         check (avatar_color is null or avatar_color in ('brown', …, 'lavender')),
     description text          not null default '',
     created_by  uuid          not null references identity (id),
     created_at  timestamptz   not null,
@@ -235,6 +237,12 @@ across the instance — not per anything, because a machine has no parent
 (`CONTEXT.md`, Key) — and it covers deleted rows, so a key stays spent for the
 grace period. That a machine key is never reused *after* the purge is a rule of
 deleting and is not yet held here.
+
+**The picture is two words, not an image** (ADR 0021). `avatar` and
+`avatar_color` hold a word of their closed set or nothing, and their
+constraints list every word of the set — the configuration builds them from
+the set itself, which is why the listing above is shortened. A machine without
+them is shown with a picture derived from its key; that one is never stored.
 
 **Hardware facts are text, `arch` excepted.** Machines are compared by eye and
 never summed, and `2×512G NVMe ZFS mirror` is a truer description of a disk

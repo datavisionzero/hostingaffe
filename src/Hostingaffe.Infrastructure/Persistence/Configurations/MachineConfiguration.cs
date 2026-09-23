@@ -49,6 +49,8 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             table.HasCheckConstraint("ck_machine_kind", "kind in ('vps', 'dedicated', 'vm', 'local')");
             table.HasCheckConstraint("ck_machine_arch", "arch is null or arch in ('amd64', 'arm64')");
             table.HasCheckConstraint("ck_machine_status", "status in ('planned', 'active', 'retired')");
+            table.HasCheckConstraint("ck_machine_avatar", Words<Avatar>("avatar"));
+            table.HasCheckConstraint("ck_machine_avatar_color", Words<AvatarColor>("avatar_color"));
 
             // Only a vm runs on a machine, and no machine runs on itself. That a
             // longer chain does not close is the write path's — the database
@@ -102,6 +104,14 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
         builder.Property(m => m.Arch)
             .HasColumnName("arch")
             .HasConversion(new SnakeCaseEnumConverter<Arch>());
+
+        builder.Property(m => m.Avatar)
+            .HasColumnName("avatar")
+            .HasConversion(new SnakeCaseEnumConverter<Avatar>());
+
+        builder.Property(m => m.AvatarColor)
+            .HasColumnName("avatar_color")
+            .HasConversion(new SnakeCaseEnumConverter<AvatarColor>());
 
         builder.Property(m => m.Cpu).HasColumnName("cpu").HasMaxLength(Machine.FactMaxLength);
         builder.Property(m => m.Memory).HasColumnName("memory").HasMaxLength(Machine.FactMaxLength);
@@ -197,4 +207,12 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
 
         builder.Ignore(m => m.Deleted);
     }
+
+    /// <summary>
+    /// The constraint of an optional closed set too long to spell by hand: the
+    /// words come from the set itself, so a drawing added to it cannot be
+    /// forgotten here (ADR 0021).
+    /// </summary>
+    private static string Words<T>(string column) where T : struct, Enum =>
+        $"{column} is null or {column} in ({string.Join(", ", Enum.GetValues<T>().Select(value => $"'{Spelling.Of(value)}'"))})";
 }

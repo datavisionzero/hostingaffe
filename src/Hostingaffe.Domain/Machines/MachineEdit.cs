@@ -22,6 +22,11 @@ namespace Hostingaffe.Domain.Machines;
 /// <see cref="MeasuredAt"/> are set, never cleared. A closed set has no empty
 /// value to send, and a measurement is corrected by measuring again.
 /// </para>
+/// <para>
+/// <see cref="Avatar"/> and <see cref="AvatarColor"/> are closed sets that can
+/// be cleared, so they arrive as the words they are spelled with: the empty
+/// string clears them the way it clears a text field (ADR 0021).
+/// </para>
 /// </remarks>
 public sealed record MachineEdit
 {
@@ -70,4 +75,8 @@ public sealed record MachineEdit
     public DateTimeOffset? MeasuredAt { get; init; }
 
     public string? Description { get; init; }
+
+    public string? Avatar { get; init; }
+
+    public string? AvatarColor { get; init; }
 }
