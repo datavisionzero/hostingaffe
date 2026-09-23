@@ -150,6 +150,17 @@ is escaped the same way everywhere, and `changes.ts` is the one reading of a
 history value — a moment as a date, a birth that does not print its own subject
 back — so that the section and the reading cannot say the same line differently.
 
+`avatars/` holds a machine's picture (ADR 0021): the drawings as SVG files —
+`faces/` has every one of the `avatar` set, `symbols/` the devices again
+without a face — and `MachineAvatar.tsx`, which every screen that shows a
+machine draws it with. The drawings are imported as strings and put into the
+page inline, because their colour arrives as the CSS variable
+`--avatar-color` and an `<img>` would not inherit it; they are the
+repository's own files and nothing else ever takes that path. `avatars.ts`
+holds the ten colours, the picture a key derives where none was chosen — a
+stable hash, never written back — and whether this browser draws faces, kept
+in local storage like the theme.
+
 `HostingMapView.tsx` reads provider and machine associations in one API call.
 `HostingDiagram.tsx` contains the linked cards, and `Diagram.tsx` lays them out
 with Dagre and renders a read-only React Flow canvas. The grouped list can be
