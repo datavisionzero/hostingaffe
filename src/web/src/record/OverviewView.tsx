@@ -92,59 +92,62 @@ function Tile({ machine, window }: { machine: MachineSummary; window: string }) 
         aria-label={`What has been going on on ${machine.key}`}
       />
 
-      <div className="relative flex flex-col gap-2 p-4">
-        <div className="flex items-center gap-2">
-          <MachineAvatar machine={machine} size={28} />
-          <Link
-            to={machinePath(machine.key)}
-            className="relative font-mono text-sm font-medium hover:underline"
-          >
-            {machine.key}
-          </Link>
-          <span className="ml-auto text-xs text-muted-foreground">{machine.kind}</span>
-          <StatusBadge status={machine.status} />
-        </div>
+      <div className="relative flex gap-4 p-4">
+        <MachineAvatar machine={machine} size={56} />
 
-        <p className="truncate text-xs text-muted-foreground">
-          {[machine.provider, machine.location, machine.arch, installations(activity)]
-            .filter((word) => word !== null && word !== undefined && word !== "")
-            .join(" · ")}
-        </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Link
+              to={machinePath(machine.key)}
+              className="relative font-mono text-sm font-medium hover:underline"
+            >
+              {machine.key}
+            </Link>
+            <span className="ml-auto text-xs text-muted-foreground">{machine.kind}</span>
+            <StatusBadge status={machine.status} />
+          </div>
 
-        {/* The line the whole screen is for: whether anything was deployed
-            here, and when. A machine with no deployment says so rather than
-            leaving the row out, because "nothing was ever deployed here" is an
-            answer. */}
-        <p className="min-w-0 truncate text-sm">
-          {activity?.latest == null
-            ? <span className="text-muted-foreground">No deployment recorded.</span>
-            : (
-              <>
-                <Link
-                  to={installationPath(activity.latest.installation)}
-                  className="relative font-mono text-xs hover:underline"
-                >
-                  {activity.latest.installation}
-                </Link>{" "}
-                {activity.latest.previous !== null && (
-                  <span className="text-muted-foreground line-through">{activity.latest.previous}</span>
-                )}{" "}
-                → {activity.latest.version}{" "}
-                <span className="text-xs text-muted-foreground">{ago(activity.latest.at)}</span>
-              </>
+          <p className="truncate text-xs text-muted-foreground">
+            {[machine.provider, machine.location, machine.arch, installations(activity)]
+              .filter((word) => word !== null && word !== undefined && word !== "")
+              .join(" · ")}
+          </p>
+
+          {/* The line the whole screen is for: whether anything was deployed
+              here, and when. A machine with no deployment says so rather than
+              leaving the row out, because "nothing was ever deployed here" is an
+              answer. */}
+          <p className="min-w-0 truncate text-sm">
+            {activity?.latest == null
+              ? <span className="text-muted-foreground">No deployment recorded.</span>
+              : (
+                <>
+                  <Link
+                    to={installationPath(activity.latest.installation)}
+                    className="relative font-mono text-xs hover:underline"
+                  >
+                    {activity.latest.installation}
+                  </Link>{" "}
+                  {activity.latest.previous !== null && (
+                    <span className="text-muted-foreground line-through">{activity.latest.previous}</span>
+                  )}{" "}
+                  → {activity.latest.version}{" "}
+                  <span className="text-xs text-muted-foreground">{ago(activity.latest.at)}</span>
+                </>
+              )}
+          </p>
+
+          <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+            <span>{changes(activity, window)}</span>
+            <span>
+              {machine.last_seen === null ? "Never reported" : `Reported ${ago(machine.last_seen)}`}
+            </span>
+            {activity !== null && activity !== undefined && activity.drift > 0 && (
+              <span>{activity.drift === 1 ? "1 drift" : `${String(activity.drift)} drift`}</span>
             )}
-        </p>
-
-        <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-          <span>{changes(activity, window)}</span>
-          <span>
-            {machine.last_seen === null ? "Never reported" : `Reported ${ago(machine.last_seen)}`}
-          </span>
-          {activity !== null && activity !== undefined && activity.drift > 0 && (
-            <span>{activity.drift === 1 ? "1 drift" : `${String(activity.drift)} drift`}</span>
-          )}
-          {machine.reboot_required === true && <span>Restart pending</span>}
-        </p>
+            {machine.reboot_required === true && <span>Restart pending</span>}
+          </p>
+        </div>
       </div>
     </li>
   );

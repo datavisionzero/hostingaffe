@@ -33,14 +33,18 @@ export function MachineCard({ data, selected }: NodeProps) {
   ].filter(([, value]) => value !== null);
   return <div className={cn("flex h-full flex-col rounded-xl border bg-card px-4 py-3 shadow-sm", selected && found)}>
     <Handle type="target" position={Position.Left} isConnectable={false} className="!size-2 !border-0 !bg-brand" />
-    <div className="flex items-center gap-2">
-      <MachineAvatar machine={machine} size={24} />
-      <span className="mr-auto truncate text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">{machine.kind}</span>
-      <StatusBadge status={machine.status} />
+    <div className="flex items-start gap-3">
+      <MachineAvatar machine={machine} size={48} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-2">
+          <span className="mr-auto truncate text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">{machine.kind}</span>
+          <StatusBadge status={machine.status} />
+        </div>
+        <Link className="nodrag nopan truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+          to={machinePath(machine.key)}>{machine.name}</Link>
+        <span className="truncate font-mono text-xs text-muted-foreground">{machine.key}</span>
+      </div>
     </div>
-    <Link className="nodrag nopan mt-1 truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
-      to={machinePath(machine.key)}>{machine.name}</Link>
-    <span className="truncate font-mono text-xs text-muted-foreground">{machine.key}</span>
     <div className="mt-2 min-h-0 flex-1 space-y-0.5 overflow-hidden font-mono text-[0.68rem] text-muted-foreground">
       {addresses.length === 0 ? <span>No addresses recorded</span> : addresses.map(([label, value]) =>
         <div key={label} className="truncate"><span className="mr-1 text-foreground">{label}</span>{value}</div>)}
