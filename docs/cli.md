@@ -249,6 +249,15 @@ provider of its host and cannot take one directly. `ha provider machines KEY`
 lists machines on that provider, including VMs. The provider's `view` includes
 its Markdown description, and `history` shows changes to it.
 
+**A provider's emblem is set like a machine's picture**: `--emblem` names one of
+the geometric compositions the web interface ships with and `--emblem-palette`
+one of its ten palettes, both listed in the help, and the empty value clears
+either (ADR 0022). `view` and the export tree print the two words.
+
+```sh
+ha provider set hetzner --emblem orbit --emblem-palette lagoon
+```
+
 **An installation is written with two directories**: `--path`, where it lives on
 the machine, and `--data`, where its persistent data lies — the one a backup has
 to take (ADR 0009). `view`, the export tree and `ha machine context` print both.

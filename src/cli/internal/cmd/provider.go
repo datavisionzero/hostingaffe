@@ -65,19 +65,26 @@ func newProviderView(g *globals) *cobra.Command {
 		}}
 }
 
-type providerFields struct{ name, description, descriptionFile string }
+type providerFields struct{ name, description, descriptionFile, emblem, emblemPalette string }
 
 func (p *providerFields) flags(cmd *cobra.Command) {
 	f := cmd.Flags()
 	f.StringVar(&p.name, "name", "", "the provider's display name; defaults to its key")
 	f.StringVar(&p.description, "description", "", "the provider's Markdown description")
 	f.StringVar(&p.descriptionFile, "description-file", "", "the description from a file, or `-` for stdin")
+	f.StringVar(&p.emblem, "emblem", "",
+		"the composition it is recognised by: orbit, arch, peak, split, quarter, stack, wave, grid, "+
+			"target, bloom, eclipse, chevron, bridge, tiles, beam or steps; empty clears it")
+	f.StringVar(&p.emblemPalette, "emblem-palette", "",
+		"the colours of that composition: bauhaus, ember, meadow, lagoon, dusk, citrus, orchid, granite, coral or glacier; empty clears it")
 }
 
 func (p *providerFields) body(cmd *cobra.Command) (*fields, error) {
 	f := given(cmd)
 	f.take("name", &p.name)
 	f.take("description", &p.description)
+	f.take("emblem", &p.emblem)
+	f.take("emblem-palette", &p.emblemPalette)
 	if cmd.Flags().Changed("description") && cmd.Flags().Changed("description-file") {
 		return nil, &config.UsageError{Message: "the description comes from one place: --description or --description-file, not both."}
 	}
@@ -122,14 +129,14 @@ func newProviderAdd(g *globals) *cobra.Command {
 func newProviderSet(g *globals) *cobra.Command {
 	var write providerFields
 	var note, ifMatch string
-	cmd := &cobra.Command{Use: "set KEY", Short: "Change the name or description; an empty value clears a text field.", Args: cobra.ExactArgs(1),
+	cmd := &cobra.Command{Use: "set KEY", Short: "Change the name, description or emblem; an empty value clears a text field.", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body, err := write.body(cmd)
 			if err != nil {
 				return err
 			}
 			if body.nothing() {
-				return &config.UsageError{Message: "nothing to change: give --name or --description."}
+				return &config.UsageError{Message: "nothing to change: give --name, --description, --emblem or --emblem-palette."}
 			}
 			_, c, err := g.load()
 			if err != nil {

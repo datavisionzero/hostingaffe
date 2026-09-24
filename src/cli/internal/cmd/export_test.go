@@ -112,6 +112,11 @@ func TestAnExportIsATreeWithTheFilesInPlace(t *testing.T) {
 		}
 	}
 
+	// A provider's emblem is two words in the tree, as on the screen (ADR 0022).
+	if provider := read(t, filepath.Join(dir, "providers/hetzner.md")); !strings.Contains(provider, "| emblem | orbit |") {
+		t.Errorf("the provider does not name its emblem:\n%s", provider)
+	}
+
 	// A file is what the machine runs, byte for byte, at its own path.
 	content := read(t, filepath.Join(dir, "machines/ex44/files/sites/logaffe.caddy"))
 	if content != "logs.example.test {\n  reverse_proxy logaffe:8080\n}\n" {

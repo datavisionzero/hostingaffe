@@ -257,6 +257,10 @@ func softwareMarkdown(software softwareRecord) string {
 func providerMarkdown(provider providerRecord) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "# %s — %s\n\n", provider.Key, provider.Name)
+	table(&out, [][2]string{
+		{"emblem", value((*string)(provider.Emblem))},
+		{"emblem palette", value((*string)(provider.EmblemPalette))},
+	})
 	body(&out, provider.Description)
 	history(&out, provider.History)
 	return out.String()

@@ -199,6 +199,9 @@ func MachineSummaries(w io.Writer, items []api.MachineSummary) {
 // Provider prints a keyed hoster and its Markdown description.
 func Provider(w io.Writer, p api.Provider) {
 	fmt.Fprintf(w, "%s  %s\n", p.Key, p.Name)
+	// The emblem the web interface draws, in the words it is chosen by; `ha`
+	// draws nothing (ADR 0022).
+	line(w, maybe("emblem", (*string)(p.Emblem)), maybe("emblem palette", (*string)(p.EmblemPalette)))
 	touched(w, p.UpdatedAt, p.UpdatedBy, p.CreatedBy)
 	body(w, p.Description)
 }
