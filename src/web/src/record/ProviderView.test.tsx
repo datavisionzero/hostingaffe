@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import { NewProviderView, ProviderView } from "./ProviderView";
 const identity = { id: aUser.id, kind: "user", name: aUser.name };
 const provider = {
   key: "example-host", name: "Example Host", description: "**Support** every day.",
+  emblem: null, emblem_palette: null,
   created_by: identity, updated_by: identity,
   created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z",
 };
@@ -117,4 +118,52 @@ it("explains a VM's inherited provider and links its host", () => {
   expect(screen.getByRole("link", { name: "host" })).toHaveAttribute("href", "/machines/host");
   expect(screen.getByText(/Old text/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Change" })).not.toBeInTheDocument();
+});
+
+function aProvider(answers: Parameters<typeof installInstance>[0]) {
+  const instance = installInstance({
+    "GET /api/providers/example-host": provider,
+    "GET /api/providers/example-host/history": [],
+    "GET /api/machines": [],
+    ...answers,
+  });
+  renderAt("/providers/example-host", <Routes><Route path="/providers/:key" element={<ProviderView />} /></Routes>);
+  return instance;
+}
+
+it("writes a chosen emblem at once and reads the provider again", async () => {
+  const instance = aProvider({ "PATCH /api/providers/example-host": { ...provider, emblem: "orbit" } });
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: "Change the emblem of example-host" }));
+  const compositions = await screen.findByRole("group", { name: "Composition" });
+  expect(within(compositions).getAllByRole("button")).toHaveLength(16);
+  expect(screen.getByText("Derived from the key until one is chosen.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Automatic" })).toBeDisabled();
+
+  await user.click(within(compositions).getByRole("button", { name: "orbit" }));
+
+  await waitFor(() => expect(instance.calls.find((call) => call.method === "PATCH")).toBeDefined());
+  expect(await instance.calls.find((call) => call.method === "PATCH")!.clone().json())
+    .toEqual({ name: null, description: null, emblem: "orbit" });
+  await waitFor(() => expect(instance.calls.filter((call) =>
+    call.method === "GET" && new URL(call.url).pathname === "/api/providers/example-host")).toHaveLength(2));
+});
+
+it("clears both words when the emblem goes back to automatic", async () => {
+  const instance = aProvider({
+    "GET /api/providers/example-host": { ...provider, emblem: "arch", emblem_palette: "dusk" },
+    "PATCH /api/providers/example-host": provider,
+  });
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole("button", { name: "Change the emblem of example-host" }));
+  const palettes = await screen.findByRole("group", { name: "Palette" });
+  expect(within(palettes).getByRole("button", { name: "dusk" })).toHaveAttribute("aria-pressed", "true");
+
+  await user.click(screen.getByRole("button", { name: "Automatic" }));
+
+  await waitFor(() => expect(instance.calls.find((call) => call.method === "PATCH")).toBeDefined());
+  expect(await instance.calls.find((call) => call.method === "PATCH")!.clone().json())
+    .toEqual({ name: null, description: null, emblem: "", emblem_palette: "" });
 });
