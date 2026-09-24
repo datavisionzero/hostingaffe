@@ -54,7 +54,7 @@ export const COLOR_NAMES = Object.keys(AVATAR_COLORS) as AvatarColor[];
  * strings well and gives the same answer in every browser. Two hashes, one
  * per choice, so that the drawing and the colour vary independently.
  */
-function hash(text: string, seed: number) {
+export function hash(text: string, seed: number) {
   let value = seed >>> 0;
   for (let i = 0; i < text.length; i++) {
     value ^= text.charCodeAt(i);
