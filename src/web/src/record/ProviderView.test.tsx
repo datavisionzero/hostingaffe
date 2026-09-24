@@ -30,6 +30,14 @@ it("lists providers, including a usable empty state and creation route", async (
   expect(screen.getByRole("link", { name: "Add provider" })).toHaveAttribute("href", "/providers/new");
 });
 
+it("draws each provider's emblem in the list", async () => {
+  installInstance({ "GET /api/providers": [{
+    key: "example-host", name: "Example Host", updated_at: "2026-09-02T10:00:00Z", emblem: "wave", emblem_palette: "coral",
+  }] });
+  renderAt("/providers", <ProviderListView />);
+  expect(await screen.findByRole("img", { name: "coral wave" })).toBeInTheDocument();
+});
+
 it("creates a provider with its description", async () => {
   const instance = installInstance({
     "POST /api/providers": (request) => {

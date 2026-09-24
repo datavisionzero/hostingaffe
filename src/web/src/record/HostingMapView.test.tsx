@@ -73,6 +73,14 @@ it("draws each machine's avatar in the grouped list", async () => {
   expect(within(list).getByRole("img", { name: "sage minimac" })).toBeInTheDocument();
 });
 
+it("draws each provider's emblem in the grouped list", async () => {
+  installInstance({ "GET /api/hosting-map": { ...map, providers: [{ ...map.providers[0], emblem: "peak", emblem_palette: "citrus" }] } });
+  renderAt("/hosting-map", <HostingMapView />);
+
+  const list = await screen.findByRole("region", { name: "Providers and machines" });
+  expect(within(list).getByRole("img", { name: "citrus peak" })).toBeInTheDocument();
+});
+
 it("answers an empty map", async () => {
   installInstance({ "GET /api/hosting-map": { providers: [], machines: [] } });
   renderAt("/hosting-map", <HostingMapView />);

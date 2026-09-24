@@ -8,6 +8,7 @@ import { Diagram, type DiagramFocus } from "./Diagram";
 import type { DiagramItem } from "./diagramLayout";
 import { StatusBadge } from "./Parts";
 import { MachineAvatar } from "./avatars/MachineAvatar";
+import { ProviderEmblem } from "./emblems/ProviderEmblem";
 
 type Provider = Schemas["HostingMapProvider"];
 type Machine = Schemas["HostingMapMachine"];
@@ -17,11 +18,14 @@ const found = "ring-4 ring-brand/60 ring-offset-2 ring-offset-background";
 
 export function ProviderCard({ data, selected }: NodeProps) {
   const provider = data.provider as Provider;
-  return <div className={cn("flex h-full flex-col justify-center rounded-xl border border-brand/40 bg-card px-4 py-3 shadow-sm", selected && found)}>
-    <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">Provider</span>
-    <Link className="nodrag nopan truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
-      to={providerPath(provider.key)}>{provider.name}</Link>
-    <span className="truncate font-mono text-xs text-muted-foreground">{provider.key}</span>
+  return <div className={cn("flex h-full items-center gap-3 rounded-xl border border-brand/40 bg-card px-4 py-3 shadow-sm", selected && found)}>
+    <ProviderEmblem provider={provider} size={48} />
+    <div className="flex min-w-0 flex-1 flex-col">
+      <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">Provider</span>
+      <Link className="nodrag nopan truncate font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+        to={providerPath(provider.key)}>{provider.name}</Link>
+      <span className="truncate font-mono text-xs text-muted-foreground">{provider.key}</span>
+    </div>
     <Handle type="source" position={Position.Right} isConnectable={false} className="!size-2 !border-0 !bg-brand" />
   </div>;
 }

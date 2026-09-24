@@ -7,6 +7,7 @@ import { useAsk } from "@/shared/ask";
 import { found } from "@/shared/narrowing";
 import { day } from "@/shared/when";
 import { providerPath } from "./addresses";
+import { ProviderEmblem } from "./emblems/ProviderEmblem";
 
 type ProviderSummary = Schemas["ProviderSummary"];
 
@@ -36,6 +37,7 @@ export function ProviderListView() {
           {rows.map((provider) => (
             <li key={provider.key}>
               <Link to={providerPath(provider.key)} className="flex min-h-11 items-center gap-3 px-4 py-1 hover:bg-accent focus-visible:outline-2 focus-visible:outline-brand">
+                <ProviderEmblem provider={provider} size={28} />
                 <span className="w-32 shrink-0 truncate font-mono text-xs text-muted-foreground sm:w-48">{provider.key}</span>
                 <span className="min-w-0 flex-1 truncate">{provider.name}</span>
                 <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground sm:block">{day(provider.updated_at)}</span>
