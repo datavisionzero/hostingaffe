@@ -2627,7 +2627,7 @@
         "tags": [
           "hostingaffe"
         ],
-        "summary": "Change a provider's name or description, guarded by `If-Match` and recorded in history.",
+        "summary": "Change a provider's name, description or emblem, guarded by `If-Match` and recorded in history.",
         "operationId": "ChangeProvider",
         "parameters": [
           {
@@ -6980,6 +6980,18 @@
               "null",
               "string"
             ]
+          },
+          "emblem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emblem_palette": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7587,6 +7599,18 @@
               "null",
               "string"
             ]
+          },
+          "emblem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emblem_palette": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -8038,6 +8062,50 @@
             ]
           }
         }
+      },
+      "Emblem": {
+        "enum": [
+          "orbit",
+          "arch",
+          "peak",
+          "split",
+          "quarter",
+          "stack",
+          "wave",
+          "grid",
+          "target",
+          "bloom",
+          "eclipse",
+          "chevron",
+          "bridge",
+          "tiles",
+          "beam",
+          "steps",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "EmblemPalette": {
+        "enum": [
+          "bauhaus",
+          "ember",
+          "meadow",
+          "lagoon",
+          "dusk",
+          "citrus",
+          "orchid",
+          "granite",
+          "coral",
+          "glacier",
+          null
+        ],
+        "type": [
+          "null",
+          "string"
+        ]
       },
       "Environment": {
         "enum": [
@@ -8618,7 +8686,9 @@
       "HostingMapProvider": {
         "required": [
           "key",
-          "name"
+          "name",
+          "emblem",
+          "emblem_palette"
         ],
         "type": "object",
         "properties": {
@@ -8627,6 +8697,26 @@
           },
           "name": {
             "type": "string"
+          },
+          "emblem": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Emblem"
+              }
+            ]
+          },
+          "emblem_palette": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EmblemPalette"
+              }
+            ]
           }
         }
       },
@@ -9164,6 +9254,18 @@
             ]
           },
           "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emblem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emblem_palette": {
             "type": [
               "null",
               "string"
@@ -10529,6 +10631,8 @@
           "key",
           "name",
           "description",
+          "emblem",
+          "emblem_palette",
           "created_by",
           "updated_by",
           "created_at",
@@ -10544,6 +10648,26 @@
           },
           "description": {
             "type": "string"
+          },
+          "emblem": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Emblem"
+              }
+            ]
+          },
+          "emblem_palette": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EmblemPalette"
+              }
+            ]
           },
           "created_by": {
             "$ref": "#/components/schemas/IdentityRef"
@@ -10565,7 +10689,9 @@
         "required": [
           "key",
           "name",
-          "updated_at"
+          "updated_at",
+          "emblem",
+          "emblem_palette"
         ],
         "type": "object",
         "properties": {
@@ -10578,6 +10704,26 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "emblem": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Emblem"
+              }
+            ]
+          },
+          "emblem_palette": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EmblemPalette"
+              }
+            ]
           }
         }
       },

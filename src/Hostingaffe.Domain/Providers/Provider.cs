@@ -25,6 +25,16 @@ public sealed class Provider
     public string Key { get; private init; } = null!;
     public string Name { get; private set; } = null!;
     public string Description { get; private set; } = null!;
+
+    /// <summary>
+    /// The composition the provider is recognised by, and the palette it is
+    /// drawn in (ADR 0022). Both optional: a provider without them is shown with
+    /// an emblem derived from its key, and that one is never stored.
+    /// </summary>
+    public Emblem? Emblem { get; private set; }
+
+    public EmblemPalette? EmblemPalette { get; private set; }
+
     public Guid CreatedBy { get; private init; }
     public DateTimeOffset CreatedAt { get; private init; }
     public Guid UpdatedBy { get; private set; }
@@ -46,6 +56,8 @@ public sealed class Provider
         ArgumentNullException.ThrowIfNull(edit);
         var changes = new List<FieldChange>();
         Fields.Text("name", edit.Name, Name, value => Name = value ?? Key, NormalizeName, changes);
+        Fields.Optional("emblem", edit.Emblem, Emblem, value => Emblem = value, changes);
+        Fields.Optional("emblem_palette", edit.EmblemPalette, EmblemPalette, value => EmblemPalette = value, changes);
         if (edit.Description is not null && edit.Description != Description)
         {
             changes.Add(new FieldChange("description", null, null));

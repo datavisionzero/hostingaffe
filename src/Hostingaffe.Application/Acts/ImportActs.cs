@@ -127,7 +127,8 @@ public sealed record ImportSoftware(
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
-public sealed record ImportProvider(string? Key, string? Name, string? Description)
+public sealed record ImportProvider(
+    string? Key, string? Name, string? Description, string? Emblem = null, string? EmblemPalette = null)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -233,7 +234,7 @@ public sealed class ImportRecord(
             {
                 Imports.Closed("provider", one.UnknownFields, "history");
                 await createProvider.ExecuteAsync(
-                    new CreateProviderRequest(one.Key, one.Name, one.Description), note, cancellationToken);
+                    new CreateProviderRequest(one.Key, one.Name, one.Description, one.Emblem, one.EmblemPalette), note, cancellationToken);
                 made.Providers++;
             }
             foreach (var (name, key) in legacyKeys)

@@ -18,8 +18,8 @@ vi.mock("./HostingDiagram", () => ({
 
 const map: Schemas["HostingMap"] = {
   providers: [
-    { key: "example-host", name: "Example Host" },
-    { key: "empty-host", name: "Empty Host" },
+    { key: "example-host", name: "Example Host", emblem: null, emblem_palette: null },
+    { key: "empty-host", name: "Empty Host", emblem: null, emblem_palette: null },
   ],
   machines: [
     { key: "guest", name: "Guest VM", kind: "vm", status: "active", provider: "example-host", ipv4: null, ipv6: null, private_ip: "198.51.100.20", avatar: null, avatar_color: null },

@@ -434,8 +434,8 @@ them is what keeps the two saying the same thing.
 |---|---|
 | `GET /api/providers` | live providers as slim `ProviderSummary` rows, by key |
 | `POST /api/providers` | create a provider; `key` is required |
-| `GET /api/providers/{key}` | name, Markdown description, authors and timestamps |
-| `PATCH /api/providers/{key}` | change name or description; `If-Match` guards it |
+| `GET /api/providers/{key}` | name, Markdown description, emblem, authors and timestamps |
+| `PATCH /api/providers/{key}` | change name, description or emblem; `If-Match` guards it |
 | `GET /api/providers/{key}/history` | its changes, oldest first |
 | `DELETE /api/providers/{key}`, `POST /api/providers/{key}/restore` | soft delete and restore |
 
@@ -447,9 +447,18 @@ including VMs by inherited provider. A provider cannot be deleted while any
 machine still refers to it, even if that machine is deleted but restorable.
 An agent may read and write providers with the same authorization as machines.
 
+**`emblem` and `emblem_palette` are the provider's picture** (ADR 0022): a word
+of each closed set, listed in `CONTEXT.md` and in the contract's `Emblem` and
+`EmblemPalette` schemas, written and cleared exactly like a machine's `avatar`
+and `avatar_color` — the empty string clears them, and a word outside the set is
+`validation` on the field it was sent in. A provider without them reads `null`.
+Every provider read carries them: the complete provider, the list and the
+hosting map.
+
 ### Hosting map
 
-`GET /api/hosting-map` returns a `HostingMap` with providers (`key`, `name`)
+`GET /api/hosting-map` returns a `HostingMap` with providers (`key`, `name`,
+`emblem`, `emblem_palette`)
 and every live machine (`key`, `name`, `kind`, `status`, effective `provider`,
 `ipv4`, `ipv6`, `private_ip`, `avatar`, `avatar_color`). Retired machines remain in it; deleted machines
 do not. A VM's provider comes from its host. This one authenticated read feeds

@@ -7,19 +7,23 @@ using Hostingaffe.Domain.Providers;
 
 namespace Hostingaffe.Application.Acts;
 
-public sealed record ProviderSummaryShape(string Key, string Name, DateTimeOffset UpdatedAt);
+public sealed record ProviderSummaryShape(
+    string Key, string Name, DateTimeOffset UpdatedAt, Emblem? Emblem, EmblemPalette? EmblemPalette);
 
 public sealed record ProviderShape(
     string Key, string Name, string Description,
+    Emblem? Emblem, EmblemPalette? EmblemPalette,
     IdentityRef CreatedBy, IdentityRef UpdatedBy,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
-public sealed record CreateProviderRequest(string? Key, string? Name, string? Description)
+public sealed record CreateProviderRequest(
+    string? Key, string? Name, string? Description, string? Emblem = null, string? EmblemPalette = null)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
 
-public sealed record ChangeProviderRequest(string? Name, string? Description)
+public sealed record ChangeProviderRequest(
+    string? Name, string? Description, string? Emblem = null, string? EmblemPalette = null)
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? UnknownFields { get; init; }
 }
@@ -27,13 +31,14 @@ public sealed record ChangeProviderRequest(string? Name, string? Description)
 public sealed class ProviderAssembler(IIdentities identities)
 {
     public static ProviderSummaryShape Summary(Provider provider) =>
-        new(provider.Key, provider.Name, provider.UpdatedAt);
+        new(provider.Key, provider.Name, provider.UpdatedAt, provider.Emblem, provider.EmblemPalette);
 
     public async Task<ProviderShape> CompleteAsync(Provider provider, CancellationToken cancellationToken)
     {
         var people = await identities.FindManyAsync([provider.CreatedBy, provider.UpdatedBy], cancellationToken);
         return new ProviderShape(
             provider.Key, provider.Name, provider.Description,
+            provider.Emblem, provider.EmblemPalette,
             IdentityRef.Of(people[provider.CreatedBy]),
             IdentityRef.Of(people[provider.UpdatedBy]),
             provider.CreatedAt, provider.UpdatedAt);
@@ -111,7 +116,10 @@ public sealed class CreateProvider(
         {
             var now = clock.GetUtcNow();
             var row = Validated.Field("name", () => Provider.Create(key, request.Name, caller.Id, now));
-            ProviderWrites.Apply(row, new ProviderEdit(Description: request.Description), caller.Id, now);
+            ProviderWrites.Apply(
+                row,
+                new ProviderEdit(Description: request.Description, Emblem: request.Emblem, EmblemPalette: request.EmblemPalette),
+                caller.Id, now);
             providers.Add(row);
             keys.Assign(Keyed.Provider, key);
             history.Add(HistoryEntry.OnProvider(row.Id, caller.Id, now, HistoryField.Created, note: said));
@@ -153,7 +161,8 @@ public sealed class ChangeProvider(
 
             var now = clock.GetUtcNow();
             foreach (var change in ProviderWrites.Apply(
-                         row, new ProviderEdit(changes.Name, changes.Description), caller.Id, now))
+                         row, new ProviderEdit(changes.Name, changes.Description, changes.Emblem, changes.EmblemPalette),
+                         caller.Id, now))
             {
                 history.Add(HistoryEntry.OnProvider(
                     row.Id, caller.Id, now, change.Field, change.OldValue, change.NewValue, said));

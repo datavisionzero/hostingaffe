@@ -29,6 +29,14 @@ internal sealed class SnakeCaseEnumConverter<TEnum>() : ValueConverter<TEnum, st
 
     public static string ToName(TEnum value) => Names[value];
 
+    /// <summary>
+    /// The check constraint of an optional closed set too long to spell by
+    /// hand: the words come from the set itself, so a drawing added to it
+    /// cannot be forgotten in the constraint (ADR 0021, 0022).
+    /// </summary>
+    public static string Optional(string column) =>
+        $"{column} is null or {column} in ({string.Join(", ", Enum.GetValues<TEnum>().Select(value => $"'{ToName(value)}'"))})";
+
     public static TEnum FromName(string name) =>
         Values.TryGetValue(name, out var value)
             ? value

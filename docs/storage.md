@@ -310,6 +310,8 @@ create table provider (
     key         varchar(64)  not null unique,
     name        varchar(200) not null,
     description text         not null default '',
+    emblem      text         check (emblem is null or emblem in ('orbit', …, 'steps')),
+    emblem_palette text      check (emblem_palette is null or emblem_palette in ('bauhaus', …, 'glacier')),
     created_by  uuid         not null references identity (id),
     created_at  timestamptz  not null,
     updated_by  uuid         not null references identity (id),
@@ -326,6 +328,11 @@ key, even if the machine is deleted. The write path also refuses a provider
 soft delete while it is in use. Provider keys stay in `assigned_key` after
 their rows are purged. Key, name and description have `letters` and `search`
 columns like other searchable records.
+
+**The emblem is two words, not an image** (ADR 0022), held and constrained
+exactly like a machine's picture: a word of each closed set or nothing, with
+constraints the configuration builds from the sets. A provider without them is
+shown with an emblem derived from its key; that one is never stored.
 
 ## Software
 
