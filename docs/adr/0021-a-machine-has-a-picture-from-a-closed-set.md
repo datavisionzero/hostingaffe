@@ -1,5 +1,9 @@
 # A Machine Has a Picture From a Closed Set
 
+[ADR 0022](0022-a-provider-has-an-emblem-from-a-closed-set.md) gives providers
+an emblem of their own. The last paragraph here still holds for installations
+and software.
+
 A list of machines is read by eye, and a column of keys that all look alike
 makes the eye work harder than it has to. A machine therefore gets a picture:
 `avatar` names one of 38 drawings — animals and devices — and `avatar_color`

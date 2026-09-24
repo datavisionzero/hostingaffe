@@ -497,6 +497,8 @@ record, not a DNS manager or an account integration.
 | `key` | handle | immutable, unique among providers, and reserved after deletion |
 | `name` | text | display name, defaults to the key |
 | `description` | Markdown | editable notes about the provider |
+| `emblem` | closed set, optional | the composition the provider is recognised by — see below |
+| `emblem_palette` | closed set, optional | the three colours that composition is drawn in |
 
 Provider creation, edits, deletion and restoration carry the same timestamps,
 optimistic writes and history as other records. A provider with any machine
@@ -506,6 +508,21 @@ assignment; restoring it recovers the same one. A VM's derived provider is
 never stored as an assignment. The provider's machine list includes VMs by
 their effective provider. Unassigned machines remain visible in lists and on
 the hosting map.
+
+**A provider has an emblem.** Where a machine has a face, the provider at the
+head of its column has a geometric composition: `emblem` names one of the
+compositions the product ships with and `emblem_palette` one of ten palettes of
+three colours, the first of which is the tile the shapes stand on. Everything
+else is what the machine's picture is — two closed sets, optional, nothing
+uploaded, and a provider without them shown with an emblem derived from its key
+that is never written back. An emblem is deliberately not an avatar, so that a
+provider never looks like one of its machines
+([ADR 0022](docs/adr/0022-a-provider-has-an-emblem-from-a-closed-set.md)).
+
+| closed set | values |
+| --- | --- |
+| `emblem` | `orbit` · `arch` · `peak` · `split` · `quarter` · `stack` · `wave` · `grid` · `target` · `bloom` · `eclipse` · `chevron` · `bridge` · `tiles` · `beam` · `steps` |
+| `emblem_palette` | `bauhaus` · `ember` · `meadow` · `lagoon` · `dusk` · `citrus` · `orchid` · `granite` · `coral` · `glacier` |
 
 The forward-only migration creates one provider per distinct nonblank legacy
 provider value. It keeps the exact original text on every machine in

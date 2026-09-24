@@ -51,6 +51,7 @@ material value to understanding the decision.
 - [0019 – An installation key can be released explicitly](./0019-an-installation-key-can-be-released-explicitly.md)
 - [0020 – A provider is a record, and a VM inherits it](./0020-a-provider-is-a-record-and-a-vm-inherits-it.md)
 - [0021 – A machine has a picture from a closed set](./0021-a-machine-has-a-picture-from-a-closed-set.md)
+- [0022 – A provider has an emblem from a closed set](./0022-a-provider-has-an-emblem-from-a-closed-set.md)
 
 ## Adopted from planaffe
 

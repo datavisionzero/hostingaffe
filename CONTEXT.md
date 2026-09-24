@@ -111,6 +111,19 @@ leads to it. A provider used by any machine, including a deleted but restorable
 one, cannot be deleted. A provider may be restored; deletion does not make its
 key available again.
 
+`emblem` and `emblem_palette` are the provider's picture (ADR 0022): one of the
+geometric compositions the product ships with, in one of its palettes of three
+colours. They behave like a machine's `avatar` and `avatar_color` — optional,
+cleared by the empty word, and derived from the key on every read where they
+are missing, never stored. **An emblem is not an avatar:** the two sets share
+no word, and a machine is never drawn with an emblem nor a provider with an
+avatar.
+
+| closed set | values |
+|---|---|
+| `emblem` | `orbit` · `arch` · `peak` · `split` · `quarter` · `stack` · `wave` · `grid` · `target` · `bloom` · `eclipse` · `chevron` · `bridge` · `tiles` · `beam` · `steps` |
+| `emblem_palette` | `bauhaus` · `ember` · `meadow` · `lagoon` · `dusk` · `citrus` · `orchid` · `granite` · `coral` · `glacier` |
+
 ## Software
 
 What an installation is an installation of: `caddy`, `postgres`, `logaffe`. It
