@@ -26,7 +26,8 @@ const (
 "repository":"https://github.com/datavisionzero/logaffe","image":"ghcr.io/datavisionzero/logaffe",
 "description":"The log.",` + identities + `}`
 
-	providerJSON = `{"key":"hetzner","name":"Example Host","description":"A provider description.",` + identities + `}`
+	providerJSON = `{"key":"hetzner","name":"Example Host","description":"A provider description.",
+"emblem":"orbit","emblem_palette":"lagoon",` + identities + `}`
 
 	installationJSON = `{"key":"logaffe-prod","name":"Logaffe production","machine":"ex44","software":"logaffe",
 "environment":"production","role":"application","status":"active","urls":["https://logs.example.test"],
@@ -314,6 +315,36 @@ func TestAMachinesPictureIsChosenInWordsAndClearedByEmptiness(t *testing.T) {
 	body = map[string]any{}
 	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
 	if len(body) != 1 || body["avatar"] != "" {
+		t.Errorf("cleared body = %v", body)
+	}
+}
+
+// A provider's emblem is chosen in the words of its two closed sets, cleared by
+// the empty value, and printed by `view` in the same words (ADR 0022).
+func TestAProvidersEmblemIsChosenInWordsAndClearedByEmptiness(t *testing.T) {
+	f := records()
+	server := httptest.NewServer(f.handler())
+	defer server.Close()
+
+	code, stdout, stderr := run(t, server, "provider", "set", "hetzner", "--emblem", "orbit", "--emblem-palette", "lagoon")
+	if code != exit.OK {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	body := map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	if len(body) != 2 || body["emblem"] != "orbit" || body["emblem_palette"] != "lagoon" {
+		t.Errorf("body = %v", body)
+	}
+	if !strings.Contains(stdout, "orbit") || !strings.Contains(stdout, "lagoon") {
+		t.Errorf("view does not name the emblem:\n%s", stdout)
+	}
+
+	if code, _, _ := run(t, server, "provider", "set", "hetzner", "--emblem-palette", ""); code != exit.OK {
+		t.Fatal("code")
+	}
+	body = map[string]any{}
+	_ = json.Unmarshal([]byte(f.bodies[len(f.bodies)-1]), &body)
+	if len(body) != 1 || body["emblem_palette"] != "" {
 		t.Errorf("cleared body = %v", body)
 	}
 }

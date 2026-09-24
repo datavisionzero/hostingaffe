@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="var(--emblem-ground)" stroke="#000" stroke-opacity="0.08"/><path d="M10 52 A22 22 0 0 1 54 52 Z" fill="var(--emblem-a)"/><path d="M22 52 A10 10 0 0 1 42 52 Z" fill="var(--emblem-b)"/><circle cx="32" cy="16" r="5" fill="var(--emblem-b)"/></svg>

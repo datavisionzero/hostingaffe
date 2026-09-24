@@ -14,6 +14,7 @@ import { StatusBadge } from "./Parts";
 import type { DiagramFocus } from "./Diagram";
 import { findOnMap, mapDiagram, type MapMatch } from "./hostingMapData";
 import { MachineAvatar } from "./avatars/MachineAvatar";
+import { ProviderEmblem } from "./emblems/ProviderEmblem";
 
 type HostingMap = Schemas["HostingMap"];
 type Machine = Schemas["HostingMapMachine"];
@@ -121,8 +122,13 @@ function GroupedList({ map, id, shown, className }: { map: HostingMap; id: strin
   return <section id={id} aria-label="Providers and machines" hidden={!shown} className={cn("min-w-0 space-y-4", className)}>
     <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Providers and machines</h2>
     {map.providers.map((provider) => <div key={provider.key} className="rounded-lg border p-3">
-      <h3 className="font-semibold"><Link className="text-brand hover:underline" to={providerPath(provider.key)}>{provider.name}</Link></h3>
-      <p className="font-mono text-xs text-muted-foreground">{provider.key}</p>
+      <div className="flex items-center gap-3">
+        <ProviderEmblem provider={provider} size={36} />
+        <div className="min-w-0">
+          <h3 className="font-semibold"><Link className="text-brand hover:underline" to={providerPath(provider.key)}>{provider.name}</Link></h3>
+          <p className="font-mono text-xs text-muted-foreground">{provider.key}</p>
+        </div>
+      </div>
       {(under.get(provider.key) ?? []).length === 0
         ? <p className="mt-2 text-sm text-muted-foreground">No machines assigned.</p>
         : <ul className="mt-2">{under.get(provider.key)!.map((machine) => <MachineList key={machine.key} machine={machine} />)}</ul>}

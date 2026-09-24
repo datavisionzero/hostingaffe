@@ -1,10 +1,11 @@
 using Hostingaffe.Application.Ports;
 using Hostingaffe.Domain;
 using Hostingaffe.Domain.Machines;
+using Hostingaffe.Domain.Providers;
 
 namespace Hostingaffe.Application.Acts;
 
-public sealed record HostingMapProviderShape(string Key, string Name);
+public sealed record HostingMapProviderShape(string Key, string Name, Emblem? Emblem, EmblemPalette? EmblemPalette);
 
 public sealed record HostingMapMachineShape(
     string Key, string Name, MachineKind Kind, Status Status, string? Provider,
@@ -24,7 +25,8 @@ public sealed class ReadHostingMap(IProviders providers, IMachines machines)
         var effective = await machines.ProviderKeysAsync(machineRows.Select(machine => machine.Id), cancellationToken);
 
         return new HostingMapShape(
-            [.. providerRows.Select(provider => new HostingMapProviderShape(provider.Key, provider.Name))],
+            [.. providerRows.Select(provider => new HostingMapProviderShape(
+                provider.Key, provider.Name, provider.Emblem, provider.EmblemPalette))],
             [.. machineRows.Select(machine => new HostingMapMachineShape(
                 machine.Key, machine.Name, machine.Kind, machine.Status,
                 effective.GetValueOrDefault(machine.Id),

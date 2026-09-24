@@ -14,13 +14,21 @@ public sealed class ProviderConfiguration : IEntityTypeConfiguration<Provider>
 
     public void Configure(EntityTypeBuilder<Provider> builder)
     {
-        builder.ToTable("provider");
+        builder.ToTable("provider", table =>
+        {
+            table.HasCheckConstraint("ck_provider_emblem", SnakeCaseEnumConverter<Emblem>.Optional("emblem"));
+            table.HasCheckConstraint(
+                "ck_provider_emblem_palette", SnakeCaseEnumConverter<EmblemPalette>.Optional("emblem_palette"));
+        });
         builder.HasKey(p => p.Id).HasName("pk_provider");
         builder.Property(p => p.Id).HasColumnName("id");
         builder.Property(p => p.Key).HasColumnName("key").HasMaxLength(Key.MaxLength).IsRequired();
         builder.HasIndex(p => p.Key).IsUnique().HasDatabaseName("provider_key");
         builder.Property(p => p.Name).HasColumnName("name").HasMaxLength(Provider.NameMaxLength).IsRequired();
         builder.Property(p => p.Description).HasColumnName("description").HasDefaultValue(string.Empty).IsRequired();
+        builder.Property(p => p.Emblem).HasColumnName("emblem").HasConversion(new SnakeCaseEnumConverter<Emblem>());
+        builder.Property(p => p.EmblemPalette).HasColumnName("emblem_palette")
+            .HasConversion(new SnakeCaseEnumConverter<EmblemPalette>());
         builder.Property<string>("Letters").HasColumnName("letters").HasComputedColumnSql(Letters, stored: true);
         builder.HasIndex("Letters").HasMethod("GIN").HasOperators("gin_trgm_ops").HasDatabaseName("provider_letters");
         builder.Property<NpgsqlTsVector>("Search").HasColumnName("search")

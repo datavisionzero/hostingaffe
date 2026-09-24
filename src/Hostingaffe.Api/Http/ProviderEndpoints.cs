@@ -44,7 +44,7 @@ public static class ProviderEndpoints
                     change.ExecuteAsync(key, request ?? new ChangeProviderRequest(null, null),
                         http.Headers.IfMatch.ToString(), note, ct))
             .WithName("ChangeProvider")
-            .WithSummary("Change a provider's name or description, guarded by `If-Match` and recorded in history.")
+            .WithSummary("Change a provider's name, description or emblem, guarded by `If-Match` and recorded in history.")
             .Produces<ProviderShape>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);

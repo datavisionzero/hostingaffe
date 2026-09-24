@@ -12,6 +12,7 @@ import { Failed, Nothing, Section, Waiting } from "@/shared/Detail";
 import { stale } from "@/shared/stale";
 import { About, Asks, History, Row, Rows, StatusBadge } from "./Parts";
 import { machinePath, providerPath } from "./addresses";
+import { EmblemChooser } from "./emblems/EmblemChooser";
 
 type Provider = Schemas["Provider"];
 type MachineSummary = Schemas["MachineSummary"];
@@ -37,6 +38,7 @@ export function ProviderView() {
   return (
     <>
       <PageHeader title={<span className="flex min-w-0 flex-wrap items-center gap-2">
+        <EmblemChooser provider={provider} onWritten={() => { again(); history.again(); }} />
         <span className="font-mono text-xs font-normal text-muted-foreground">{provider.key}</span>
         {provider.name}
       </span>}>

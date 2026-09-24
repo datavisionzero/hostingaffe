@@ -57,6 +57,51 @@ public sealed class ProviderEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
     }
 
+    /// <summary>
+    /// A provider's emblem is two words of closed sets: written on creation,
+    /// read back on the provider, its list and the hosting map, named in the
+    /// history, cleared by the empty string, and refused outside its set
+    /// (ADR 0022).
+    /// </summary>
+    [Fact]
+    public async Task A_provider_is_given_an_emblem_and_can_lose_it_again()
+    {
+        await using var instance = await AnInstance.BootstrappedAsync(postgres);
+        using var admin = instance.ClientWith(AnInstance.BootstrapToken);
+
+        using var created = await admin.PostAsJsonAsync("/api/providers",
+            new { key = "example-host", emblem = "arch" }, Ct);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var written = await admin.PatchAsJsonAsync(
+            "/api/providers/example-host", new { emblem = "orbit", emblem_palette = "lagoon" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+        var provider = await written.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal("orbit", provider.GetProperty("emblem").GetString());
+        Assert.Equal("lagoon", provider.GetProperty("emblem_palette").GetString());
+
+        var list = await admin.GetFromJsonAsync<JsonElement>("/api/providers", Ct);
+        Assert.Equal("orbit", list[0].GetProperty("emblem").GetString());
+
+        var map = await admin.GetFromJsonAsync<JsonElement>("/api/hosting-map", Ct);
+        Assert.Equal("lagoon", map.GetProperty("providers")[0].GetProperty("emblem_palette").GetString());
+
+        var history = await admin.GetFromJsonAsync<JsonElement>("/api/providers/example-host/history", Ct);
+        var change = history.EnumerateArray().Last(one => one.GetProperty("field").GetString() == "emblem");
+        Assert.Equal("arch", change.GetProperty("old_value").GetString());
+        Assert.Equal("orbit", change.GetProperty("new_value").GetString());
+
+        using var refused = await admin.PatchAsJsonAsync("/api/providers/example-host", new { emblem_palette = "teal" }, Ct);
+        var problem = await Refusals.Problem(refused, HttpStatusCode.BadRequest, "validation");
+        Assert.Equal("emblem_palette", problem.GetProperty("errors").EnumerateObject().Single().Name);
+
+        using var cleared = await admin.PatchAsJsonAsync(
+            "/api/providers/example-host", new { emblem = "", emblem_palette = "" }, Ct);
+        var bare = await cleared.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal(JsonValueKind.Null, bare.GetProperty("emblem").ValueKind);
+        Assert.Equal(JsonValueKind.Null, bare.GetProperty("emblem_palette").ValueKind);
+    }
+
     [Fact]
     public async Task Machines_use_live_provider_keys_and_vms_inherit_through_their_hosts()
     {
