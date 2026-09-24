@@ -156,6 +156,20 @@
   --status-canceled: #585d58;
 }
 
+/*
+ * React Flow's controls bring colours of their own: a near-white button whose
+ * icon inherits the text colour, which in dark mode is white on white. They
+ * speak the tokens here instead, like every other button.
+ */
+.react-flow {
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--accent);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-color-hover: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-controls-box-shadow: 0 0 0 1px var(--border);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
